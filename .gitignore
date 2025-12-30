@@ -1,7 +1,8 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# dependencies (frontend y backend)
 node_modules/
+londoncafe-api/node_modules/
 
 # Expo
 .expo/
@@ -30,7 +31,7 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (frontend)
 .env*.local
 
 # typescript
@@ -39,7 +40,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-
 
 # Expo shared
 .expo-shared/
@@ -55,11 +55,14 @@ yarn-error.log*
 .idea/
 *.iml
 
-# Entornos locales
+# Entornos locales (general)
 .env
 .env.*.local
+
+# Entornos locales backend
+londoncafe-api/.env
+londoncafe-api/.env.*.local
 
 # Sistema (Windows)
 Thumbs.db
 desktop.ini
-
