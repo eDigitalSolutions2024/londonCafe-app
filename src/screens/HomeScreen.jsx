@@ -1,72 +1,93 @@
-import React from 'react';
+import React, { useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { colors } from '../theme/colors';
+import Screen from '../components/Screen';
+import { apiFetch } from '../api/client'; 
+import { AuthContext } from "../context/AuthContext";
 
 export default function HomeScreen({ navigation }) {
+  const { signOut } = useContext(AuthContext);
+  useEffect(() => {
+    apiFetch("/health")
+      .then((d) => console.log("✅ HEALTH OK:", d))
+      .catch((e) => console.log("❌ HEALTH ERROR:", e?.data || e.message));
+  }, []);
   return (
-    <ScrollView style={styles.container}>
-      {/* Hero */}
-      <View style={styles.hero}>
-        <View style={styles.heroTextBox}>
-          <Text style={styles.subtitle}>Bienvenido a</Text>
-          <Text style={styles.title}>LondonCafe</Text>
-          <Text style={styles.description}>
-            Café de especialidad, postres y el mejor ambiente para relajarte o trabajar.
-          </Text>
-          <TouchableOpacity
-            style={styles.heroButton}
-            onPress={() => navigation.navigate('Menu')}
-          >
-            <Text style={styles.heroButtonText}>Ver menú</Text>
-          </TouchableOpacity>
+    <Screen>
+      <ScrollView style={styles.container}>
+        {/* Hero */}
+        <View style={styles.hero}>
+          <View style={styles.heroTextBox}>
+            <Text style={styles.subtitle}>Bienvenido a</Text>
+            <Text style={styles.title}>LondonCafe</Text>
+            <Text style={styles.description}>
+              Café de especialidad, postres y el mejor ambiente para relajarte o trabajar.
+            </Text>
+            <TouchableOpacity
+              style={styles.heroButton}
+              onPress={() => navigation.navigate('Menu')}
+            >
+              <Text style={styles.heroButtonText}>Ver menú</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Si luego quieres, aquí va el logo o una imagen de café */}
+          {/* <Image source={require('../../assets/coffee.png')} style={styles.heroImage} /> */}
         </View>
 
-        {/* Si luego quieres, aquí va el logo o una imagen de café */}
-        {/* <Image source={require('../../assets/coffee.png')} style={styles.heroImage} /> */}
-      </View>
+        {/* Sección rápida de accesos */}
+        <View style={styles.quickActions}>
+          <Text style={styles.sectionTitle}>¿Qué quieres hacer hoy?</Text>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('Menu')}
+            >
+              <Text style={styles.actionTitle}>Menú</Text>
+              <Text style={styles.actionSubtitle}>Bebidas & postres</Text>
+            </TouchableOpacity>
 
-      {/* Sección rápida de accesos */}
-      <View style={styles.quickActions}>
-        <Text style={styles.sectionTitle}>¿Qué quieres hacer hoy?</Text>
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate('Menu')}
-          >
-            <Text style={styles.actionTitle}>Menú</Text>
-            <Text style={styles.actionSubtitle}>Bebidas & postres</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.heroButton, { backgroundColor: "#2a2a33" }]}
+              onPress={signOut}
+            >
+              <Text style={styles.heroButtonText}>Cerrar sesión</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate('Promos')}
-          >
-            <Text style={styles.actionTitle}>Promos</Text>
-            <Text style={styles.actionSubtitle}>Ofertas del día</Text>
-          </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('Promos')}
+            >
+              <Text style={styles.actionTitle}>Promos</Text>
+              <Text style={styles.actionSubtitle}>Ofertas del día</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('Ubicación')}
+            >
+              <Text style={styles.actionTitle}>Ubicación</Text>
+              <Text style={styles.actionSubtitle}>¿Cómo llegar?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionCardDisabled}
+              disabled
+            >
+              <Text style={styles.actionTitle}>Ordenar</Text>
+              <Text style={styles.actionSubtitle}>Próximamente</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={styles.actionCard}
-            onPress={() => navigation.navigate('Ubicación')}
-          >
-            <Text style={styles.actionTitle}>Ubicación</Text>
-            <Text style={styles.actionSubtitle}>¿Cómo llegar?</Text>
-          </TouchableOpacity>
+      </ScrollView>
+    </Screen>
 
-          <TouchableOpacity
-            style={styles.actionCardDisabled}
-            disabled
-          >
-            <Text style={styles.actionTitle}>Ordenar</Text>
-            <Text style={styles.actionSubtitle}>Próximamente</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
-    </ScrollView>
-  );
+    );
 }
 
 const styles = StyleSheet.create({

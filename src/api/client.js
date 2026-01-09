@@ -1,11 +1,22 @@
-// ⚠️ CAMBIA ESTA IP por la de tu PC en la red local
-// Si estás probando en el navegador (Expo web) puedes usar "http://localhost:4000"
-const API_BASE = "http://192.168.1.90:4000"; 
+const BASE_URL = "http://192.168.1.91:3001/api";
 
-export async function getMenu() {
-  const res = await fetch(`${API_BASE}/api/menu`);
+export async function apiFetch(path, options = {}) {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+    ...options,
+  });
+
+  const data = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    throw new Error("Error al cargar el menú");
+    const err = new Error(data?.error || "REQUEST_FAILED");
+    err.status = res.status;
+    err.data = data;
+    throw err;
   }
-  return res.json();
+
+  return data;
 }
