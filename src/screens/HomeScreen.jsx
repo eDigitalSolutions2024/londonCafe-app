@@ -1,6 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { colors } from '../theme/colors';
+import AvatarWidget from "../components/AvatarWidget";
+import PointsStepperBar from "../components/PointsStepperBar";
+
 
 export default function HomeScreen({ navigation }) {
   return (
@@ -13,12 +16,32 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.description}>
             Café de especialidad, postres y el mejor ambiente para relajarte o trabajar.
           </Text>
-          <TouchableOpacity
-            style={styles.heroButton}
-            onPress={() => navigation.navigate('Menu')}
-          >
-            <Text style={styles.heroButtonText}>Ver menú</Text>
-          </TouchableOpacity>
+        </View>
+        <View style={{ marginTop: 14 }}>
+        <AvatarWidget
+          name="London Buddy"
+          mood="Con energía"
+          energy={80}
+          avatarConfig={{
+            skin: "skin_01",
+            hair: "hair_01",
+            top: "top_01",
+            bottom: "bottom_01",
+            shoes: "shoes_01",
+            accessory: null,
+          }}
+          onFeedCoffee={() => console.log("Dar café")}
+          onFeedBread={() => console.log("Dar pan")}
+          />
+          <PointsStepperBar
+            points={68}
+            maxPoints={200}
+            steps={[50, 100, 150, 200]}
+            title="Puntos"
+            subtitle="Rewards"
+          />
+
+
         </View>
 
         {/* Si luego quieres, aquí va el logo o una imagen de café */}
