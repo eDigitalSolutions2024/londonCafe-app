@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { colors } from '../theme/colors';
 import { getMenu } from '../api/client';
+import Screen from '../components/Screen';
+
 
 export default function MenuScreen() {
   const [menu, setMenu] = useState([]);
@@ -36,22 +38,24 @@ export default function MenuScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Menú LondonCafe</Text>
+    <Screen>
+      <ScrollView style={styles.container}>
+        <Text style={styles.title}>Menú LondonCafe</Text>
 
-      {menu.map(category => (
-        <View key={category.id} style={styles.categoryBlock}>
-          <Text style={styles.categoryTitle}>{category.name}</Text>
+        {menu.map(category => (
+          <View key={category.id} style={styles.categoryBlock}>
+            <Text style={styles.categoryTitle}>{category.name}</Text>
 
-          {category.items.map(item => (
-            <View key={item.id} style={styles.itemRow}>
-              <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={styles.itemPrice}>${item.price}</Text>
-            </View>
-          ))}
-        </View>
-      ))}
-    </ScrollView>
+            {category.items.map(item => (
+              <View key={item.id} style={styles.itemRow}>
+                <Text style={styles.itemName}>{item.name}</Text>
+                <Text style={styles.itemPrice}>${item.price}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
+      </ScrollView>
+    </Screen>
   );
 }
 
