@@ -5,6 +5,7 @@ import Screen from '../components/Screen';
 import { apiFetch } from '../api/client';
 import { AuthContext } from "../context/AuthContext";
 
+//Test
 // Avatar + puntos
 import AvatarWidget from "../components/AvatarWidget";
 import PointsStepperBar from "../components/PointsStepperBar";
