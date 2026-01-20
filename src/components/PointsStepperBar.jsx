@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { colors } from "../theme/colors";
-
+import { appStyles } from "../theme/styles";
 /**
  * Barra tipo "stepper" como la imagen:
  * - ticks en 25 / 50 / 75 / 100 (o lo que definas)
@@ -89,11 +89,7 @@ export default function PointsStepperBar({
 const styles = StyleSheet.create({
   card: {
     marginTop: 14,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
+    ...appStyles.card,
   },
 
   header: {
@@ -106,12 +102,12 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 30,
     fontWeight: "800",
-    lineHeight: 32,
+    lineHeight: 36,
   },
   star: {
-    color: colors.accent,
+    color: colors.primary, // 👈 ginda
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "900",
   },
   smallLabel: {
     marginTop: 2,
@@ -120,22 +116,22 @@ const styles = StyleSheet.create({
   },
 
   pill: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: "#121218",
-  },
-  pillText: {
-    color: colors.accent,
-    fontWeight: "700",
-    fontSize: 12,
-  },
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: colors.primary,
+  paddingHorizontal: 14,
+  paddingVertical: 7,
+  backgroundColor: "#FFFFFF", // 👈 fondo blanco
+},
+pillText: {
+  color: colors.primary,      // 👈 ginda
+  fontWeight: "700",
+  fontSize: 12,
+},
 
   barWrap: {
     position: "relative",
-    height: 54,
+    height: 58,
     justifyContent: "center",
   },
 
@@ -143,50 +139,46 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 6,
     right: 6,
-    height: 6,
+    height: 8,
     borderRadius: 999,
-    backgroundColor: "#221c27",
-    borderWidth: 1,
-    borderColor: "#2f2633",
+    backgroundColor: colors.primarySoft,
   },
   fill: {
     position: "absolute",
     left: 6,
-    height: 6,
+    height: 8,
     borderRadius: 999,
     backgroundColor: colors.primary,
   },
 
-  // Pin (marcador)
   pinWrap: {
     position: "absolute",
-    top: 2,
+    top: 0,
     transform: [{ translateX: -8 }],
     alignItems: "center",
   },
   pin: {
     width: 2,
     height: 16,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.primary,
     borderRadius: 999,
     opacity: 0.9,
   },
   pinDot: {
     marginTop: 2,
-    width: 10,
-    height: 10,
+    width: 12,
+    height: 12,
     borderRadius: 999,
-    backgroundColor: colors.accent,
-    borderWidth: 2,
-    borderColor: "#121218",
+    backgroundColor: colors.primary,
+    borderWidth: 3,
+    borderColor: "#fff",
   },
 
-  // Steps
   stepsRow: {
     position: "absolute",
     left: 6,
     right: 6,
-    top: 22,
+    top: 26,
     height: 28,
   },
   stepItem: {
@@ -198,13 +190,12 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 999,
-    backgroundColor: "#2f2633",
-    borderWidth: 1,
-    borderColor: "#3b2a35",
+    backgroundColor: "#D9D9D9",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   stepDotActive: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primarySoft,
+    backgroundColor: colors.primary,
   },
   stepText: {
     marginTop: 6,
@@ -214,7 +205,7 @@ const styles = StyleSheet.create({
 
   hint: {
     marginTop: 10,
-    fontSize: 11,
+    fontSize: 12,
     color: colors.textMuted,
   },
 });

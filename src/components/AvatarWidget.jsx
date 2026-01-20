@@ -1,9 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { colors } from "../theme/colors";
+import { appStyles } from "../theme/styles";
 import AvatarPreview from "./AvatarPreview";
-
-
 
 export default function AvatarWidget({
   name = "Tu avatar",
@@ -20,32 +19,42 @@ export default function AvatarWidget({
   onFeedCoffee = () => {},
   onFeedBread = () => {},
 }) {
+  const energyPct = Math.max(0, Math.min(100, energy));
 
   return (
     <View style={styles.card}>
+      {/* Lado izquierdo: Avatar */}
       <View style={styles.left}>
-        {/* Preview 2D (placeholder por ahora) */}
         <View style={styles.avatarBox}>
-        <View style={styles.avatarCircle}>
-        <AvatarPreview config={avatarConfig} size={74} />
-        </View>
+          <View style={styles.avatarCircle}>
+            <AvatarPreview config={avatarConfig} size={72} />
+          </View>
 
           <Text style={styles.avatarName}>{name}</Text>
           <Text style={styles.avatarMood}>{mood}</Text>
         </View>
       </View>
 
+      {/* Lado derecho: Energía + acciones */}
       <View style={styles.right}>
         <Text style={styles.label}>Energía</Text>
+
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(100, energy))}%` }]} />
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${energyPct}%` },
+            ]}
+          />
         </View>
-        <Text style={styles.energyText}>{energy}%</Text>
+
+        <Text style={styles.energyText}>{energyPct}%</Text>
 
         <View style={styles.actions}>
           <Pressable onPress={onFeedCoffee} style={styles.actionBtn}>
             <Text style={styles.actionText}>Dar café</Text>
           </Pressable>
+
           <Pressable onPress={onFeedBread} style={styles.actionBtnOutline}>
             <Text style={styles.actionTextOutline}>Dar pan</Text>
           </Pressable>
@@ -60,61 +69,117 @@ export default function AvatarWidget({
 }
 
 const styles = StyleSheet.create({
+  /* Card principal */
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border ?? "#3b2a35",
-    backgroundColor: colors.card ?? "#121018",
-    padding: 14,
+    ...appStyles.card,
     flexDirection: "row",
-    gap: 12,
+    gap: 14,
   },
-  left: { width: 120, justifyContent: "center" },
-  right: { flex: 1, justifyContent: "center" },
 
-  avatarBox: { alignItems: "center", gap: 6 },
+  left: {
+    width: 120,
+    justifyContent: "center",
+  },
+
+  right: {
+    flex: 1,
+    justifyContent: "center",
+  },
+
+  /* Avatar */
+  avatarBox: {
+    alignItems: "center",
+    gap: 6,
+  },
+
   avatarCircle: {
     width: 78,
     height: 78,
     borderRadius: 39,
-    backgroundColor: colors.primary ?? "#7b1f3a",
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden", // 👈 agrega esto
-  },
-  avatarEmoji: { fontSize: 28 },
-  avatarName: { color: colors.text ?? "#fff", fontWeight: "700" },
-  avatarMood: { color: colors.textMuted ?? "#c7c7c7", fontSize: 12 },
-
-  label: { color: colors.textMuted ?? "#c7c7c7", fontSize: 12, marginBottom: 6 },
-  progressTrack: {
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: "#221c27",
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#2f2633",
   },
-  progressFill: { height: "100%", backgroundColor: colors.primary ?? "#7b1f3a" },
-  energyText: { color: colors.text ?? "#fff", marginTop: 6, fontWeight: "700" },
 
-  actions: { flexDirection: "row", gap: 10, marginTop: 10 },
+  avatarName: {
+  color: colors.text,
+  fontWeight: "800",
+}
+,
+
+  avatarMood: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+
+  /* Energía */
+  label: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginBottom: 6,
+  },
+
+  progressTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: colors.primarySoft,
+    overflow: "hidden",
+  },
+
+  progressFill: {
+    height: "100%",
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+  },
+
+  energyText: {
+    color: colors.text,
+    marginTop: 6,
+    fontWeight: "800",
+  },
+
+  /* Botones */
+  actions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+
   actionBtn: {
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: colors.primary ?? "#7b1f3a",
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
   },
-  actionText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+
+  actionText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 12,
+  },
 
   actionBtnOutline: {
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingHorizontal: 16,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.primary ?? "#7b1f3a",
+    borderColor: colors.primary,
+    backgroundColor: "#fff",
   },
-  actionTextOutline: { color: colors.text ?? "#fff", fontWeight: "700", fontSize: 12 },
 
-  hint: { color: colors.textMuted ?? "#c7c7c7", fontSize: 11, marginTop: 10, lineHeight: 14 },
+  actionTextOutline: {
+    color: colors.primary,
+    fontWeight: "800",
+    fontSize: 12,
+  },
+
+  hint: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 10,
+    lineHeight: 14,
+  },
 });

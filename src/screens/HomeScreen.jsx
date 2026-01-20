@@ -27,16 +27,7 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.heroTextBox}>
             <Text style={styles.subtitle}>Bienvenido a</Text>
             <Text style={styles.title}>LondonCafe</Text>
-            <Text style={styles.description}>
-              Café de especialidad, postres y el mejor ambiente para relajarte o trabajar.
-            </Text>
 
-            <TouchableOpacity
-              style={styles.heroButton}
-              onPress={() => navigation.navigate('Menu')}
-            >
-              <Text style={styles.heroButtonText}>Ver menú</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Avatar + Puntos */}
@@ -67,55 +58,60 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Sección rápida de accesos */}
-        <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>¿Qué quieres hacer hoy?</Text>
+    
+        {/* Promociones (default por ahora) */}
+          <View style={styles.promosSection}>
+            <View style={styles.promosHeader}>
+              <Text style={styles.sectionTitle}>Promociones</Text>
+              <Text style={styles.sectionHint}>Novedades de LondonCafe</Text>
+            </View>
 
-          {/* ✅ Responsive: flexWrap para que no se rompa en pantallas chicas */}
-          <View style={styles.actionsRow}>
+            {/* Card 1 */}
             <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => navigation.navigate('Menu')}
+              style={styles.promoCard}
+              onPress={() => navigation.navigate("Promos")}
+              activeOpacity={0.9}
             >
-              <Text style={styles.actionTitle}>Menú</Text>
-              <Text style={styles.actionSubtitle}>Bebidas & postres</Text>
+              <View style={styles.promoTopRow}>
+                <Text style={styles.promoBadge}>HOY</Text>
+                <Text style={styles.promoTag}>⭐ Puntos x2</Text>
+              </View>
+              <Text style={styles.promoTitle}>Doble puntos en bebidas calientes</Text>
+              <Text style={styles.promoDesc}>Acumula más rápido y canjea por productos gratis.</Text>
+              <Text style={styles.promoFoot}>Válido de 4:00 pm a 8:00 pm</Text>
             </TouchableOpacity>
 
+            {/* Card 2 */}
             <TouchableOpacity
-              style={styles.actionCardSecondary}
-              onPress={signOut}
+              style={styles.promoCard}
+              onPress={() => navigation.navigate("Promos")}
+              activeOpacity={0.9}
             >
-              <Text style={styles.actionTitle}>Cerrar sesión</Text>
-              <Text style={styles.actionSubtitle}>Salir</Text>
+              <View style={styles.promoTopRow}>
+                <Text style={styles.promoBadge}>NUEVO</Text>
+                <Text style={styles.promoTag}>☕ + 🍪</Text>
+              </View>
+              <Text style={styles.promoTitle}>Combo café + snack</Text>
+              <Text style={styles.promoDesc}>Elige cualquier café del día y un snack seleccionado.</Text>
+              <Text style={styles.promoFoot}>Pregunta en barra por el combo</Text>
             </TouchableOpacity>
 
+            {/* Card 3 */}
             <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => navigation.navigate('Promos')}
+              style={styles.promoCard}
+              onPress={() => navigation.navigate("Promos")}
+              activeOpacity={0.9}
             >
-              <Text style={styles.actionTitle}>Promos</Text>
-              <Text style={styles.actionSubtitle}>Ofertas del día</Text>
+              <View style={styles.promoTopRow}>
+                <Text style={styles.promoBadge}>WEEK</Text>
+                <Text style={styles.promoTag}>🎉 Evento</Text>
+              </View>
+              <Text style={styles.promoTitle}>Tarde de juegos / comunidad</Text>
+              <Text style={styles.promoDesc}>Ven con amigos, café y buena vibra (cupos limitados).</Text>
+              <Text style={styles.promoFoot}>Revisa horarios en Promos</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={styles.actionCard}
-              onPress={() => navigation.navigate('Ubicación')}
-            >
-              <Text style={styles.actionTitle}>Ubicación</Text>
-              <Text style={styles.actionSubtitle}>¿Cómo llegar?</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCardDisabled}
-              disabled
-            >
-              <Text style={styles.actionTitle}>Ordenar</Text>
-              <Text style={styles.actionSubtitle}>Próximamente</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
     </Screen>
   );
@@ -135,10 +131,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   subtitle: {
-    color: colors.accent,
-    fontSize: 14,
-    letterSpacing: 1,
+    color: colors.textMuted,   // 👈 ya no dorado
+    fontSize: 12,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
+    marginBottom: 2,
   },
   title: {
     color: colors.text,
@@ -224,13 +221,86 @@ const styles = StyleSheet.create({
   },
 
   actionTitle: {
-    color: colors.accent,
+    color: colors.text,
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
+    fontWeight: "700",
+  }
+,
   actionSubtitle: {
     color: colors.textMuted,
     fontSize: 12,
   },
+  promosSection: {
+  paddingHorizontal: 20,
+  paddingBottom: 24,
+},
+
+promosHeader: {
+  marginBottom: 12,
+},
+
+sectionHint: {
+  marginTop: 2,
+  fontSize: 12,
+  color: colors.textMuted,
+},
+
+promoCard: {
+  backgroundColor: colors.card,
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+  marginBottom: 12,
+  shadowColor: "#000",
+  shadowOpacity: 0.08,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 2,
+},
+
+promoTopRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 10,
+},
+
+promoBadge: {
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 999,
+  backgroundColor: "#FFFFFF",
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+  color: colors.primary,
+  fontSize: 11,
+  fontWeight: "800",
+  letterSpacing: 0.4,
+},
+
+promoTag: {
+  color: colors.primary,
+  fontWeight: "700",
+  fontSize: 12,
+},
+
+promoTitle: {
+  color: colors.text,
+  fontSize: 16,
+  fontWeight: "800",
+  marginBottom: 4,
+},
+
+promoDesc: {
+  color: colors.textMuted,
+  fontSize: 12,
+  lineHeight: 16,
+},
+
+promoFoot: {
+  marginTop: 10,
+  color: colors.textMuted,
+  fontSize: 11,
+},
 });

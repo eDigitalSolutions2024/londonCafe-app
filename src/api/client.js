@@ -1,4 +1,4 @@
-const BASE_URL = "http://192.168.1.91:3001/api";
+const BASE_URL = "http://10.0.2.2:3001/api";
 
 export async function apiFetch(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
