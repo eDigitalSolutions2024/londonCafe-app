@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { colors } from "../theme/colors";
 import { appStyles } from "../theme/styles";
@@ -18,17 +18,35 @@ export default function AvatarWidget({
   },
   onFeedCoffee = () => {},
   onFeedBread = () => {},
+
+  // ✅ NUEVO: doble tap en avatar
+  onAvatarDoubleTap = () => {},
 }) {
   const energyPct = Math.max(0, Math.min(100, energy));
+
+  // ✅ Doble tap (double click) para móvil
+  const lastTapRef = useRef(0);
+  const DOUBLE_TAP_DELAY = 280;
+
+  const handleAvatarTap = () => {
+    const now = Date.now();
+    if (lastTapRef.current && now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      lastTapRef.current = 0;
+      onAvatarDoubleTap?.();
+      return;
+    }
+    lastTapRef.current = now;
+  };
 
   return (
     <View style={styles.card}>
       {/* Lado izquierdo: Avatar */}
       <View style={styles.left}>
         <View style={styles.avatarBox}>
-          <View style={styles.avatarCircle}>
+          {/* ✅ SOLO el avatar tiene doble tap */}
+          <Pressable onPress={handleAvatarTap} style={styles.avatarCircle}>
             <AvatarPreview config={avatarConfig} size={72} />
-          </View>
+          </Pressable>
 
           <Text style={styles.avatarName}>{name}</Text>
           <Text style={styles.avatarMood}>{mood}</Text>
@@ -40,12 +58,7 @@ export default function AvatarWidget({
         <Text style={styles.label}>Energía</Text>
 
         <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${energyPct}%` },
-            ]}
-          />
+          <View style={[styles.progressFill, { width: `${energyPct}%` }]} />
         </View>
 
         <Text style={styles.energyText}>{energyPct}%</Text>
@@ -105,10 +118,9 @@ const styles = StyleSheet.create({
   },
 
   avatarName: {
-  color: colors.text,
-  fontWeight: "800",
-}
-,
+    color: colors.text,
+    fontWeight: "800",
+  },
 
   avatarMood: {
     color: colors.textMuted,

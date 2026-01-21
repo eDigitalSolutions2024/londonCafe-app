@@ -1,5 +1,6 @@
 import React, { useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+
 import { colors } from '../theme/colors';
 import Screen from '../components/Screen';
 import { apiFetch } from '../api/client';
@@ -24,11 +25,24 @@ export default function HomeScreen({ navigation }) {
       <ScrollView style={styles.container}>
         {/* Hero */}
         <View style={styles.hero}>
-          <View style={styles.heroTextBox}>
-            <Text style={styles.subtitle}>Bienvenido a</Text>
-            <Text style={styles.title}>LondonCafe</Text>
+          <View style={styles.heroHeader}>
+  <View style={styles.heroTextBox}>
+    <Text style={styles.subtitle}>Bienvenido a</Text>
 
-          </View>
+    <View style={styles.titleRow}>
+      <Text style={styles.title}>LondonCafe</Text>
+
+      <TouchableOpacity
+        onPress={signOut}
+        activeOpacity={0.85}
+        style={styles.logoutBtn}
+      >
+        <Text style={styles.logoutText}>Salir</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</View>
+
 
           {/* Avatar + Puntos */}
           <View style={styles.avatarSection}>
@@ -46,6 +60,7 @@ export default function HomeScreen({ navigation }) {
               }}
               onFeedCoffee={() => console.log("Dar café")}
               onFeedBread={() => console.log("Dar pan")}
+              onAvatarDoubleTap={() => navigation.navigate("AccountSettings")}
             />
 
             <PointsStepperBar
@@ -142,6 +157,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     marginTop: 4,
+    flex: 1,
   },
   description: {
     color: colors.textMuted,
@@ -303,4 +319,31 @@ promoFoot: {
   color: colors.textMuted,
   fontSize: 11,
 },
+
+heroHeader: {
+  marginBottom: 16,
+},
+
+titleRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+},
+
+logoutBtn: {
+  paddingVertical: 8,
+  paddingHorizontal: 12,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+  backgroundColor: "transparent",
+},
+
+logoutText: {
+  color: colors.textMuted,
+  fontSize: 12,
+  fontWeight: "800",
+},
+
 });
