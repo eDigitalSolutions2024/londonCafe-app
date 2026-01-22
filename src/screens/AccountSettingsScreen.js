@@ -1,34 +1,120 @@
-import React, { useContext, useState } from "react";
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView } from "react-native";
+import React, { useContext, useEffect, useState, useCallback } from "react";
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Alert } from "react-native";
 import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
 import AvatarPreview from "../components/AvatarPreview";
+import { apiFetch } from "../api/client";
 
 export default function AccountSettingsScreen({ navigation }) {
-  const { signOut, user } = useContext(AuthContext);
+  const { signOut, token } = useContext(AuthContext);
 
-  // UI local (luego lo conectamos a backend)
-  const [fullName, setFullName] = useState(user?.name || "");
-  const [username, setUsername] = useState(user?.username || "");
-  const [email, setEmail] = useState(user?.email || "");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
+  // perfil
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+
+  // seguridad (pendiente backend)
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
-  // ✅ Avatar actual (de momento local / o desde user.avatarConfig si ya lo tienes)
-  const [avatarConfig] = useState(
-    user?.avatarConfig || {
-      skin: "skin_01",
-      hair: "hair_01",
-      top: "top_01",
-      bottom: "bottom_01",
-      shoes: "shoes_01",
-      accessory: null,
-    }
-  );
+  // avatar
+  const [avatarConfig, setAvatarConfig] = useState({
+    skin: "skin_01",
+    hair: "hair_01",
+    top: "top_01",
+    bottom: "bottom_01",
+    shoes: "shoes_01",
+    accessory: null,
+  });
 
-  const onSave = () => {
-    console.log("Guardar cambios:", { fullName, username, email, currentPassword, newPassword, avatarConfig });
+  const authHeaders = token
+    ? { Authorization: `Bearer ${token}` }
+    : {};
+
+  const loadMe = useCallback(async () => {
+    try {
+      setLoading(true);
+      const r = await apiFetch("/me", { headers: authHeaders });
+      const u = r?.user;
+
+      setFullName(u?.name || "");
+      setUsername(u?.username || "");
+      setEmail(u?.email || "");
+      setAvatarConfig(u?.avatarConfig || {
+        skin: "skin_01",
+        hair: "hair_01",
+        top: "top_01",
+        bottom: "bottom_01",
+        shoes: "shoes_01",
+        accessory: null,
+      });
+    } catch (e) {
+      console.log("❌ loadMe:", e?.data || e?.message);
+      Alert.alert("Error", "No se pudo cargar tu perfil.");
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadMe();
+  }, [loadMe]);
+
+  const onSave = async () => {
+    try {
+      setSaving(true);
+
+      // 1) Perfil
+      await apiFetch("/me", {
+        method: "PUT",
+        headers: authHeaders,
+        body: JSON.stringify({
+          name: fullName,
+          username,
+          email,
+        }),
+      });
+
+      // 2) Avatar
+      await apiFetch("/me/avatar", {
+        method: "PUT",
+        headers: authHeaders,
+        body: JSON.stringify({
+          avatarConfig,
+        }),
+      });
+
+      // 3) Password (todavía no hay endpoint)
+      if ((currentPassword && !newPassword) || (!currentPassword && newPassword)) {
+        Alert.alert("Aviso", "Para cambiar contraseña, llena ambos campos.");
+      } else if (currentPassword && newPassword) {
+        Alert.alert(
+          "Pendiente",
+          "Aún falta crear el endpoint para cambiar contraseña en el backend."
+        );
+      }
+
+      Alert.alert("Listo", "Cambios guardados ✅");
+      setCurrentPassword("");
+      setNewPassword("");
+      await loadMe();
+    } catch (e) {
+      console.log("❌ save:", e?.data || e?.message);
+
+      // errores típicos del backend
+      if (e?.status === 401) return Alert.alert("Sesión", "Tu sesión expiró. Inicia de nuevo.");
+      if (e?.status === 409) return Alert.alert("Duplicado", "Ese usuario o correo ya existe.");
+      if (e?.status === 400 && e?.data?.error === "BAD_USERNAME") {
+        return Alert.alert("Usuario inválido", "Usa 3-20 caracteres: letras, números o _");
+      }
+
+      Alert.alert("Error", "No se pudieron guardar los cambios.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -79,8 +165,11 @@ export default function AccountSettingsScreen({ navigation }) {
           style={styles.input}
         />
 
-        {/* ✅ Preview del avatar actual */}
-        <View style={styles.avatarPreviewRow}>
+        {/* Preview del avatar */}
+        <Pressable
+          onPress={() => navigation.navigate("AvatarCustomize", { avatarConfig })}
+          style={styles.avatarPreviewRow}
+        >
           <View style={styles.avatarCircle}>
             <AvatarPreview config={avatarConfig} size={56} />
           </View>
@@ -89,17 +178,17 @@ export default function AccountSettingsScreen({ navigation }) {
             <Text style={styles.avatarTitle}>Tu avatar</Text>
             <Text style={styles.avatarHint}>Toca para cambiar cabello, ropa y más.</Text>
           </View>
-        </View>
+        </Pressable>
 
         <Pressable
-          onPress={() => navigation.navigate("AvatarCustomize")}
+          onPress={() => navigation.navigate("AvatarCustomize", { avatarConfig })}
           style={styles.secondaryBtn}
         >
           <Text style={styles.secondaryBtnText}>Personalizar avatar</Text>
         </Pressable>
       </View>
 
-      {/* Card: Seguridad */}
+      {/* Card: Seguridad (UI lista, backend pendiente) */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Seguridad</Text>
 
@@ -124,40 +213,26 @@ export default function AccountSettingsScreen({ navigation }) {
         />
       </View>
 
-      <Pressable onPress={onSave} style={styles.primaryBtn}>
-        <Text style={styles.primaryBtnText}>Guardar cambios</Text>
+      <Pressable
+        onPress={onSave}
+        style={[styles.primaryBtn, (saving || loading) && { opacity: 0.7 }]}
+        disabled={saving || loading}
+      >
+        <Text style={styles.primaryBtnText}>
+          {saving ? "Guardando..." : "Guardar cambios"}
+        </Text>
       </Pressable>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 28,
-  },
+  wrap: { flex: 1, backgroundColor: colors.background },
+  content: { padding: 20, paddingBottom: 28 },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 16,
-  },
-
-  title: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  sub: {
-    marginTop: 4,
-    color: colors.textMuted,
-    fontSize: 12,
-  },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
+  title: { color: colors.text, fontSize: 22, fontWeight: "900" },
+  sub: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
 
   logoutBtn: {
     paddingVertical: 10,
@@ -167,11 +242,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primarySoft,
     backgroundColor: colors.card,
   },
-  logoutText: {
-    color: colors.primary,
-    fontWeight: "800",
-    fontSize: 12,
-  },
+  logoutText: { color: colors.primary, fontWeight: "800", fontSize: 12 },
 
   card: {
     backgroundColor: colors.card,
@@ -181,19 +252,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primarySoft,
     marginBottom: 12,
   },
-  cardTitle: {
-    color: colors.text,
-    fontWeight: "900",
-    fontSize: 14,
-    marginBottom: 10,
-  },
+  cardTitle: { color: colors.text, fontWeight: "900", fontSize: 14, marginBottom: 10 },
 
-  label: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginBottom: 6,
-    marginTop: 8,
-  },
+  label: { color: colors.textMuted, fontSize: 12, marginBottom: 6, marginTop: 8 },
   input: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
@@ -205,7 +266,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // ✅ Avatar preview
   avatarPreviewRow: {
     marginTop: 12,
     flexDirection: "row",
@@ -228,16 +288,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primarySoft,
   },
-  avatarTitle: {
-    color: "#111",
-    fontWeight: "900",
-    fontSize: 13,
-  },
-  avatarHint: {
-    marginTop: 2,
-    color: "#666",
-    fontSize: 11,
-  },
+  avatarTitle: { color: "#111", fontWeight: "900", fontSize: 13 },
+  avatarHint: { marginTop: 2, color: "#666", fontSize: 11 },
 
   secondaryBtn: {
     marginTop: 12,
@@ -248,11 +300,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     alignItems: "center",
   },
-  secondaryBtnText: {
-    color: colors.primary,
-    fontWeight: "900",
-    fontSize: 13,
-  },
+  secondaryBtnText: { color: colors.primary, fontWeight: "900", fontSize: 13 },
 
   primaryBtn: {
     marginTop: 10,
@@ -261,9 +309,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: "center",
   },
-  primaryBtnText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 14,
-  },
+  primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 });

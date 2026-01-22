@@ -26,6 +26,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/menu", menuRoutes);
 app.use("/api/promos", promoRoutes);
 app.use("/api/branches", branchRoutes);
+app.use("/api", require("./routes/me.routes"));
+
 
 const PORT = process.env.PORT || 4000;
 

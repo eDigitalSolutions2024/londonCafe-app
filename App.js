@@ -4,7 +4,6 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import PhoneBoothIcon from "./src/assets/icons/phone-booth.svg";
-import AccountSettingsScreen from "./src/screens/AccountSettingsScreen";
 
 import HomeScreen from "./src/screens/HomeScreen";
 import LocationScreen from "./src/screens/LocationScreen";
@@ -16,6 +15,10 @@ import GiftsScreen from "./src/screens/GiftsScreen";
 
 // Pantallas internas del tab Inicio
 import AvatarCustomizeScreen from "./src/screens/AvatarCustomizeScreen";
+import AccountSettingsScreen from "./src/screens/AccountSettingsScreen";
+
+// ✅ NUEVO: Avatar en grande (long press)
+import AvatarPreviewLargeScreen from "./src/screens/AvatarPreviewLargeScreen";
 
 // Auth
 import LoginScreen from "./src/screens/LoginScreen";
@@ -37,11 +40,13 @@ function HomeStackNav() {
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="Home" component={HomeScreen} />
       <HomeStack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
-      <HomeStack.Screen name="AccountSettings" component={AccountSettingsScreen} /> 
+      <HomeStack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+
+      {/* ✅ NUEVO: se abre con long press */}
+      <HomeStack.Screen name="AvatarPreviewLarge" component={AvatarPreviewLargeScreen} />
     </HomeStack.Navigator>
   );
 }
-
 
 function MainTabs() {
   return (
@@ -104,8 +109,6 @@ function RootNav() {
   const { token, loading } = useContext(AuthContext);
   if (loading) return null;
 
-  // ✅ Ya no ocupamos AppStack arriba de Tabs
-  // porque AvatarCustomize vive dentro del HomeStackNav
   return token ? <MainTabs /> : <AuthStack />;
 }
 

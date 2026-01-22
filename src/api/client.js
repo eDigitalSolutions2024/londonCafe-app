@@ -1,15 +1,27 @@
 const BASE_URL = "http://10.0.2.2:3001/api";
 
 export async function apiFetch(path, options = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const url = `${BASE_URL}${path}`;
+
+  // OJO: primero esparcimos options, y AL FINAL construimos headers,
+  // para que NO se pierda Content-Type ni Authorization.
+  const res = await fetch(url, {
+    ...options,
     headers: {
+      Accept: "application/json",
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
-    ...options,
   });
 
-  const data = await res.json().catch(() => ({}));
+  // Mejor parseo (hay endpoints que pueden regresar vacío)
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = {};
+  }
 
   if (!res.ok) {
     const err = new Error(data?.error || "REQUEST_FAILED");

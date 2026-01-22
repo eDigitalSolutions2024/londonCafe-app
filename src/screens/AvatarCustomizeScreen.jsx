@@ -1,171 +1,252 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import React, { useState, useContext, useMemo } from "react";
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from "react-native";
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import AvatarPreview from "../components/AvatarPreview";
+import { apiFetch } from "../api/client";
+import { AuthContext } from "../context/AuthContext";
 
 const OPTIONS = {
-  hair: ["hair_01", "hair_02", "hair_03"],
-  top: ["top_01", "top_02", "top_03"],
-  bottom: ["bottom_01", "bottom_02"],
-  shoes: ["shoes_01", "shoes_02"],
+  skin: ["skin_01", "skin_02", "skin_03"],      // ✅ tono de piel
+  eyes: ["eyes_01", "eyes_02", "eyes_03"],      // ✅ ojos
+  hair: ["hair_01", "hair_02", "hair_03"],      // ✅ pelo
+  top:  ["top_01", "top_02", "top_03"],         // ✅ ropa
 };
 
+const labelMap = {
+  skin: "Tono de piel",
+  eyes: "Ojos",
+  hair: "Cabello",
+  top: "Ropa",
+};
+
+function prettyLabel(v) {
+  // hair_01 -> hair 01 (todos los _)
+  return String(v).replace(/_/g, " ");
+}
+
 export default function AvatarCustomizeScreen({ navigation }) {
-  const [avatarConfig, setAvatarConfig] = useState({
-    skin: "skin_01",
-    hair: "hair_01",
-    top: "top_01",
-    bottom: "bottom_01",
-    shoes: "shoes_01",
-    accessory: null,
-  });
+  const { token, setUser, user } = useContext(AuthContext);
+  const [saving, setSaving] = useState(false);
+
+  // ✅ defaults completos (incluye eyes)
+  const defaults = useMemo(
+    () => ({
+      skin: "skin_01",
+      eyes: "eyes_01",
+      hair: "hair_01",
+      top: "top_01",
+      bottom: "bottom_01",   // fijo (no se muestra)
+      shoes: "shoes_01",     // fijo (no se muestra)
+      accessory: null,
+    }),
+    []
+  );
+
+  // ✅ merge: si user.avatarConfig viene viejo (sin eyes), no se rompe
+  const initialConfig = useMemo(() => {
+    const fromUser = user?.avatarConfig || {};
+    return { ...defaults, ...fromUser };
+  }, [user, defaults]);
+
+  const [avatarConfig, setAvatarConfig] = useState(initialConfig);
 
   const setPart = (key, value) => {
     setAvatarConfig((prev) => ({ ...prev, [key]: value }));
   };
 
+  const onSave = async () => {
+    try {
+      if (!token) {
+        Alert.alert("Sesión", "No hay token. Vuelve a iniciar sesión.");
+        return;
+      }
+
+      setSaving(true);
+
+      const r = await apiFetch("/me/avatar", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ avatarConfig }),
+      });
+
+      // Backend: { ok:true, avatarConfig:{...} }
+      if (setUser) {
+        setUser((prev) => ({
+          ...(prev || {}),
+          avatarConfig: r?.avatarConfig || avatarConfig,
+        }));
+      }
+
+      Alert.alert("Listo", "Avatar actualizado ✅");
+      navigation.goBack();
+    } catch (e) {
+      console.log("❌ save avatar:", e?.data || e?.message);
+      Alert.alert("Error", e?.data?.error || e?.message || "REQUEST_FAILED");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Personalizar personaje</Text>
-        <Text style={styles.subtitle}>
-          Toca una opción para ver los cambios en tiempo real
-        </Text>
+      <ScrollView
+        style={styles.wrap}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Personalizar personaje</Text>
+            <Text style={styles.sub}>Toca una opción para ver cambios en tiempo real</Text>
+          </View>
 
-        {/* Preview grande */}
-        <View style={styles.previewBox}>
-          <AvatarPreview config={avatarConfig} size={140} />
+          <Pressable onPress={() => navigation.goBack()} style={styles.closeBtn}>
+            <Text style={styles.closeText}>Cerrar</Text>
+          </Pressable>
         </View>
 
-        {/* Selectores */}
-        {Object.entries(OPTIONS).map(([key, values]) => (
-          <View key={key} style={styles.section}>
-            <Text style={styles.sectionTitle}>{labelMap[key]}</Text>
-
-            <View style={styles.optionsRow}>
-              {values.map((v) => {
-                const active = avatarConfig[key] === v;
-                return (
-                  <Pressable
-                    key={v}
-                    onPress={() => setPart(key, v)}
-                    style={[
-                      styles.optionBtn,
-                      active && styles.optionBtnActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        active && styles.optionTextActive,
-                      ]}
-                    >
-                      {v.replace("_", " ")}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+        {/* Card principal */}
+        <View style={styles.card}>
+          {/* Preview */}
+          <View style={styles.previewWrap}>
+            <View style={styles.previewCircle}>
+              <AvatarPreview config={avatarConfig} size={150} />
             </View>
           </View>
-        ))}
 
-        {/* Guardar */}
-        <Pressable
-          style={styles.saveBtn}
-          onPress={() => {
-            // ⛔ luego aquí mandaremos al backend
-            navigation.goBack();
-          }}
-        >
-          <Text style={styles.saveText}>Guardar cambios</Text>
-        </Pressable>
+          {/* Opciones */}
+          {Object.entries(OPTIONS).map(([key, values]) => (
+            <View key={key} style={styles.section}>
+              <Text style={styles.sectionTitle}>{labelMap[key]}</Text>
+
+              <View style={styles.optionsRow}>
+                {values.map((v) => {
+                  const active = avatarConfig[key] === v;
+                  return (
+                    <Pressable
+                      key={v}
+                      onPress={() => setPart(key, v)}
+                      style={[styles.optionBtn, active && styles.optionBtnActive]}
+                    >
+                      <Text style={[styles.optionText, active && styles.optionTextActive]}>
+                        {prettyLabel(v)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+
+          {/* Guardar */}
+          <Pressable
+            style={[styles.saveBtn, saving && { opacity: 0.75 }]}
+            onPress={onSave}
+            disabled={saving}
+          >
+            <Text style={styles.saveText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
+          </Pressable>
+        </View>
+
+        <View style={{ height: 18 }} />
       </ScrollView>
     </Screen>
   );
 }
 
-const labelMap = {
-  hair: "Cabello",
-  top: "Ropa",
-  bottom: "Pantalón",
-  shoes: "Zapatos",
-};
-
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    paddingBottom: 40,
-  },
+  wrap: { flex: 1, backgroundColor: colors.background },
+  content: { padding: 20, paddingBottom: 28 },
 
-  title: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: "800",
-  },
-
-  subtitle: {
-    color: colors.textMuted,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-
-  previewBox: {
+  header: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    gap: 12,
+    marginBottom: 12,
+  },
+  title: { color: colors.text, fontSize: 20, fontWeight: "900" },
+  sub: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
+
+  closeBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: colors.card,
+  },
+  closeText: { color: colors.textMuted, fontWeight: "800", fontSize: 12 },
+
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
   },
 
-  section: {
-    marginBottom: 18,
-  },
-
-  sectionTitle: {
-    color: colors.text,
-    fontWeight: "700",
+  previewWrap: {
+    alignItems: "center",
     marginBottom: 8,
+  },
+  previewCircle: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+
+  section: { marginTop: 14 },
+  sectionTitle: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+    marginBottom: 10,
   },
 
   optionsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
   },
 
   optionBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
+    borderColor: colors.primarySoft,
+    backgroundColor: "#fff",
+    marginRight: 10,
+    marginBottom: 10,
   },
-
   optionBtnActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
 
   optionText: {
-    color: colors.text,
+    color: "#111",
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "900",
   },
-
-  optionTextActive: {
-    color: "#fff",
-  },
+  optionTextActive: { color: "#fff" },
 
   saveBtn: {
-    marginTop: 24,
-    backgroundColor: colors.primary,
+    marginTop: 16,
     paddingVertical: 14,
     borderRadius: 999,
+    backgroundColor: colors.primary,
     alignItems: "center",
   },
-
-  saveText: {
-    color: "#fff",
-    fontWeight: "800",
-    fontSize: 15,
-  },
+  saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 });

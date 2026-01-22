@@ -19,23 +19,43 @@ export default function AvatarWidget({
   onFeedCoffee = () => {},
   onFeedBread = () => {},
 
-  // ✅ NUEVO: doble tap en avatar
-  onAvatarDoubleTap = () => {},
+  // ✅ 1 tap = settings
+  onAvatarPress = () => {},
+  // ✅ long press = vista grande
+  onAvatarLongPress = () => {},
+  // ✅ opcionales (por si quieres animar o algo)
+  onAvatarPressIn = () => {},
+  onAvatarPressOut = () => {},
 }) {
-  const energyPct = Math.max(0, Math.min(100, energy));
+  const energyPct = Math.max(0, Math.min(100, Number(energy) || 0));
 
-  // ✅ Doble tap (double click) para móvil
-  const lastTapRef = useRef(0);
-  const DOUBLE_TAP_DELAY = 280;
+  // ✅ Evita que onPress se dispare después de un long press
+  const longPressFiredRef = useRef(false);
 
-  const handleAvatarTap = () => {
-    const now = Date.now();
-    if (lastTapRef.current && now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      lastTapRef.current = 0;
-      onAvatarDoubleTap?.();
-      return;
-    }
-    lastTapRef.current = now;
+  const handlePressIn = () => {
+    longPressFiredRef.current = false; // reset al tocar
+    onAvatarPressIn?.();
+  };
+
+  const handleLongPress = () => {
+    longPressFiredRef.current = true;
+    onAvatarLongPress?.();
+  };
+
+  const handlePress = () => {
+    // Si venimos de long press, NO navegamos a settings
+    if (longPressFiredRef.current) return;
+    onAvatarPress?.();
+  };
+
+  const handlePressOut = () => {
+    onAvatarPressOut?.();
+
+    // Resetea después de soltar (por si el usuario toca otra vez)
+    // (lo ponemos con micro-delay para no interferir con el press cycle)
+    setTimeout(() => {
+      longPressFiredRef.current = false;
+    }, 0);
   };
 
   return (
@@ -43,8 +63,14 @@ export default function AvatarWidget({
       {/* Lado izquierdo: Avatar */}
       <View style={styles.left}>
         <View style={styles.avatarBox}>
-          {/* ✅ SOLO el avatar tiene doble tap */}
-          <Pressable onPress={handleAvatarTap} style={styles.avatarCircle}>
+          <Pressable
+            onPressIn={handlePressIn}
+            onLongPress={handleLongPress}
+            onPress={handlePress}
+            onPressOut={handlePressOut}
+            delayLongPress={250}
+            style={styles.avatarCircle}
+          >
             <AvatarPreview config={avatarConfig} size={72} />
           </Pressable>
 
@@ -82,7 +108,6 @@ export default function AvatarWidget({
 }
 
 const styles = StyleSheet.create({
-  /* Card principal */
   card: {
     ...appStyles.card,
     flexDirection: "row",
@@ -99,7 +124,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  /* Avatar */
   avatarBox: {
     alignItems: "center",
     gap: 6,
@@ -127,7 +151,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  /* Energía */
   label: {
     color: colors.textMuted,
     fontSize: 12,
@@ -153,7 +176,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
-  /* Botones */
   actions: {
     flexDirection: "row",
     gap: 10,
