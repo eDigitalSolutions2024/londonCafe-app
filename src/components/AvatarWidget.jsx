@@ -10,52 +10,79 @@ export default function AvatarWidget({
   energy = 80,
   avatarConfig = {
     skin: "skin_01",
-    hair: "hair_01",
+    hair: null,
+    hairColor: "hairColor_01",
     top: "top_01",
     bottom: "bottom_01",
     shoes: "shoes_01",
     accessory: null,
   },
+
   onFeedCoffee = () => {},
   onFeedBread = () => {},
 
-  // ✅ 1 tap = settings
+  // ✅ 1 tap
   onAvatarPress = () => {},
-  // ✅ long press = vista grande
+  // ✅ long press
   onAvatarLongPress = () => {},
-  // ✅ opcionales (por si quieres animar o algo)
+  // ✅ suelta
   onAvatarPressIn = () => {},
   onAvatarPressOut = () => {},
 }) {
   const energyPct = Math.max(0, Math.min(100, Number(energy) || 0));
 
-  // ✅ Evita que onPress se dispare después de un long press
-  const longPressFiredRef = useRef(false);
+  // ✅ Fix Android: a veces dispara onPress después de longPress
+  const longPressedRef = useRef(false);
+  const longPressAtRef = useRef(0);
+  const resetTimerRef = useRef(null);
+
+  const LONGPRESS_GUARD_MS = 450; // ventana para bloquear el onPress tras long press
+
+  const clearResetTimer = () => {
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+  };
 
   const handlePressIn = () => {
-    longPressFiredRef.current = false; // reset al tocar
+    clearResetTimer();
+    longPressedRef.current = false;
+    longPressAtRef.current = 0;
     onAvatarPressIn?.();
   };
 
   const handleLongPress = () => {
-    longPressFiredRef.current = true;
+    longPressedRef.current = true;
+    longPressAtRef.current = Date.now();
     onAvatarLongPress?.();
   };
 
   const handlePress = () => {
-    // Si venimos de long press, NO navegamos a settings
-    if (longPressFiredRef.current) return;
+    const now = Date.now();
+
+    // Si hubo long press (o acaba de ocurrir), NO navegamos a settings
+    if (
+      longPressedRef.current ||
+      (longPressAtRef.current && now - longPressAtRef.current < LONGPRESS_GUARD_MS)
+    ) {
+      return;
+    }
+
     onAvatarPress?.();
   };
 
   const handlePressOut = () => {
     onAvatarPressOut?.();
 
-    // Resetea después de soltar (por si el usuario toca otra vez)
-    // (lo ponemos con micro-delay para no interferir con el press cycle)
-    setTimeout(() => {
-      longPressFiredRef.current = false;
-    }, 0);
+    // ✅ NO reseteamos “inmediato” porque en algunos Android el orden de eventos es raro.
+    // Mejor: resetea un poco después del release para que no se cuele un onPress tardío.
+    clearResetTimer();
+    resetTimerRef.current = setTimeout(() => {
+      longPressedRef.current = false;
+      longPressAtRef.current = 0;
+      resetTimerRef.current = null;
+    }, LONGPRESS_GUARD_MS);
   };
 
   return (

@@ -18,27 +18,31 @@ import { AuthContext } from "../context/AuthContext";
 import AvatarWidget from "../components/AvatarWidget";
 import PointsStepperBar from "../components/PointsStepperBar";
 
-// ✅ Para el modal (avatar grande)
+// ✅ Modal avatar grande
 import AvatarPreview from "../components/AvatarPreview";
 
 export default function HomeScreen({ navigation }) {
-  const { signOut } = useContext(AuthContext);
+  // ✅ IMPORTANTE: tomar user del contexto
+  const { signOut, user } = useContext(AuthContext);
 
   // ✅ Modal peek (mantener presionado)
   const [showAvatarPeek, setShowAvatarPeek] = useState(false);
 
-  // ✅ avatarConfig definido
-  const avatarConfig = useMemo(
-    () => ({
+  // ✅ Defaults + merge con lo guardado en user.avatarConfig
+  const avatarConfig = useMemo(() => {
+    const defaults = {
       skin: "skin_01",
-      hair: "hair_01",
+      eyes: "eyes_01",
+      hair: null, // por si después lo usas como "forma"
+      hairColor: "hairColor_01", // ✅ tu caso actual
       top: "top_01",
       bottom: "bottom_01",
       shoes: "shoes_01",
       accessory: null,
-    }),
-    []
-  );
+    };
+
+    return { ...defaults, ...(user?.avatarConfig || {}) };
+  }, [user]);
 
   useEffect(() => {
     apiFetch("/health")
@@ -48,7 +52,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <Screen>
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View style={styles.hero}>
           <View style={styles.heroHeader}>
@@ -78,14 +82,11 @@ export default function HomeScreen({ navigation }) {
               avatarConfig={avatarConfig}
               onFeedCoffee={() => console.log("Dar café")}
               onFeedBread={() => console.log("Dar pan")}
-
               // ✅ 1 tap -> settings
               onAvatarPress={() => navigation.navigate("AccountSettings")}
-
-              // ✅ mantener presionado -> mostrar avatar grande (NO navegar)
+              // ✅ mantener presionado -> mostrar modal (peek)
               onAvatarLongPress={() => setShowAvatarPeek(true)}
-
-              // ✅ soltar -> cerrar modal y regresar a Home
+              // ✅ soltar -> cerrar modal
               onAvatarPressOut={() => setShowAvatarPeek(false)}
             />
 
@@ -99,7 +100,7 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        {/* ✅ Promociones */}
+        {/* Promociones */}
         <View style={styles.promosSection}>
           <View style={styles.sectionHeader}>
             <View>
@@ -200,16 +201,16 @@ export default function HomeScreen({ navigation }) {
             </View>
           </TouchableOpacity>
         </View>
-
-        {/* ✅ MODAL PEEK (solo avatar; se cierra al soltar) */}
-        <Modal visible={showAvatarPeek} transparent animationType="fade">
-          <View style={styles.peekBackdrop}>
-            <View style={styles.peekCircle}>
-              <AvatarPreview config={avatarConfig} size={260} />
-            </View>
-          </View>
-        </Modal>
       </ScrollView>
+
+      {/* ✅ MODAL PEEK (solo avatar; se cierra al soltar) */}
+      <Modal visible={showAvatarPeek} transparent animationType="fade">
+        <View style={styles.peekBackdrop}>
+          <View style={styles.peekCircle}>
+            <AvatarPreview config={avatarConfig} size={260} />
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }

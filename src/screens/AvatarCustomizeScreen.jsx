@@ -7,21 +7,17 @@ import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 
 const OPTIONS = {
-  skin: ["skin_01", "skin_02", "skin_03"],      // ✅ tono de piel
-  eyes: ["eyes_01", "eyes_02", "eyes_03"],      // ✅ ojos
-  hair: ["hair_01", "hair_02", "hair_03"],      // ✅ pelo
-  top:  ["top_01", "top_02", "top_03"],         // ✅ ropa
+  // ✅ por ahora: SOLO color de pelo + ropa
+  hairColor: ["hairColor_01", "hairColor_02", "hairColor_03", "hairColor_04", "hairColor_05"],
+  top: ["top_01", "top_02", "top_03"],
 };
 
 const labelMap = {
-  skin: "Tono de piel",
-  eyes: "Ojos",
-  hair: "Cabello",
+  hairColor: "Color de cabello",
   top: "Ropa",
 };
 
 function prettyLabel(v) {
-  // hair_01 -> hair 01 (todos los _)
   return String(v).replace(/_/g, " ");
 }
 
@@ -29,21 +25,22 @@ export default function AvatarCustomizeScreen({ navigation }) {
   const { token, setUser, user } = useContext(AuthContext);
   const [saving, setSaving] = useState(false);
 
-  // ✅ defaults completos (incluye eyes)
+  // ✅ defaults completos (aunque no se muestren en UI)
   const defaults = useMemo(
     () => ({
       skin: "skin_01",
       eyes: "eyes_01",
-      hair: "hair_01",
+      hair: null, // por si luego agregas forma de pelo
+      hairColor: "hairColor_01", // ✅ tu caso actual
       top: "top_01",
-      bottom: "bottom_01",   // fijo (no se muestra)
-      shoes: "shoes_01",     // fijo (no se muestra)
+      bottom: "bottom_01",
+      shoes: "shoes_01",
       accessory: null,
     }),
     []
   );
 
-  // ✅ merge: si user.avatarConfig viene viejo (sin eyes), no se rompe
+  // ✅ merge: si user.avatarConfig viene viejo, no se rompe
   const initialConfig = useMemo(() => {
     const fromUser = user?.avatarConfig || {};
     return { ...defaults, ...fromUser };
@@ -66,13 +63,10 @@ export default function AvatarCustomizeScreen({ navigation }) {
 
       const r = await apiFetch("/me/avatar", {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({ avatarConfig }),
       });
 
-      // Backend: { ok:true, avatarConfig:{...} }
       if (setUser) {
         setUser((prev) => ({
           ...(prev || {}),
@@ -109,7 +103,7 @@ export default function AvatarCustomizeScreen({ navigation }) {
           </Pressable>
         </View>
 
-        {/* Card principal */}
+        {/* Card */}
         <View style={styles.card}>
           {/* Preview */}
           <View style={styles.previewWrap}>
@@ -189,10 +183,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primarySoft,
   },
 
-  previewWrap: {
-    alignItems: "center",
-    marginBottom: 8,
-  },
+  previewWrap: { alignItems: "center", marginBottom: 8 },
   previewCircle: {
     width: 220,
     height: 220,
@@ -214,10 +205,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  optionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
+  optionsRow: { flexDirection: "row", flexWrap: "wrap" },
 
   optionBtn: {
     paddingVertical: 10,
@@ -229,16 +217,9 @@ const styles = StyleSheet.create({
     marginRight: 10,
     marginBottom: 10,
   },
-  optionBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
+  optionBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
 
-  optionText: {
-    color: "#111",
-    fontSize: 12,
-    fontWeight: "900",
-  },
+  optionText: { color: "#111", fontSize: 12, fontWeight: "900" },
   optionTextActive: { color: "#fff" },
 
   saveBtn: {

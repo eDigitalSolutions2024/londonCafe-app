@@ -75,7 +75,7 @@ async function updateAvatar(req, res) {
     }
 
     // ✅ whitelist (solo permitimos estas llaves)
-    const allowed = ["skin", "hair", "top", "bottom", "shoes", "accessory"];
+    const allowed = ["skin", "hairColor", "top", "bottom", "shoes", "accessory"];
     const clean = {};
     for (const k of allowed) {
       if (k in avatarConfig) clean[k] = avatarConfig[k];
