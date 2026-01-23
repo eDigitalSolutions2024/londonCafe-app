@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState, useCallback } from "react";
 import { View, Text, StyleSheet, Alert, TouchableOpacity, ActivityIndicator } from "react-native";
-import { BarCodeScanner } from "expo-barcode-scanner";
+import { CameraView, useCameraPermissions } from "expo-camera";;
 import { useFocusEffect } from "@react-navigation/native";
 
 import { colors } from "../theme/colors";

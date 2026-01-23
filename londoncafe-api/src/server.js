@@ -11,6 +11,7 @@ const branchRoutes = require("./routes/branch.routes");
 const pointsRoutes = require("./routes/points.routes");
 // auth (cuando lo agreguemos)
 const authRoutes = require("./routes/auth.routes");
+const salesRoutes = require("./routes/sales");
 
 dotenv.config();
 
@@ -28,7 +29,7 @@ app.use("/api/promos", promoRoutes);
 app.use("/api/branches", branchRoutes);
 app.use("/api", require("./routes/me.routes"));
 app.use("/api/points", pointsRoutes);
-
+app.use("/api/sales", salesRoutes);
 app.use("/api/dev", require("./routes/dev"));
 
 const PORT = process.env.PORT || 4000;
