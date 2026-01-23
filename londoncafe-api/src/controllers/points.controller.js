@@ -33,6 +33,42 @@ async function claimPoints(req, res) {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
+    // ✅ DEV bypass: permite QR fijo "TEST_10_POINTS" (no caduca, no requiere PointClaim)
+    // Acepta tanto { code } como { qr } por si en el front mandas qr.
+    if (process.env.NODE_ENV !== "production") {
+      const incoming = String(req.body?.code || req.body?.qr || "").trim();
+      if (incoming === "TEST_10_POINTS") {
+        const add = 10;
+
+        const updatedUser = await User.findByIdAndUpdate(
+          uid,
+          {
+            $inc: { points: add, lifetimePoints: add },
+            $push: {
+              pointsHistory: {
+                type: "EARN",
+                points: add,
+                source: "QR",
+                ref: "TEST_10_POINTS",
+                note: "DEV / QR",
+                createdAt: new Date(),
+              },
+            },
+          },
+          { new: true }
+        ).select("points lifetimePoints");
+
+        return res.json({
+          ok: true,
+          added: add,
+          points: updatedUser?.points || 0,
+          lifetimePoints: updatedUser?.lifetimePoints || 0,
+          code: "TEST_10_POINTS",
+          dev: true,
+        });
+      }
+    }
+
     const { code } = req.body || {};
     const cleanCode = String(code || "").trim();
 
@@ -98,6 +134,7 @@ async function claimPoints(req, res) {
     return res.status(500).json({ error: "SERVER_ERROR" });
   }
 }
+
 
 function randomCode(len = 8) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin 0/O/1/I

@@ -15,6 +15,7 @@ import { colors } from "../theme/colors";
 import Screen from "../components/Screen";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
+import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
 
 // Avatar + puntos
 import AvatarWidget from "../components/AvatarWidget";
@@ -165,9 +166,12 @@ export default function HomeScreen({ navigation }) {
               points={points}
               maxPoints={200}
               steps={[50, 100, 150, 200]}
-              title="Puntos"
+              title="Buddy Points"
               subtitle="Rewards"
+              iconSource={LondonBuddyLogo}   // ✅ aquí reemplaza la estrella por el logo
+              iconSize={18}                  // opcional
             />
+
 
             {/* opcional: mostrar acumulados de por vida */}
             <Text style={styles.pointsMeta}>Acumulados: {lifetimePoints}</Text>

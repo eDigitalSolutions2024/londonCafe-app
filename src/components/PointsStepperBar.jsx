@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Image } from "react-native";
 import { colors } from "../theme/colors";
 import { appStyles } from "../theme/styles";
+
 /**
  * Barra tipo "stepper" como la imagen:
  * - ticks en 25 / 50 / 75 / 100 (o lo que definas)
@@ -11,18 +12,20 @@ import { appStyles } from "../theme/styles";
 export default function PointsStepperBar({
   points = 68,
   maxPoints = 200,
-  steps = [50, 100, 150, 200], // niveles (puedes cambiar a [25,50,75,100] si max=100)
+  steps = [50, 100, 150, 200],
   title = "Puntos",
   subtitle = "Rewards",
+
+  // ✅ NUEVO: icono para mostrar junto al número (en vez de la estrella)
+  iconSource = null,
+  iconSize = 18, // opcional
 }) {
   const clamped = Math.max(0, Math.min(maxPoints, points));
 
   const normalizedSteps = useMemo(() => {
-    // fuerza steps dentro del rango 0..max
     const s = Array.from(new Set(steps))
       .filter((v) => v > 0 && v <= maxPoints)
       .sort((a, b) => a - b);
-    // si no hay steps válidos, crea uno al max
     return s.length ? s : [maxPoints];
   }, [steps, maxPoints]);
 
@@ -33,10 +36,24 @@ export default function PointsStepperBar({
       {/* Header como la imagen (número grande + label a la derecha) */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.bigNumber}>
-            {clamped}
-            <Text style={styles.star}>★</Text>
-          </Text>
+          {/* ✅ Número + icono (reemplaza ★) */}
+          <View style={styles.bigRow}>
+            <Text style={styles.bigNumber}>{clamped}</Text>
+
+            {iconSource ? (
+              <Image
+                source={iconSource}
+                style={[
+                  styles.coinIcon,
+                  { width: iconSize, height: iconSize, borderRadius: iconSize / 2 },
+                ]}
+                resizeMode="contain"
+              />
+            ) : (
+              <Text style={styles.star}>★</Text>
+            )}
+          </View>
+
           <Text style={styles.smallLabel}>{title}</Text>
         </View>
 
@@ -98,17 +115,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+
+  // ✅ contenedor para número + icono
+  bigRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
   bigNumber: {
     color: colors.text,
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 36,
   },
+
+  // fallback (si no se pasa iconSource)
   star: {
-    color: colors.primary, // 👈 ginda
+    color: colors.primary,
     fontSize: 18,
     fontWeight: "900",
+    marginTop: 2,
   },
+
+  // ✅ icono moneda
+  coinIcon: {
+    marginTop: 2,
+    backgroundColor: "transparent",
+  },
+
   smallLabel: {
     marginTop: 2,
     color: colors.textMuted,
@@ -116,18 +151,18 @@ const styles = StyleSheet.create({
   },
 
   pill: {
-  borderRadius: 999,
-  borderWidth: 1,
-  borderColor: colors.primary,
-  paddingHorizontal: 14,
-  paddingVertical: 7,
-  backgroundColor: "#FFFFFF", // 👈 fondo blanco
-},
-pillText: {
-  color: colors.primary,      // 👈 ginda
-  fontWeight: "700",
-  fontSize: 12,
-},
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    backgroundColor: "#FFFFFF",
+  },
+  pillText: {
+    color: colors.primary,
+    fontWeight: "700",
+    fontSize: 12,
+  },
 
   barWrap: {
     position: "relative",

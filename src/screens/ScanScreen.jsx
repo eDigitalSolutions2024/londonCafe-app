@@ -1,47 +1,49 @@
 import React, { useContext, useEffect, useRef, useState, useCallback } from "react";
 import { View, Text, StyleSheet, Alert, TouchableOpacity, ActivityIndicator } from "react-native";
-import { BarCodeScanner } from "expo-barcode-scanner";
 import { useFocusEffect } from "@react-navigation/native";
+import { CameraView, useCameraPermissions } from "expo-camera";
 
 import { colors } from "../theme/colors";
 import Screen from "../components/Screen";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 
-const CLAIM_PATH = "/points/claim"; // ✅ AJUSTA: "/qr/claim" etc.
+const CLAIM_PATH = "/points/claim";
 
 export default function ScanScreen({ navigation }) {
   const { token } = useContext(AuthContext);
 
-  const [hasPermission, setHasPermission] = useState(null);
+  const [permission, requestPermission] = useCameraPermissions();
+
   const [scanning, setScanning] = useState(true);
   const [loading, setLoading] = useState(false);
 
   // lock para evitar doble escaneo
   const lockRef = useRef(false);
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
-      setHasPermission(status === "granted");
-    })();
-  }, []);
-
   // cuando entras a la pantalla, re-habilita escaneo
   useFocusEffect(
     useCallback(() => {
       setScanning(true);
       lockRef.current = false;
+      setLoading(false);
     }, [])
   );
 
-  const handleBarCodeScanned = async ({ data, type }) => {
+  useEffect(() => {
+    if (!permission) return;
+    if (!permission.granted && permission.canAskAgain) {
+      // no auto-pidas aquí si no quieres; puedes dejar que el usuario toque botón
+    }
+  }, [permission]);
+
+  const handleBarcodeScanned = async ({ data, type }) => {
     if (!token) {
       Alert.alert("Sesión", "Inicia sesión de nuevo.");
       return;
     }
 
-    if (!scanning || lockRef.current) return;
+    if (!scanning || lockRef.current || loading) return;
 
     lockRef.current = true;
     setScanning(false);
@@ -49,52 +51,48 @@ export default function ScanScreen({ navigation }) {
     try {
       setLoading(true);
 
+      const clean = String(data || "").trim();
       console.log("✅ QR type:", type);
-      console.log("✅ QR data:", data);
+      console.log("✅ QR data:", clean);
 
-      // ✅ Si tu backend espera { code: data } cámbialo aquí
+      // ✅ Backend espera { code }, no { qr }
       const r = await apiFetch(CLAIM_PATH, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ qr: data }),
+        body: JSON.stringify({ code: clean }),
       });
 
-      /**
-       * Backend recomendado devuelva algo así:
-       * { ok:true, addedPoints: 25, points: 120, lifetimePoints: 580 }
-       * o { ok:true, msg:"..." }
-       */
       if (r?.ok === false) {
         Alert.alert("No se pudo", r?.msg || "QR inválido.");
-      } else {
-        const added = Number(r?.addedPoints) || null;
-
-        Alert.alert(
-          "Listo ✅",
-          added ? `Se agregaron ${added} puntos.` : "Puntos agregados.",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                // ✅ Regresa al Home para que refresque /points/me
-                navigation.navigate("Home");
-              },
-            },
-          ]
-        );
+        lockRef.current = false;
+        setScanning(true);
+        return;
       }
-    } catch (e) {
-      console.log("❌ claim:", e?.data || e?.message);
 
-      // ejemplos típicos
+      // ✅ Backend responde { added }, no addedPoints
+      const added = Number(r?.added) || null;
+
+      Alert.alert(
+        "Listo ✅",
+        added ? `Se agregaron ${added} puntos.` : "Puntos agregados.",
+        [{ text: "OK", onPress: () => navigation.navigate("Home") }]
+      );
+    } catch (e) {
+      console.log("❌ claim status:", e?.status);
+      console.log("❌ claim data:", e?.data || e?.message);
+
       if (e?.status === 401) return Alert.alert("Sesión", "Tu sesión expiró. Inicia de nuevo.");
       if (e?.status === 409) return Alert.alert("Ya usado", "Este QR ya fue reclamado.");
-      if (e?.status === 400) return Alert.alert("QR inválido", "El QR no es válido o expiró.");
+      if (e?.status === 404) return Alert.alert("QR inválido", "Código no encontrado.");
+      if (e?.status === 410) return Alert.alert("Caducado", "Este QR ya caducó.");
+      if (e?.status === 400) return Alert.alert("QR inválido", "Falta código o es inválido.");
 
       Alert.alert("Error", "No se pudo procesar el QR.");
+
+      lockRef.current = false;
+      setScanning(true);
     } finally {
       setLoading(false);
-      // permite reintentar desde botón
     }
   };
 
@@ -103,23 +101,29 @@ export default function ScanScreen({ navigation }) {
     setScanning(true);
   };
 
-  if (hasPermission === null) {
+  if (!permission) {
     return (
       <Screen>
         <View style={styles.center}>
           <ActivityIndicator />
-          <Text style={styles.muted}>Solicitando permisos de cámara...</Text>
+          <Text style={styles.muted}>Cargando permisos de cámara...</Text>
         </View>
       </Screen>
     );
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
       <Screen>
-        <View style={styles.center}>
-          <Text style={styles.title}>Sin acceso a cámara</Text>
-          <Text style={styles.muted}>Activa permisos de cámara para escanear QR.</Text>
+        <View style={[styles.wrap, { justifyContent: "center" }]}>
+          <Text style={styles.h1}>Escanear</Text>
+          <Text style={[styles.sub, { marginBottom: 18 }]}>
+            Necesitamos permiso de cámara para escanear QR.
+          </Text>
+
+          <TouchableOpacity onPress={requestPermission} style={styles.primaryBtn} activeOpacity={0.9}>
+            <Text style={styles.primaryBtnText}>Dar permiso</Text>
+          </TouchableOpacity>
         </View>
       </Screen>
     );
@@ -132,15 +136,15 @@ export default function ScanScreen({ navigation }) {
         <Text style={styles.sub}>Escanea el QR de tu compra para sumar puntos</Text>
 
         <View style={styles.cameraBox}>
-          <BarCodeScanner
-            onBarCodeScanned={scanning ? handleBarCodeScanned : undefined}
+          <CameraView
             style={StyleSheet.absoluteFillObject}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+            onBarcodeScanned={scanning ? handleBarcodeScanned : undefined}
           />
 
-          {/* overlay del recuadro (simple) */}
           <View style={styles.frame} />
 
-          {/* loading */}
           {loading ? (
             <View style={styles.loadingPill}>
               <ActivityIndicator />
@@ -219,6 +223,13 @@ const styles = StyleSheet.create({
   loadingText: { color: "#fff", fontWeight: "900" },
 
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
-  title: { color: colors.text, fontSize: 18, fontWeight: "900" },
   muted: { color: colors.textMuted },
+
+  primaryBtn: {
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+  },
+  primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 });

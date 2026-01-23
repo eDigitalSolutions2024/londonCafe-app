@@ -18,6 +18,7 @@
     "expo": "~54.0.30",
     "expo-barcode-scanner": "^13.0.1",
     "expo-camera": "~17.0.10",
+    "expo-constants": "~18.0.13",
     "expo-status-bar": "~3.0.9",
     "nodemailer": "^7.0.12",
     "react": "19.1.0",
