@@ -8,15 +8,11 @@ export default function AvatarWidget({
   name = "Tu avatar",
   mood = "Con energía",
   energy = 80,
-  avatarConfig = {
-    skin: "skin_01",
-    hair: null,
-    hairColor: "hairColor_01",
-    top: "top_01",
-    bottom: "bottom_01",
-    shoes: "shoes_01",
-    accessory: null,
-  },
+
+  // ✅ IMPORTANTE: NO hardcodear hair_03 aquí.
+  // Si no mandas avatarConfig desde Home (user.avatarConfig),
+  // al menos se verá hair_01 por default.
+  avatarConfig = { hair: "hair_01" },
 
   onFeedCoffee = () => {},
   onFeedBread = () => {},
@@ -75,14 +71,19 @@ export default function AvatarWidget({
   const handlePressOut = () => {
     onAvatarPressOut?.();
 
-    // ✅ NO reseteamos “inmediato” porque en algunos Android el orden de eventos es raro.
-    // Mejor: resetea un poco después del release para que no se cuele un onPress tardío.
+    // ✅ NO reseteamos inmediato para evitar onPress tardío en Android
     clearResetTimer();
     resetTimerRef.current = setTimeout(() => {
       longPressedRef.current = false;
       longPressAtRef.current = 0;
       resetTimerRef.current = null;
     }, LONGPRESS_GUARD_MS);
+  };
+
+  // ✅ Asegura fallback por si viene vacío / viejo
+  const safeConfig = {
+    hair: "hair_01",
+    ...(avatarConfig || {}),
   };
 
   return (
@@ -98,7 +99,7 @@ export default function AvatarWidget({
             delayLongPress={250}
             style={styles.avatarCircle}
           >
-            <AvatarPreview config={avatarConfig} size={72} />
+            <AvatarPreview config={safeConfig} size={72} />
           </Pressable>
 
           <Text style={styles.avatarName}>{name}</Text>

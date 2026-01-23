@@ -12,6 +12,19 @@ const avatarSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// ✅ Historial de puntos (opcional pero recomendado)
+const pointsHistorySchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ["EARN", "REDEEM", "ADJUST"], default: "EARN" },
+    points: { type: Number, required: true },          // + o -
+    source: { type: String, default: "QR" },           // QR / manual / promo / etc
+    ref: { type: String, default: null },              // claimCode / ticketId
+    note: { type: String, default: null },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -30,8 +43,13 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     isEmailVerified: { type: Boolean, default: false },
 
-    // ✅ nuevo
+    // ✅ Avatar
     avatarConfig: { type: avatarSchema, default: () => ({}) },
+
+    // ✅ Puntos
+    points: { type: Number, default: 0 },          // disponibles para canje
+    lifetimePoints: { type: Number, default: 0 },  // acumulados históricos
+    pointsHistory: { type: [pointsHistorySchema], default: [] },
   },
   { timestamps: true }
 );

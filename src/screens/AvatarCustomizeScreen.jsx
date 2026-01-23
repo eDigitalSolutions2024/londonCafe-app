@@ -8,7 +8,7 @@ import { AuthContext } from "../context/AuthContext";
 
 const OPTIONS = {
   // ✅ por ahora: SOLO color de pelo + ropa
-  hairColor: ["hairColor_01", "hairColor_02", "hairColor_03", "hairColor_04", "hairColor_05"],
+   hair: ["hair_01", "hair_02", "hair_03", "hair_04", "hair_05"],
   top: ["top_01", "top_02", "top_03"],
 };
 

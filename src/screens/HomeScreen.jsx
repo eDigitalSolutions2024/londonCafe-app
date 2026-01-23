@@ -1,4 +1,4 @@
-import React, { useEffect, useContext, useMemo, useState } from "react";
+import React, { useEffect, useContext, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   ScrollView,
   Image,
   Modal,
+  RefreshControl,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { colors } from "../theme/colors";
 import Screen from "../components/Screen";
@@ -22,27 +24,62 @@ import PointsStepperBar from "../components/PointsStepperBar";
 import AvatarPreview from "../components/AvatarPreview";
 
 export default function HomeScreen({ navigation }) {
-  // ✅ IMPORTANTE: tomar user del contexto
-  const { signOut, user } = useContext(AuthContext);
+  const { signOut, user, token } = useContext(AuthContext);
 
-  // ✅ Modal peek (mantener presionado)
   const [showAvatarPeek, setShowAvatarPeek] = useState(false);
 
-  // ✅ Defaults + merge con lo guardado en user.avatarConfig
-  const avatarConfig = useMemo(() => {
-    const defaults = {
-      skin: "skin_01",
-      eyes: "eyes_01",
-      hair: null, // por si después lo usas como "forma"
-      hairColor: "hairColor_01", // ✅ tu caso actual
-      top: "top_01",
-      bottom: "bottom_01",
-      shoes: "shoes_01",
-      accessory: null,
-    };
+  // ✅ puntos reales
+  const [points, setPoints] = useState(0);
+  const [lifetimePoints, setLifetimePoints] = useState(0);
+  const [loadingPoints, setLoadingPoints] = useState(false);
 
-    return { ...defaults, ...(user?.avatarConfig || {}) };
-  }, [user]);
+  // ✅ AVATAR REAL DEL BACKEND (SIN DEFAULTS)
+  const [avatarConfig, setAvatarConfig] = useState(null);
+  const [loadingMe, setLoadingMe] = useState(false);
+
+  const fetchPoints = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      setLoadingPoints(true);
+
+      // ✅ GET /api/points/me
+      const r = await apiFetch("/points/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setPoints(Number(r?.points) || 0);
+      setLifetimePoints(Number(r?.lifetimePoints) || 0);
+    } catch (e) {
+      console.log("❌ points/me:", e?.data || e?.message);
+    } finally {
+      setLoadingPoints(false);
+    }
+  }, [token]);
+
+  // ✅ Traer /me para obtener avatarConfig real del backend
+  const fetchMe = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      setLoadingMe(true);
+
+      const r = await apiFetch("/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Preferimos el backend; si no viene, intentamos con el user del contexto
+      const cfg = r?.user?.avatarConfig ?? user?.avatarConfig ?? null;
+      setAvatarConfig(cfg);
+    } catch (e) {
+      console.log("❌ /me:", e?.data || e?.message);
+
+      // fallback: lo que haya en el contexto (si existe)
+      setAvatarConfig(user?.avatarConfig ?? null);
+    } finally {
+      setLoadingMe(false);
+    }
+  }, [token, user]);
 
   useEffect(() => {
     apiFetch("/health")
@@ -50,9 +87,29 @@ export default function HomeScreen({ navigation }) {
       .catch((e) => console.log("❌ HEALTH ERROR:", e?.data || e.message));
   }, []);
 
+  // ✅ cada vez que abres Home, refresca puntos + perfil (avatar)
+  useFocusEffect(
+    useCallback(() => {
+      fetchPoints();
+      fetchMe();
+    }, [fetchPoints, fetchMe])
+  );
+
   return (
     <Screen>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loadingPoints || loadingMe}
+            onRefresh={async () => {
+              await fetchPoints();
+              await fetchMe();
+            }}
+          />
+        }
+      >
         {/* Hero */}
         <View style={styles.hero}>
           <View style={styles.heroHeader}>
@@ -75,28 +132,45 @@ export default function HomeScreen({ navigation }) {
 
           {/* Avatar + Puntos */}
           <View style={styles.avatarSection}>
-            <AvatarWidget
-              name="London Buddy"
-              mood="Con energía"
-              energy={80}
-              avatarConfig={avatarConfig}
-              onFeedCoffee={() => console.log("Dar café")}
-              onFeedBread={() => console.log("Dar pan")}
-              // ✅ 1 tap -> settings
-              onAvatarPress={() => navigation.navigate("AccountSettings")}
-              // ✅ mantener presionado -> mostrar modal (peek)
-              onAvatarLongPress={() => setShowAvatarPeek(true)}
-              // ✅ soltar -> cerrar modal
-              onAvatarPressOut={() => setShowAvatarPeek(false)}
-            />
+            {/* ✅ NO mostrar avatar default: solo cuando ya existe avatarConfig real */}
+            {avatarConfig ? (
+              <AvatarWidget
+                name="London Buddy"
+                mood="Con energía"
+                energy={80}
+                avatarConfig={avatarConfig}
+                onFeedCoffee={() => console.log("Dar café")}
+                onFeedBread={() => console.log("Dar pan")}
+                onAvatarPress={() => navigation.navigate("AccountSettings")}
+                onAvatarLongPress={() => setShowAvatarPeek(true)}
+                onAvatarPressOut={() => setShowAvatarPeek(false)}
+              />
+            ) : (
+              <View
+                style={{
+                  padding: 14,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: colors.primarySoft,
+                  backgroundColor: colors.card,
+                }}
+              >
+                <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "800" }}>
+                  Cargando avatar...
+                </Text>
+              </View>
+            )}
 
             <PointsStepperBar
-              points={68}
+              points={points}
               maxPoints={200}
               steps={[50, 100, 150, 200]}
               title="Puntos"
               subtitle="Rewards"
             />
+
+            {/* opcional: mostrar acumulados de por vida */}
+            <Text style={styles.pointsMeta}>Acumulados: {lifetimePoints}</Text>
           </View>
         </View>
 
@@ -203,11 +277,11 @@ export default function HomeScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      {/* ✅ MODAL PEEK (solo avatar; se cierra al soltar) */}
+      {/* ✅ MODAL PEEK */}
       <Modal visible={showAvatarPeek} transparent animationType="fade">
         <View style={styles.peekBackdrop}>
           <View style={styles.peekCircle}>
-            <AvatarPreview config={avatarConfig} size={260} />
+            {avatarConfig ? <AvatarPreview config={avatarConfig} size={260} /> : null}
           </View>
         </View>
       </Modal>
@@ -256,6 +330,12 @@ const styles = StyleSheet.create({
   logoutText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
 
   avatarSection: { marginTop: 14 },
+
+  pointsMeta: {
+    marginTop: 8,
+    fontSize: 12,
+    color: colors.textMuted,
+  },
 
   promosSection: { paddingHorizontal: 20, paddingBottom: 24 },
 
@@ -344,7 +424,6 @@ const styles = StyleSheet.create({
 
   promoSubtitle: { color: "rgba(255,255,255,0.88)", fontSize: 12 },
 
-  // ✅ Peek modal styles
   peekBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.18)",

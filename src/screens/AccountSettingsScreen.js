@@ -126,9 +126,10 @@ export default function AccountSettingsScreen({ navigation }) {
           <Text style={styles.sub}>Cuenta, seguridad y preferencias</Text>
         </View>
 
-        <Pressable onPress={signOut} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>Salir</Text>
+        <Pressable onPress={() => navigation.goBack()} style={styles.logoutBtn}>
+          <Text style={styles.logoutText}>regresar</Text>
         </Pressable>
+
       </View>
 
       {/* Card: Perfil */}

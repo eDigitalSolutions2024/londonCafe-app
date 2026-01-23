@@ -2,7 +2,6 @@ const User = require("../models/User");
 
 /** helper: saca uid del token */
 function getUid(req) {
-  // tu middleware dice: req.user = payload // { uid: ... }
   return req.user?.uid || req.user?.sub || req.user?.userId || req.user?.id || null;
 }
 
@@ -48,8 +47,6 @@ async function updateMe(req, res) {
 
     if (typeof email === "string" && email.trim()) {
       patch.email = email.trim().toLowerCase();
-      // opcional: si cambias email, marca no verificado
-      // patch.isEmailVerified = false;
     }
 
     const updated = await User.findByIdAndUpdate(uid, patch, { new: true })
@@ -57,7 +54,6 @@ async function updateMe(req, res) {
 
     return res.json({ ok: true, user: updated });
   } catch (err) {
-    // duplicate key (email/username)
     if (err?.code === 11000) return res.status(409).json({ error: "DUPLICATE" });
     console.log("updateMe error:", err?.message);
     return res.status(500).json({ error: "SERVER_ERROR" });
@@ -74,16 +70,28 @@ async function updateAvatar(req, res) {
       return res.status(400).json({ error: "BAD_AVATAR" });
     }
 
-    // ✅ whitelist (solo permitimos estas llaves)
-    const allowed = ["skin", "hairColor", "top", "bottom", "shoes", "accessory"];
-    const clean = {};
+    /**
+     * ✅ TU CASO ACTUAL:
+     * solo guardar "hair" (porque es el avatar completo)
+     * y NO reemplazar todo avatarConfig, solo hacer $set a la(s) llave(s).
+     */
+    const allowed = ["hair"];
+    const $set = {};
+
     for (const k of allowed) {
-      if (k in avatarConfig) clean[k] = avatarConfig[k];
+      if (k in avatarConfig) {
+        $set[`avatarConfig.${k}`] = avatarConfig[k];
+      }
+    }
+
+    // Si no mandaron nada permitido
+    if (Object.keys($set).length === 0) {
+      return res.status(400).json({ error: "NO_ALLOWED_FIELDS" });
     }
 
     const updated = await User.findByIdAndUpdate(
       uid,
-      { $set: { avatarConfig: clean } },
+      { $set },
       { new: true }
     ).select("avatarConfig");
 
