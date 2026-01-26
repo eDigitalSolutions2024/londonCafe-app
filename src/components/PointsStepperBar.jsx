@@ -2,23 +2,21 @@ import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Image } from "react-native";
 import { colors } from "../theme/colors";
 import { appStyles } from "../theme/styles";
+import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
 
-/**
- * Barra tipo "stepper" como la imagen:
- * - ticks en 25 / 50 / 75 / 100 (o lo que definas)
- * - línea de progreso
- * - marcador (pin) en el punto actual
- */
 export default function PointsStepperBar({
   points = 68,
   maxPoints = 200,
   steps = [50, 100, 150, 200],
   title = "Puntos",
-  subtitle = "Rewards",
+  subtitle = "Buddy Points",
 
-  // ✅ NUEVO: icono para mostrar junto al número (en vez de la estrella)
-  iconSource = null,
-  iconSize = 18, // opcional
+  // ✅ icono para mostrar (número + pill)
+  iconSource = LondonBuddyLogo,
+  iconSize = 25,
+
+  // ✅ tamaño para el icono dentro del pill
+  pillIconSize = 14,
 }) {
   const clamped = Math.max(0, Math.min(maxPoints, points));
 
@@ -33,10 +31,9 @@ export default function PointsStepperBar({
 
   return (
     <View style={styles.card}>
-      {/* Header como la imagen (número grande + label a la derecha) */}
       <View style={styles.header}>
         <View>
-          {/* ✅ Número + icono (reemplaza ★) */}
+          {/* ✅ Número + moneda */}
           <View style={styles.bigRow}>
             <Text style={styles.bigNumber}>{clamped}</Text>
 
@@ -49,34 +46,39 @@ export default function PointsStepperBar({
                 ]}
                 resizeMode="contain"
               />
-            ) : (
-              <Text style={styles.star}>★</Text>
-            )}
+            ) : null}
           </View>
 
           <Text style={styles.smallLabel}>{title}</Text>
         </View>
 
+        {/* ✅ Pill: texto + moneda (SIN estrella) */}
         <View style={styles.pill}>
-          <Text style={styles.pillText}>{subtitle} ★</Text>
+          <Text style={styles.pillText}>{subtitle}</Text>
+
+          {iconSource ? (
+            <Image
+              source={iconSource}
+              style={[
+                styles.pillIcon,
+                { width: pillIconSize, height: pillIconSize, borderRadius: pillIconSize / 2 },
+              ]}
+              resizeMode="contain"
+            />
+          ) : null}
         </View>
       </View>
 
       {/* Barra */}
       <View style={styles.barWrap}>
-        {/* Línea base */}
         <View style={styles.track} />
-
-        {/* Progreso */}
         <View style={[styles.fill, { width: `${progressPct}%` }]} />
 
-        {/* Marcador actual tipo pin */}
         <View style={[styles.pinWrap, { left: `${progressPct}%` }]}>
           <View style={styles.pin} />
           <View style={styles.pinDot} />
         </View>
 
-        {/* Steps: bolitas + números */}
         <View style={styles.stepsRow}>
           {normalizedSteps.map((stepValue, idx) => {
             const pct = (stepValue / maxPoints) * 100;
@@ -95,7 +97,6 @@ export default function PointsStepperBar({
         </View>
       </View>
 
-      {/* Hint */}
       <Text style={styles.hint}>
         Acumula puntos y cámbialos por productos gratis ☕
       </Text>
@@ -116,7 +117,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // ✅ contenedor para número + icono
   bigRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -130,15 +130,6 @@ const styles = StyleSheet.create({
     lineHeight: 36,
   },
 
-  // fallback (si no se pasa iconSource)
-  star: {
-    color: colors.primary,
-    fontSize: 18,
-    fontWeight: "900",
-    marginTop: 2,
-  },
-
-  // ✅ icono moneda
   coinIcon: {
     marginTop: 2,
     backgroundColor: "transparent",
@@ -157,11 +148,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     backgroundColor: "#FFFFFF",
+
+    // ✅ para meter texto + icono
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
+
   pillText: {
     color: colors.primary,
     fontWeight: "700",
     fontSize: 12,
+  },
+
+  pillIcon: {
+    backgroundColor: "transparent",
   },
 
   barWrap: {
@@ -178,6 +179,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.primarySoft,
   },
+
   fill: {
     position: "absolute",
     left: 6,
@@ -192,6 +194,7 @@ const styles = StyleSheet.create({
     transform: [{ translateX: -8 }],
     alignItems: "center",
   },
+
   pin: {
     width: 2,
     height: 16,
@@ -199,6 +202,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     opacity: 0.9,
   },
+
   pinDot: {
     marginTop: 2,
     width: 12,
@@ -216,11 +220,13 @@ const styles = StyleSheet.create({
     top: 26,
     height: 28,
   },
+
   stepItem: {
     position: "absolute",
     transform: [{ translateX: -8 }],
     alignItems: "center",
   },
+
   stepDot: {
     width: 10,
     height: 10,
@@ -229,9 +235,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
+
   stepDotActive: {
     backgroundColor: colors.primary,
   },
+
   stepText: {
     marginTop: 6,
     fontSize: 10,

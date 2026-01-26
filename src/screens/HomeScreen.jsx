@@ -21,6 +21,9 @@ import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
 import AvatarWidget from "../components/AvatarWidget";
 import PointsStepperBar from "../components/PointsStepperBar";
 
+// Promociones desde POS
+import PromosSection from "../components/PromoSection";
+
 // ✅ Modal avatar grande
 import AvatarPreview from "../components/AvatarPreview";
 
@@ -166,10 +169,10 @@ export default function HomeScreen({ navigation }) {
               points={points}
               maxPoints={200}
               steps={[50, 100, 150, 200]}
-              title="Buddy Points"
-              subtitle="Rewards"
+              title="Buddy Coins"
+              subtitle="Buddy Coins"
               iconSource={LondonBuddyLogo}   // ✅ aquí reemplaza la estrella por el logo
-              iconSize={18}                  // opcional
+              iconSize={30}                  // opcional
             />
 
 
@@ -179,106 +182,11 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         {/* Promociones */}
-        <View style={styles.promosSection}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Promociones</Text>
-              <Text style={styles.sectionHint}>Novedades de LondonCafe</Text>
-            </View>
+        <PromosSection
+          limit={5}
+          onViewAll={() => navigation.navigate("Promos")}
+        />
 
-            <TouchableOpacity
-              style={styles.seeAllBtn}
-              onPress={() => navigation.navigate("Promos")}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.seeAllText}>Ver todas</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Card 1 */}
-          <TouchableOpacity
-            style={styles.promoCardV}
-            onPress={() => navigation.navigate("Promos")}
-            activeOpacity={0.9}
-          >
-            <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=1200&q=80",
-              }}
-              style={styles.promoImageV}
-            />
-
-            <View style={styles.promoOverlayV}>
-              <View style={styles.promoMetaRow}>
-                <Text style={styles.promoBadge}>HOY</Text>
-                <Text style={styles.promoTag}>⭐ Puntos x2</Text>
-              </View>
-
-              <Text style={styles.promoTitle} numberOfLines={1}>
-                Doble puntos en bebidas calientes
-              </Text>
-              <Text style={styles.promoSubtitle} numberOfLines={1}>
-                Válido de 4:00 pm a 8:00 pm
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Card 2 */}
-          <TouchableOpacity
-            style={styles.promoCardV}
-            onPress={() => navigation.navigate("Promos")}
-            activeOpacity={0.9}
-          >
-            <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=1200&q=80",
-              }}
-              style={styles.promoImageV}
-            />
-
-            <View style={styles.promoOverlayV}>
-              <View style={styles.promoMetaRow}>
-                <Text style={styles.promoBadge}>NUEVO</Text>
-                <Text style={styles.promoTag}>☕ + 🍪</Text>
-              </View>
-
-              <Text style={styles.promoTitle} numberOfLines={1}>
-                Combo café + snack
-              </Text>
-              <Text style={styles.promoSubtitle} numberOfLines={1}>
-                Pregunta en barra por el combo
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Card 3 */}
-          <TouchableOpacity
-            style={styles.promoCardV}
-            onPress={() => navigation.navigate("Promos")}
-            activeOpacity={0.9}
-          >
-            <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1200&q=80",
-              }}
-              style={styles.promoImageV}
-            />
-
-            <View style={styles.promoOverlayV}>
-              <View style={styles.promoMetaRow}>
-                <Text style={styles.promoBadge}>WEEK</Text>
-                <Text style={styles.promoTag}>🎉 Evento</Text>
-              </View>
-
-              <Text style={styles.promoTitle} numberOfLines={1}>
-                Tarde de juegos / comunidad
-              </Text>
-              <Text style={styles.promoSubtitle} numberOfLines={1}>
-                Revisa horarios en Promos
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
 
       {/* ✅ MODAL PEEK */}

@@ -1,109 +1,136 @@
 // controllers/points.controller.js
+const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const PointClaim = require("../models/PointClaims");
+const Receipt = require("../models/Receipt"); // ✅ modelo anti-duplicados (receiptId UNIQUE)
 
-/** helper: saca uid del token */
+/** helper: saca uid del token (tu auth normal) */
 function getUid(req) {
   return req.user?.uid || req.user?.sub || req.user?.userId || req.user?.id || null;
 }
 
-/** GET /points/me */
+/** helper: puntos por compra (ajústalo) */
+function calcPointsFromTotal(total) {
+  // ejemplo: 1 punto por cada $10
+  const t = Number(total) || 0;
+  if (t <= 0) return 0;
+  return Math.floor(t / 10);
+}
+
+/** helper: requiere JWT_SECRET */
+function getJwtSecret() {
+  return process.env.JWT_SECRET;
+}
+
+/** GET /api/points/me */
 async function getMyPoints(req, res) {
   try {
     const uid = getUid(req);
-    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
 
     const user = await User.findById(uid).select("points lifetimePoints");
-    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+    if (!user) return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
 
     return res.json({
       ok: true,
-      points: user.points || 0,
-      lifetimePoints: user.lifetimePoints || 0,
+      points: Number(user.points) || 0,
+      lifetimePoints: Number(user.lifetimePoints) || 0,
     });
   } catch (err) {
     console.log("getMyPoints error:", err?.message);
-    return res.status(500).json({ error: "SERVER_ERROR" });
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
   }
 }
 
-/** POST /points/claim  body: { code: "XXXX" } */
-async function claimPoints(req, res) {
+/**
+ * ✅ GET /api/points/qr/me  (APP)
+ * Genera un QR token temporal para que el POS lo escanee
+ */
+async function getMyQr(req, res) {
   try {
     const uid = getUid(req);
-    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
 
-    // ✅ DEV bypass: permite QR fijo "TEST_10_POINTS" (no caduca, no requiere PointClaim)
-    // Acepta tanto { code } como { qr } por si en el front mandas qr.
-    if (process.env.NODE_ENV !== "production") {
-      const incoming = String(req.body?.code || req.body?.qr || "").trim();
-      if (incoming === "TEST_10_POINTS") {
-        const add = 10;
+    const secret = getJwtSecret();
+    if (!secret) return res.status(500).json({ ok: false, error: "MISSING_JWT_SECRET" });
 
-        const updatedUser = await User.findByIdAndUpdate(
-          uid,
-          {
-            $inc: { points: add, lifetimePoints: add },
-            $push: {
-              pointsHistory: {
-                type: "EARN",
-                points: add,
-                source: "QR",
-                ref: "TEST_10_POINTS",
-                note: "DEV / QR",
-                createdAt: new Date(),
-              },
-            },
-          },
-          { new: true }
-        ).select("points lifetimePoints");
+    const ttlSeconds = 90; // 60-120s recomendado
 
-        return res.json({
-          ok: true,
-          added: add,
-          points: updatedUser?.points || 0,
-          lifetimePoints: updatedUser?.lifetimePoints || 0,
-          code: "TEST_10_POINTS",
-          dev: true,
-        });
-      }
-    }
-
-    const { code } = req.body || {};
-    const cleanCode = String(code || "").trim();
-
-    if (!cleanCode) return res.status(400).json({ error: "MISSING_CODE" });
-
-    // 1) buscar el claim
-    const claim = await PointClaim.findOne({ code: cleanCode });
-    if (!claim) return res.status(404).json({ error: "CODE_NOT_FOUND" });
-
-    // 2) validar expiración
-    if (claim.expiresAt && claim.expiresAt.getTime() < Date.now()) {
-      return res.status(410).json({ error: "CODE_EXPIRED" });
-    }
-
-    // 3) validar no usado
-    if (claim.usedBy) {
-      return res.status(409).json({ error: "CODE_ALREADY_USED" });
-    }
-
-    // 4) bloquear el claim y aplicarlo (evita double-claim por race condition)
-    //    hacemos update atómico: solo se marca si usedBy sigue en null
-    const locked = await PointClaim.findOneAndUpdate(
-      { _id: claim._id, usedBy: null },
-      { $set: { usedBy: uid, usedAt: new Date() } },
-      { new: true }
+    const qrToken = jwt.sign(
+      {
+        typ: "BUDDY_QR",
+        uid,
+        // nonce opcional para evitar reusos "visibles"
+        nonce: Math.random().toString(36).slice(2),
+      },
+      secret,
+      { expiresIn: ttlSeconds }
     );
 
-    if (!locked) {
-      return res.status(409).json({ error: "CODE_ALREADY_USED" });
+    return res.json({ ok: true, qrToken, expiresIn: ttlSeconds });
+  } catch (err) {
+    console.log("getMyQr error:", err?.message);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+}
+
+/**
+ * ✅ POST /api/points/pos/checkout  (POS)
+ * body: { qrToken, receiptId, total }
+ * - valida qrToken
+ * - evita duplicados por receiptId (UNIQUE)
+ * - suma puntos al usuario
+ */
+async function posCheckout(req, res) {
+  try {
+    const { qrToken, receiptId, total } = req.body || {};
+    const cleanToken = String(qrToken || "").trim();
+    const cleanReceipt = String(receiptId || "").trim();
+
+    if (!cleanToken) return res.status(400).json({ ok: false, error: "MISSING_QR_TOKEN" });
+    if (!cleanReceipt) return res.status(400).json({ ok: false, error: "MISSING_RECEIPT_ID" });
+
+    const secret = getJwtSecret();
+    if (!secret) return res.status(500).json({ ok: false, error: "MISSING_JWT_SECRET" });
+
+    // 1) validar token QR (expira solo)
+    let payload;
+    try {
+      payload = jwt.verify(cleanToken, secret);
+    } catch (e) {
+      return res.status(401).json({ ok: false, error: "QR_INVALID_OR_EXPIRED" });
     }
 
-    const add = Number(locked.points) || 0;
-    if (add <= 0) return res.status(400).json({ error: "BAD_POINTS" });
+    if (payload?.typ !== "BUDDY_QR") {
+      return res.status(400).json({ ok: false, error: "BAD_QR_TYPE" });
+    }
 
-    // 5) sumar puntos al usuario + historial
+    const uid = String(payload?.uid || "").trim();
+    if (!uid) return res.status(400).json({ ok: false, error: "QR_NO_UID" });
+
+    // 2) calcular puntos
+    const add = calcPointsFromTotal(total);
+    if (add <= 0) return res.status(400).json({ ok: false, error: "NO_POINTS_FOR_TOTAL" });
+
+    // 3) anti-duplicado (receiptId único)
+    //    crea primero el receipt; si ya existe -> 409
+    try {
+      await Receipt.create({
+        receiptId: cleanReceipt,
+        uid,
+        total: Number(total) || 0,
+        points: add,
+        createdAt: new Date(),
+      });
+    } catch (e) {
+      // si tienes unique index, Mongo tira error de duplicate key
+      if (e?.code === 11000) {
+        return res.status(409).json({ ok: false, error: "RECEIPT_ALREADY_PROCESSED" });
+      }
+      console.log("Receipt.create error:", e?.message);
+      return res.status(500).json({ ok: false, error: "RECEIPT_SAVE_FAILED" });
+    }
+
+    // 4) sumar puntos al usuario + historial
     const updatedUser = await User.findByIdAndUpdate(
       uid,
       {
@@ -112,9 +139,9 @@ async function claimPoints(req, res) {
           pointsHistory: {
             type: "EARN",
             points: add,
-            source: "QR",
-            ref: locked.code,
-            note: "Compra / QR",
+            source: "POS",
+            ref: cleanReceipt,
+            note: "Compra en caja",
             createdAt: new Date(),
           },
         },
@@ -122,59 +149,23 @@ async function claimPoints(req, res) {
       { new: true }
     ).select("points lifetimePoints");
 
+    if (!updatedUser) {
+      // ⚠️ Si por alguna razón no existe user, el receipt ya quedó creado.
+      // (si quieres, luego lo hacemos transaccional con Mongo sessions)
+      return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
+    }
+
     return res.json({
       ok: true,
       added: add,
-      points: updatedUser?.points || 0,
-      lifetimePoints: updatedUser?.lifetimePoints || 0,
-      code: locked.code,
+      points: Number(updatedUser?.points) || 0,
+      lifetimePoints: Number(updatedUser?.lifetimePoints) || 0,
+      receiptId: cleanReceipt,
     });
   } catch (err) {
-    console.log("claimPoints error:", err?.message);
-    return res.status(500).json({ error: "SERVER_ERROR" });
+    console.log("posCheckout error:", err?.message);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
   }
 }
 
-
-function randomCode(len = 8) {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin 0/O/1/I
-  let out = "";
-  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
-
-// POST /api/points/admin/create  body: { points: 10, expiresInHours?: 72 }
-async function adminCreateClaim(req, res) {
-  try {
-    // 🔒 por ahora simple. Luego lo amarramos a un admin role.
-    const { points, expiresInHours = 72 } = req.body || {};
-    const pts = Number(points) || 0;
-    if (pts <= 0) return res.status(400).json({ error: "BAD_POINTS" });
-
-    let code = randomCode(8);
-
-    // por si choca, reintenta
-    for (let i = 0; i < 5; i++) {
-      const exists = await PointClaim.findOne({ code });
-      if (!exists) break;
-      code = randomCode(8);
-    }
-
-    const expiresAt = expiresInHours ? new Date(Date.now() + Number(expiresInHours) * 3600 * 1000) : null;
-
-    const created = await PointClaim.create({
-      code,
-      points: pts,
-      expiresAt,
-    });
-
-    return res.json({ ok: true, code: created.code, points: created.points, expiresAt: created.expiresAt });
-  } catch (err) {
-    console.log("adminCreateClaim error:", err?.message);
-    return res.status(500).json({ error: "SERVER_ERROR" });
-  }
-}
-
-module.exports = { getMyPoints, claimPoints, adminCreateClaim };
-
-
+module.exports = { getMyPoints, getMyQr, posCheckout };

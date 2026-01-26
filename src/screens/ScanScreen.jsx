@@ -1,163 +1,134 @@
-import React, { useContext, useEffect, useRef, useState, useCallback } from "react";
-import { View, Text, StyleSheet, Alert, TouchableOpacity, ActivityIndicator } from "react-native";
+import React, { useContext, useCallback, useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import QRCode from "react-native-qrcode-svg";
 
-import { colors } from "../theme/colors";
 import Screen from "../components/Screen";
+import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 
-const CLAIM_PATH = "/points/claim";
+// ✅ backend real: GET /api/points/qr
+const QR_PATH = "/points/qr";
 
-export default function ScanScreen({ navigation }) {
+export default function ScanScreen() {
   const { token } = useContext(AuthContext);
 
-  const [permission, requestPermission] = useCameraPermissions();
-
-  const [scanning, setScanning] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [qrToken, setQrToken] = useState("");
+  const [expiresIn, setExpiresIn] = useState(0); // seconds
+  const [errorMsg, setErrorMsg] = useState("");
 
-  // lock para evitar doble escaneo
-  const lockRef = useRef(false);
+  const timerRef = useRef(null);
 
-  // cuando entras a la pantalla, re-habilita escaneo
-  useFocusEffect(
-    useCallback(() => {
-      setScanning(true);
-      lockRef.current = false;
-      setLoading(false);
-    }, [])
-  );
+  const stopTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+  };
 
-  useEffect(() => {
-    if (!permission) return;
-    if (!permission.granted && permission.canAskAgain) {
-      // no auto-pidas aquí si no quieres; puedes dejar que el usuario toque botón
-    }
-  }, [permission]);
+  const startCountdown = (seconds) => {
+    stopTimer();
+    setExpiresIn(seconds);
 
-  const handleBarcodeScanned = async ({ data, type }) => {
+    timerRef.current = setInterval(() => {
+      setExpiresIn((s) => {
+        if (s <= 1) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  };
+
+  const fetchMyQr = useCallback(async () => {
     if (!token) {
-      Alert.alert("Sesión", "Inicia sesión de nuevo.");
+      setErrorMsg("Sesión inválida. Inicia sesión de nuevo.");
       return;
     }
 
-    if (!scanning || lockRef.current || loading) return;
-
-    lockRef.current = true;
-    setScanning(false);
-
     try {
       setLoading(true);
+      setErrorMsg("");
 
-      const clean = String(data || "").trim();
-      console.log("✅ QR type:", type);
-      console.log("✅ QR data:", clean);
-
-      // ✅ Backend espera { code }, no { qr }
-      const r = await apiFetch(CLAIM_PATH, {
-        method: "POST",
+      const r = await apiFetch(QR_PATH, {
+        method: "GET",
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ code: clean }),
       });
 
-      if (r?.ok === false) {
-        Alert.alert("No se pudo", r?.msg || "QR inválido.");
-        lockRef.current = false;
-        setScanning(true);
-        return;
-      }
+      const t = String(r?.qrToken || "");
+      const ttl = Number(r?.expiresIn) || 90;
 
-      // ✅ Backend responde { added }, no addedPoints
-      const added = Number(r?.added) || null;
+      if (!r?.ok || !t) throw new Error("NO_QR_TOKEN");
 
-      Alert.alert(
-        "Listo ✅",
-        added ? `Se agregaron ${added} puntos.` : "Puntos agregados.",
-        [{ text: "OK", onPress: () => navigation.navigate("Home") }]
-      );
+      setQrToken(t);
+      startCountdown(ttl);
     } catch (e) {
-      console.log("❌ claim status:", e?.status);
-      console.log("❌ claim data:", e?.data || e?.message);
+      console.log("❌ points/qr:", e?.status, e?.data || e?.message);
+      setQrToken("");
+      setExpiresIn(0);
 
-      if (e?.status === 401) return Alert.alert("Sesión", "Tu sesión expiró. Inicia de nuevo.");
-      if (e?.status === 409) return Alert.alert("Ya usado", "Este QR ya fue reclamado.");
-      if (e?.status === 404) return Alert.alert("QR inválido", "Código no encontrado.");
-      if (e?.status === 410) return Alert.alert("Caducado", "Este QR ya caducó.");
-      if (e?.status === 400) return Alert.alert("QR inválido", "Falta código o es inválido.");
-
-      Alert.alert("Error", "No se pudo procesar el QR.");
-
-      lockRef.current = false;
-      setScanning(true);
+      // mensajes según status si quieres (opcional)
+      if (e?.status === 401) setErrorMsg("Tu sesión expiró. Inicia sesión de nuevo.");
+      else setErrorMsg("No se pudo generar tu QR. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  const onRescan = () => {
-    lockRef.current = false;
-    setScanning(true);
-  };
+  // ✅ al abrir la pantalla, genera QR
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyQr();
+      return () => stopTimer();
+    }, [fetchMyQr])
+  );
 
-  if (!permission) {
-    return (
-      <Screen>
-        <View style={styles.center}>
-          <ActivityIndicator />
-          <Text style={styles.muted}>Cargando permisos de cámara...</Text>
-        </View>
-      </Screen>
-    );
-  }
-
-  if (!permission.granted) {
-    return (
-      <Screen>
-        <View style={[styles.wrap, { justifyContent: "center" }]}>
-          <Text style={styles.h1}>Escanear</Text>
-          <Text style={[styles.sub, { marginBottom: 18 }]}>
-            Necesitamos permiso de cámara para escanear QR.
-          </Text>
-
-          <TouchableOpacity onPress={requestPermission} style={styles.primaryBtn} activeOpacity={0.9}>
-            <Text style={styles.primaryBtnText}>Dar permiso</Text>
-          </TouchableOpacity>
-        </View>
-      </Screen>
-    );
-  }
+  // ✅ refresco automático cuando quedan pocos segundos (opcional)
+  useEffect(() => {
+    if (!expiresIn) return;
+    if (expiresIn === 10) fetchMyQr();
+  }, [expiresIn, fetchMyQr]);
 
   return (
     <Screen>
       <View style={styles.wrap}>
-        <Text style={styles.h1}>Escanear</Text>
-        <Text style={styles.sub}>Escanea el QR de tu compra para sumar puntos</Text>
+        <Text style={styles.h1}>Mi QR</Text>
+        <Text style={styles.sub}>Muestra este QR en caja para vincular tu compra</Text>
 
-        <View style={styles.cameraBox}>
-          <CameraView
-            style={StyleSheet.absoluteFillObject}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={scanning ? handleBarcodeScanned : undefined}
-          />
-
-          <View style={styles.frame} />
-
+        <View style={styles.card}>
           {loading ? (
-            <View style={styles.loadingPill}>
+            <View style={styles.center}>
               <ActivityIndicator />
-              <Text style={styles.loadingText}>Procesando...</Text>
+              <Text style={styles.muted}>Generando QR...</Text>
+            </View>
+          ) : qrToken ? (
+            <View style={styles.center}>
+              <View style={styles.qrBox}>
+                <QRCode value={qrToken} size={220} />
+              </View>
+
+              <Text style={styles.timer}>
+                Expira en <Text style={styles.timerStrong}>{expiresIn}s</Text>
+              </Text>
+
+              <Text style={styles.hint}>*Por seguridad, este QR cambia seguido.</Text>
             </View>
           ) : (
-            <View style={styles.bottomArea}>
-              <Text style={styles.help}>Coloca el QR dentro del recuadro</Text>
-              <TouchableOpacity onPress={onRescan} style={styles.btn} activeOpacity={0.9}>
-                <Text style={styles.btnText}>Escanear de nuevo</Text>
-              </TouchableOpacity>
+            <View style={styles.center}>
+              <Text style={styles.err}>{errorMsg || "Sin QR disponible"}</Text>
             </View>
           )}
+
+          <TouchableOpacity
+            onPress={fetchMyQr}
+            style={[styles.btn, loading && { opacity: 0.6 }]}
+            activeOpacity={0.9}
+            disabled={loading}
+          >
+            <Text style={styles.btnText}>{qrToken ? "Actualizar QR" : "Generar QR"}</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Screen>
@@ -167,69 +138,40 @@ export default function ScanScreen({ navigation }) {
 const styles = StyleSheet.create({
   wrap: { flex: 1, padding: 20, backgroundColor: colors.background },
   h1: { color: colors.text, fontSize: 22, fontWeight: "900", marginBottom: 6 },
-  sub: { color: colors.textMuted, marginBottom: 12 },
+  sub: { color: colors.textMuted, marginBottom: 14 },
 
-  cameraBox: {
-    flex: 1,
+  card: {
     borderRadius: 18,
-    overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: colors.card,
+    padding: 16,
   },
 
-  frame: {
-    position: "absolute",
-    left: 40,
-    right: 40,
-    top: "28%",
-    height: 220,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.9)",
-  },
+  center: { alignItems: "center", justifyContent: "center", gap: 10 },
 
-  bottomArea: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 18,
-    alignItems: "center",
-    gap: 10,
-  },
-
-  help: { color: "rgba(255,255,255,0.95)", fontWeight: "800" },
-
-  btn: {
+  qrBox: {
+    padding: 14,
+    borderRadius: 16,
     backgroundColor: "#fff",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.06)",
   },
-  btnText: { color: "#111", fontWeight: "900" },
 
-  loadingPill: {
-    position: "absolute",
-    bottom: 24,
-    alignSelf: "center",
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-  loadingText: { color: "#fff", fontWeight: "900" },
+  timer: { marginTop: 4, color: colors.textMuted, fontWeight: "800" },
+  timerStrong: { color: colors.text },
 
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
+  hint: { marginTop: 2, color: colors.textMuted, fontSize: 12 },
+
+  err: { color: colors.text, fontWeight: "900" },
   muted: { color: colors.textMuted },
 
-  primaryBtn: {
-    paddingVertical: 14,
-    borderRadius: 999,
+  btn: {
+    marginTop: 14,
     backgroundColor: colors.primary,
+    paddingVertical: 12,
+    borderRadius: 999,
     alignItems: "center",
   },
-  primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+  btnText: { color: "#fff", fontWeight: "900" },
 });

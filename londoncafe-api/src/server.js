@@ -11,11 +11,16 @@ const branchRoutes = require("./routes/branch.routes");
 const pointsRoutes = require("./routes/points.routes");
 // auth (cuando lo agreguemos)
 const authRoutes = require("./routes/auth.routes");
+const salesRoutes = require("./routes/sales");
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
+}));
 app.use(express.json());
 
 app.get("/api/health", (req, res) => {
@@ -28,7 +33,7 @@ app.use("/api/promos", promoRoutes);
 app.use("/api/branches", branchRoutes);
 app.use("/api", require("./routes/me.routes"));
 app.use("/api/points", pointsRoutes);
-
+app.use("/api/sales", salesRoutes);
 app.use("/api/dev", require("./routes/dev"));
 
 const PORT = process.env.PORT || 4000;
