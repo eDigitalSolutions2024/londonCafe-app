@@ -17,9 +17,10 @@ function calcPointsFromTotal(total) {
 }
 
 /** helper: requiere JWT_SECRET */
-function getJwtSecret() {
-  return process.env.JWT_SECRET;
+function getQrSecret() {
+  return process.env.QR_JWT_SECRET;
 }
+
 
 /** GET /api/points/me */
 async function getMyPoints(req, res) {
@@ -50,10 +51,14 @@ async function getMyQr(req, res) {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
 
-    const secret = getJwtSecret();
-    if (!secret) return res.status(500).json({ ok: false, error: "MISSING_JWT_SECRET" });
+    const secret = getQrSecret()  // fallback por si no tienes QR_JWT_SECRET
+if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET" });
+
 
     const ttlSeconds = 90; // 60-120s recomendado
+
+      console.log("[APP getMyQr] QR_JWT_SECRET =", process.env.QR_JWT_SECRET);
+
 
     const qrToken = jwt.sign(
       {
@@ -69,6 +74,46 @@ async function getMyQr(req, res) {
     return res.json({ ok: true, qrToken, expiresIn: ttlSeconds });
   } catch (err) {
     console.log("getMyQr error:", err?.message);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+}
+
+
+/**
+ * ✅ POST /api/points/pos/scan-qr  (POS)
+ * body: { qrToken }
+ * - valida qrToken
+ * - regresa info del usuario (sin sumar puntos)
+ */
+async function posScanQr(req, res) {
+  try {
+    const { qrToken } = req.body || {};
+    const cleanToken = String(qrToken || "").trim();
+    if (!cleanToken) return res.status(400).json({ ok: false, error: "MISSING_QR_TOKEN" });
+
+    const secret = process.env.QR_JWT_SECRET || process.env.JWT_SECRET; // recomendado: QR_JWT_SECRET
+    if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET" });
+
+    let payload;
+    try {
+      payload = jwt.verify(cleanToken, secret); // verifica firma + exp
+    } catch (e) {
+      return res.status(401).json({ ok: false, error: "QR_INVALID_OR_EXPIRED" });
+    }
+
+    if (payload?.typ !== "BUDDY_QR") {
+      return res.status(400).json({ ok: false, error: "BAD_QR_TYPE" });
+    }
+
+    const uid = String(payload?.uid || "").trim();
+    if (!uid) return res.status(400).json({ ok: false, error: "QR_NO_UID" });
+
+    const user = await User.findById(uid).select("_id name username email points lifetimePoints");
+    if (!user) return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
+
+    return res.json({ ok: true, user, exp: payload.exp });
+  } catch (err) {
+    console.log("posScanQr error:", err?.message);
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
   }
 }
@@ -89,8 +134,10 @@ async function posCheckout(req, res) {
     if (!cleanToken) return res.status(400).json({ ok: false, error: "MISSING_QR_TOKEN" });
     if (!cleanReceipt) return res.status(400).json({ ok: false, error: "MISSING_RECEIPT_ID" });
 
-    const secret = getJwtSecret();
-    if (!secret) return res.status(500).json({ ok: false, error: "MISSING_JWT_SECRET" });
+    const secret = getQrSecret() || process.env.JWT_SECRET;
+if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET" });
+
+
 
     // 1) validar token QR (expira solo)
     let payload;
@@ -167,5 +214,15 @@ async function posCheckout(req, res) {
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
   }
 }
+/**
+ * ✅ POST /api/points/pos/scan-qr  (POS)
+ * body: { qrToken }
+ * - valida qrToken
+ * - regresa info básica del usuario (sin sumar puntos)
+ */
 
-module.exports = { getMyPoints, getMyQr, posCheckout };
+
+
+module.exports = { getMyPoints, getMyQr, posScanQr, posCheckout };
+
+

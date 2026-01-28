@@ -58,11 +58,12 @@ export default function ScanScreen() {
       });
 
       const t = String(r?.qrToken || "");
+const qrValue = `londoncafe://qr?token=${encodeURIComponent(t)}`;
       const ttl = Number(r?.expiresIn) || 90;
 
       if (!r?.ok || !t) throw new Error("NO_QR_TOKEN");
 
-      setQrToken(t);
+      setQrToken(qrValue);
       startCountdown(ttl);
     } catch (e) {
       console.log("❌ points/qr:", e?.status, e?.data || e?.message);
