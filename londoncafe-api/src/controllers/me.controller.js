@@ -5,13 +5,15 @@ function getUid(req) {
   return req.user?.uid || req.user?.sub || req.user?.userId || req.user?.id || null;
 }
 
+const ALLOWED_GENDERS = new Set(["male", "female", "other"]);
+
 async function getMe(req, res) {
   try {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
     const user = await User.findById(uid).select(
-      "name username email isEmailVerified avatarConfig createdAt"
+      "name gender username email isEmailVerified avatarConfig createdAt"
     );
 
     if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
@@ -28,7 +30,7 @@ async function updateMe(req, res) {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
-    const { name, username, email } = req.body || {};
+    const { name, username, email, gender } = req.body || {};
     const patch = {};
 
     if (typeof name === "string" && name.trim()) patch.name = name.trim();
@@ -49,8 +51,18 @@ async function updateMe(req, res) {
       patch.email = email.trim().toLowerCase();
     }
 
-    const updated = await User.findByIdAndUpdate(uid, patch, { new: true })
-      .select("name username email isEmailVerified avatarConfig createdAt");
+    // ✅ NUEVO: actualizar género
+    if (typeof gender === "string") {
+      const g = gender.trim().toLowerCase();
+      if (!ALLOWED_GENDERS.has(g)) {
+        return res.status(400).json({ error: "BAD_GENDER" });
+      }
+      patch.gender = g;
+    }
+
+    const updated = await User.findByIdAndUpdate(uid, patch, { new: true }).select(
+      "name gender username email isEmailVerified avatarConfig createdAt"
+    );
 
     return res.json({ ok: true, user: updated });
   } catch (err) {
@@ -84,16 +96,13 @@ async function updateAvatar(req, res) {
       }
     }
 
-    // Si no mandaron nada permitido
     if (Object.keys($set).length === 0) {
       return res.status(400).json({ error: "NO_ALLOWED_FIELDS" });
     }
 
-    const updated = await User.findByIdAndUpdate(
-      uid,
-      { $set },
-      { new: true }
-    ).select("avatarConfig");
+    const updated = await User.findByIdAndUpdate(uid, { $set }, { new: true }).select(
+      "avatarConfig"
+    );
 
     return res.json({ ok: true, avatarConfig: updated.avatarConfig });
   } catch (err) {

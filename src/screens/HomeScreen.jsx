@@ -40,6 +40,7 @@ export default function HomeScreen({ navigation }) {
   // ✅ AVATAR REAL DEL BACKEND (SIN DEFAULTS)
   const [avatarConfig, setAvatarConfig] = useState(null);
   const [loadingMe, setLoadingMe] = useState(false);
+const [me, setMe] = useState(null);
 
   const fetchPoints = useCallback(async () => {
     if (!token) return;
@@ -63,27 +64,31 @@ export default function HomeScreen({ navigation }) {
 
   // ✅ Traer /me para obtener avatarConfig real del backend
   const fetchMe = useCallback(async () => {
-    if (!token) return;
+  if (!token) return;
 
-    try {
-      setLoadingMe(true);
+  try {
+    setLoadingMe(true);
 
-      const r = await apiFetch("/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    const r = await apiFetch("/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      // Preferimos el backend; si no viene, intentamos con el user del contexto
-      const cfg = r?.user?.avatarConfig ?? user?.avatarConfig ?? null;
-      setAvatarConfig(cfg);
-    } catch (e) {
-      console.log("❌ /me:", e?.data || e?.message);
+    const u = r?.user ?? user ?? null;
+    setMe(u);
 
-      // fallback: lo que haya en el contexto (si existe)
-      setAvatarConfig(user?.avatarConfig ?? null);
-    } finally {
-      setLoadingMe(false);
-    }
-  }, [token, user]);
+    const cfg = u?.avatarConfig ?? null;
+    setAvatarConfig(cfg);
+  } catch (e) {
+    console.log("❌ /me:", e?.data || e?.message);
+
+    const u = user ?? null;
+    setMe(u);
+    setAvatarConfig(u?.avatarConfig ?? null);
+  } finally {
+    setLoadingMe(false);
+  }
+}, [token, user]);
+
 
   useEffect(() => {
     apiFetch("/health")
@@ -98,6 +103,13 @@ export default function HomeScreen({ navigation }) {
       fetchMe();
     }, [fetchPoints, fetchMe])
   );
+
+  const displayName = (() => {
+  const n = (me?.name || user?.name || "London Buddy").trim();
+  const un = (me?.username || user?.username || "").trim();
+  return un ? `${n} (@${un})` : n;
+})();
+
 
   return (
     <Screen>
@@ -139,7 +151,7 @@ export default function HomeScreen({ navigation }) {
             {/* ✅ NO mostrar avatar default: solo cuando ya existe avatarConfig real */}
             {avatarConfig ? (
               <AvatarWidget
-                name="London Buddy"
+                name={displayName}
                 mood="Con energía"
                 energy={80}
                 avatarConfig={avatarConfig}
@@ -149,6 +161,7 @@ export default function HomeScreen({ navigation }) {
                 onAvatarLongPress={() => setShowAvatarPeek(true)}
                 onAvatarPressOut={() => setShowAvatarPeek(false)}
               />
+
             ) : (
               <View
                 style={{
