@@ -1,17 +1,16 @@
 // routes/points.routes.js
 const router = require("express").Router();
 const { requireAuth } = require("../middleware/auth.middleware");
+const { requireApiKey } = require("../middleware/apiKey.middleware");
 
-const { getMyPoints, getMyQr, posCheckout } = require("../controllers/points.controller");
+const { getMyPoints, getMyQr, posScanQr, posCheckout } = require("../controllers/points.controller");
 
 // APP
 router.get("/me", requireAuth, getMyPoints);
-
-// APP: generar token QR temporal para mostrar en pantalla
 router.get("/qr", requireAuth, getMyQr);
 
-// POS: caja escanea QR + manda receiptId/total para sumar puntos
-// (Luego le ponemos middleware de POS KEY)
-router.post("/pos/checkout", posCheckout);
+// POS
+router.post("/pos/scan-qr", requireApiKey, posScanQr);
+router.post("/pos/checkout", requireApiKey, posCheckout);
 
 module.exports = router;
