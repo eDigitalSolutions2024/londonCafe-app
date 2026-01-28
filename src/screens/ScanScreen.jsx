@@ -42,41 +42,40 @@ export default function ScanScreen() {
     }, 1000);
   };
 
-  const fetchMyQr = useCallback(async () => {
-    if (!token) {
-      setErrorMsg("Sesión inválida. Inicia sesión de nuevo.");
-      return;
-    }
+ const fetchMyQr = useCallback(async () => {
+  if (!token) {
+    setErrorMsg("Sesión inválida. Inicia sesión de nuevo.");
+    return;
+  }
 
-    try {
-      setLoading(true);
-      setErrorMsg("");
+  try {
+    setLoading(true);
+    setErrorMsg("");
 
-      const r = await apiFetch(QR_PATH, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    const r = await apiFetch(QR_PATH, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      const t = String(r?.qrToken || "");
-const qrValue = `londoncafe://qr?token=${encodeURIComponent(t)}`;
-      const ttl = Number(r?.expiresIn) || 90;
+    const qrValue = String(r?.qrValue || "");
+    const ttl = Number(r?.expiresIn) || 90;
 
-      if (!r?.ok || !t) throw new Error("NO_QR_TOKEN");
+    if (!r?.ok || !qrValue) throw new Error("NO_QR_VALUE");
 
-      setQrToken(qrValue);
-      startCountdown(ttl);
-    } catch (e) {
-      console.log("❌ points/qr:", e?.status, e?.data || e?.message);
-      setQrToken("");
-      setExpiresIn(0);
+    setQrToken(qrValue);
+    startCountdown(ttl);
+  } catch (e) {
+    console.log("❌ points/qr:", e?.status, e?.data || e?.message);
+    setQrToken("");
+    setExpiresIn(0);
 
-      // mensajes según status si quieres (opcional)
-      if (e?.status === 401) setErrorMsg("Tu sesión expiró. Inicia sesión de nuevo.");
-      else setErrorMsg("No se pudo generar tu QR. Intenta de nuevo.");
-    } finally {
-      setLoading(false);
-    }
-  }, [token]);
+    if (e?.status === 401) setErrorMsg("Tu sesión expiró. Inicia sesión de nuevo.");
+    else setErrorMsg("No se pudo generar tu QR. Intenta de nuevo.");
+  } finally {
+    setLoading(false);
+  }
+}, [token]);
+
 
   // ✅ al abrir la pantalla, genera QR
   useFocusEffect(

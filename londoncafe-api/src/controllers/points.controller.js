@@ -1,7 +1,7 @@
 // controllers/points.controller.js
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const Receipt = require("../models/Receipt"); // ✅ modelo anti-duplicados (receiptId UNIQUE)
+const Receipt = require("../models/Receipt"); // ✅ anti-duplicados (receiptId UNIQUE)
 
 /** helper: saca uid del token (tu auth normal) */
 function getUid(req) {
@@ -16,11 +16,43 @@ function calcPointsFromTotal(total) {
   return Math.floor(t / 10);
 }
 
-/** helper: requiere JWT_SECRET */
+/** helper: secret único para QR (NO mezclar con JWT_SECRET si quieres consistencia) */
 function getQrSecret() {
-  return process.env.QR_JWT_SECRET;
+  return process.env.QR_JWT_SECRET || "";
 }
 
+/** helper: si te llega un deep link tipo londoncafe://qr?token=... extrae el token */
+function extractToken(raw) {
+  let s = String(raw || "").trim();
+  if (!s) return "";
+
+  // quita espacios y newlines
+  s = s.replace(/\s+/g, "");
+
+  // intenta URL decode (por si viene %3D etc)
+  try {
+    s = decodeURIComponent(s);
+  } catch {}
+
+  // si viene como deep link con token=
+  const m = s.match(/token=([^&]+)/i);
+  if (m?.[1]) {
+    try {
+      return decodeURIComponent(m[1]);
+    } catch {
+      return m[1];
+    }
+  }
+
+  // si viene como "qr_token)" o similares, intenta recortar desde eyJ
+  const start = s.indexOf("eyJ");
+  if (start >= 0) s = s.slice(start);
+
+  // corta por separadores típicos
+  s = s.split("&")[0];
+
+  return s;
+}
 
 /** GET /api/points/me */
 async function getMyPoints(req, res) {
@@ -45,53 +77,54 @@ async function getMyPoints(req, res) {
 /**
  * ✅ GET /api/points/qr/me  (APP)
  * Genera un QR token temporal para que el POS lo escanee
+ * 🔥 MEJORA: regresamos qrValue listo para QR: londoncafe://qr?token=<ENCODED>
  */
 async function getMyQr(req, res) {
   try {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
 
-    const secret = getQrSecret()  // fallback por si no tienes QR_JWT_SECRET
-if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET" });
-
+    const secret = getQrSecret();
+    if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET" });
 
     const ttlSeconds = 90; // 60-120s recomendado
-
-      console.log("[APP getMyQr] QR_JWT_SECRET =", process.env.QR_JWT_SECRET);
-
 
     const qrToken = jwt.sign(
       {
         typ: "BUDDY_QR",
         uid,
-        // nonce opcional para evitar reusos "visibles"
         nonce: Math.random().toString(36).slice(2),
       },
       secret,
       { expiresIn: ttlSeconds }
     );
 
-    return res.json({ ok: true, qrToken, expiresIn: ttlSeconds });
+    // 🔎 Diagnóstico: un JWT base64url normalmente NO trae "/" ni "+"
+    console.log("[APP getMyQr] token hasSlash:", qrToken.includes("/"), "hasPlus:", qrToken.includes("+"));
+
+    // ✅ Esto es lo que debes pintar como QR en la app
+    const qrValue = `londoncafe://qr?token=${encodeURIComponent(qrToken)}`;
+
+    return res.json({ ok: true, qrToken, qrValue, expiresIn: ttlSeconds });
   } catch (err) {
     console.log("getMyQr error:", err?.message);
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
   }
 }
 
-
 /**
  * ✅ POST /api/points/pos/scan-qr  (POS)
- * body: { qrToken }
+ * body: { qrToken }  (puede ser token directo o el deep link completo)
  * - valida qrToken
  * - regresa info del usuario (sin sumar puntos)
  */
 async function posScanQr(req, res) {
   try {
-    const { qrToken } = req.body || {};
-    const cleanToken = String(qrToken || "").trim();
+    const rawIn = req.body?.qrToken;
+    const cleanToken = extractToken(rawIn);
     if (!cleanToken) return res.status(400).json({ ok: false, error: "MISSING_QR_TOKEN" });
 
-    const secret = process.env.QR_JWT_SECRET || process.env.JWT_SECRET; // recomendado: QR_JWT_SECRET
+    const secret = getQrSecret();
     if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET" });
 
     let payload;
@@ -127,17 +160,15 @@ async function posScanQr(req, res) {
  */
 async function posCheckout(req, res) {
   try {
-    const { qrToken, receiptId, total } = req.body || {};
-    const cleanToken = String(qrToken || "").trim();
+    const { receiptId, total } = req.body || {};
     const cleanReceipt = String(receiptId || "").trim();
 
+    const cleanToken = extractToken(req.body?.qrToken);
     if (!cleanToken) return res.status(400).json({ ok: false, error: "MISSING_QR_TOKEN" });
     if (!cleanReceipt) return res.status(400).json({ ok: false, error: "MISSING_RECEIPT_ID" });
 
-    const secret = getQrSecret() || process.env.JWT_SECRET;
-if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET" });
-
-
+    const secret = getQrSecret();
+    if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET" });
 
     // 1) validar token QR (expira solo)
     let payload;
@@ -159,7 +190,6 @@ if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET"
     if (add <= 0) return res.status(400).json({ ok: false, error: "NO_POINTS_FOR_TOTAL" });
 
     // 3) anti-duplicado (receiptId único)
-    //    crea primero el receipt; si ya existe -> 409
     try {
       await Receipt.create({
         receiptId: cleanReceipt,
@@ -169,7 +199,6 @@ if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET"
         createdAt: new Date(),
       });
     } catch (e) {
-      // si tienes unique index, Mongo tira error de duplicate key
       if (e?.code === 11000) {
         return res.status(409).json({ ok: false, error: "RECEIPT_ALREADY_PROCESSED" });
       }
@@ -197,8 +226,6 @@ if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET"
     ).select("points lifetimePoints");
 
     if (!updatedUser) {
-      // ⚠️ Si por alguna razón no existe user, el receipt ya quedó creado.
-      // (si quieres, luego lo hacemos transaccional con Mongo sessions)
       return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
     }
 
@@ -214,15 +241,5 @@ if (!secret) return res.status(500).json({ ok: false, error: "MISSING_QR_SECRET"
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
   }
 }
-/**
- * ✅ POST /api/points/pos/scan-qr  (POS)
- * body: { qrToken }
- * - valida qrToken
- * - regresa info básica del usuario (sin sumar puntos)
- */
-
-
 
 module.exports = { getMyPoints, getMyQr, posScanQr, posCheckout };
-
-
