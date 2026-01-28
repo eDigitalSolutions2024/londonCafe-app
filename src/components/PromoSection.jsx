@@ -129,7 +129,7 @@ export default function PromosSection({
               <Text style={styles.promoTitle} numberOfLines={1}>
                 {p?.title || "Promoción"}
               </Text>
-              <Text style={styles.promoSubtitle} numberOfLines={1}>
+              <Text style={styles.promoSubtitle} numberOfLines={3}>
                 {p?.description || ""}
               </Text>
             </View>
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   emptyText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
 
   promoCardV: {
-    height: 150,
+    height: 220,
     borderRadius: 18,
     overflow: "hidden",
     marginBottom: 12,
@@ -223,10 +223,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    height: 80,                 // ✅ NUEVO (controla cuánto tapa)
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingVertical: 10,        // ✅ un poco menos
+    backgroundColor: "rgba(0,0,0,0.38)", // ✅ menos opaco
   },
+
 
   promoMetaRow: {
     flexDirection: "row",
