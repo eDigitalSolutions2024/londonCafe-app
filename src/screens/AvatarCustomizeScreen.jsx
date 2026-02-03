@@ -7,17 +7,30 @@ import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 
 const OPTIONS = {
-  // ✅ por ahora: SOLO color de pelo + ropa
-   hair: ["hair_01", "hair_02", "hair_03", "hair_04", "hair_05"],
+  // ✅ NUEVO: skin
+  skin: ["skin_01", "skin_f_01"],
+
+  // ✅ pelo
+  hair: ["hair_01", "hair_02", "hair_03", "hair_04", "hair_05", "hair_f_01"],
+
+  // ✅ ropa
   top: ["top_01", "top_02", "top_03"],
 };
 
 const labelMap = {
-  hairColor: "Color de cabello",
+  skin: "Skin",
+  hair: "Cabello",
   top: "Ropa",
 };
 
-function prettyLabel(v) {
+function prettyLabel(key, v) {
+  if (key === "skin") {
+    if (v === "skin_01") return "Default";
+    if (v === "skin_f_01") return "Mujer";
+  }
+  if (key === "hair") {
+    if (v === "hair_f_01") return "hair 06";
+  }
   return String(v).replace(/_/g, " ");
 }
 
@@ -25,13 +38,12 @@ export default function AvatarCustomizeScreen({ navigation }) {
   const { token, setUser, user } = useContext(AuthContext);
   const [saving, setSaving] = useState(false);
 
-  // ✅ defaults completos (aunque no se muestren en UI)
   const defaults = useMemo(
     () => ({
       skin: "skin_01",
       eyes: "eyes_01",
-      hair: null, // por si luego agregas forma de pelo
-      hairColor: "hairColor_01", // ✅ tu caso actual
+      hair: null,
+      hairColor: "hairColor_01",
       top: "top_01",
       bottom: "bottom_01",
       shoes: "shoes_01",
@@ -40,7 +52,6 @@ export default function AvatarCustomizeScreen({ navigation }) {
     []
   );
 
-  // ✅ merge: si user.avatarConfig viene viejo, no se rompe
   const initialConfig = useMemo(() => {
     const fromUser = user?.avatarConfig || {};
     return { ...defaults, ...fromUser };
@@ -86,11 +97,7 @@ export default function AvatarCustomizeScreen({ navigation }) {
 
   return (
     <Screen>
-      <ScrollView
-        style={styles.wrap}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
@@ -115,19 +122,20 @@ export default function AvatarCustomizeScreen({ navigation }) {
           {/* Opciones */}
           {Object.entries(OPTIONS).map(([key, values]) => (
             <View key={key} style={styles.section}>
-              <Text style={styles.sectionTitle}>{labelMap[key]}</Text>
+              {/* ✅ anti-error si no existe label */}
+              <Text style={styles.sectionTitle}>{labelMap[key] || key}</Text>
 
               <View style={styles.optionsRow}>
                 {values.map((v) => {
                   const active = avatarConfig[key] === v;
                   return (
                     <Pressable
-                      key={v}
+                      key={`${key}-${v}`} // ✅ key único
                       onPress={() => setPart(key, v)}
                       style={[styles.optionBtn, active && styles.optionBtnActive]}
                     >
                       <Text style={[styles.optionText, active && styles.optionTextActive]}>
-                        {prettyLabel(v)}
+                        {prettyLabel(key, v)}
                       </Text>
                     </Pressable>
                   );
@@ -137,11 +145,7 @@ export default function AvatarCustomizeScreen({ navigation }) {
           ))}
 
           {/* Guardar */}
-          <Pressable
-            style={[styles.saveBtn, saving && { opacity: 0.75 }]}
-            onPress={onSave}
-            disabled={saving}
-          >
+          <Pressable style={[styles.saveBtn, saving && { opacity: 0.75 }]} onPress={onSave} disabled={saving}>
             <Text style={styles.saveText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
           </Pressable>
         </View>
@@ -156,12 +160,7 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.background },
   content: { padding: 20, paddingBottom: 28 },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
   title: { color: colors.text, fontSize: 20, fontWeight: "900" },
   sub: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
 
@@ -175,13 +174,7 @@ const styles = StyleSheet.create({
   },
   closeText: { color: colors.textMuted, fontWeight: "800", fontSize: 12 },
 
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-  },
+  card: { backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.primarySoft },
 
   previewWrap: { alignItems: "center", marginBottom: 8 },
   previewCircle: {
@@ -197,13 +190,7 @@ const styles = StyleSheet.create({
   },
 
   section: { marginTop: 14 },
-  sectionTitle: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-    marginBottom: 10,
-  },
+  sectionTitle: { color: colors.textMuted, fontSize: 12, fontWeight: "900", letterSpacing: 0.3, marginBottom: 10 },
 
   optionsRow: { flexDirection: "row", flexWrap: "wrap" },
 
@@ -222,12 +209,6 @@ const styles = StyleSheet.create({
   optionText: { color: "#111", fontSize: 12, fontWeight: "900" },
   optionTextActive: { color: "#fff" },
 
-  saveBtn: {
-    marginTop: 16,
-    paddingVertical: 14,
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-  },
+  saveBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
   saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 });

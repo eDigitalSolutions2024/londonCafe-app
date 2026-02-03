@@ -1,9 +1,9 @@
 import { apiFetch } from "./client";
 
-export function register({ name, email, password }) {
+export function register({ name, email, password, gender }) {
   return apiFetch("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify({ name, email, password, gender }),
   });
 }
 

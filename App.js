@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import PhoneBoothIcon from "./src/assets/icons/phone-booth.svg";
-
+import { SafeAreaProvider } from "react-native-safe-area-context"; // ✅ NUEVO
 import HomeScreen from "./src/screens/HomeScreen";
 import LocationScreen from "./src/screens/LocationScreen";
 
@@ -123,9 +123,11 @@ function RootNav() {
 export default function App() {
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <RootNav />
-      </NavigationContainer>
+      <SafeAreaProvider> {/* ✅ NUEVO */}
+        <NavigationContainer>
+          <RootNav />
+        </NavigationContainer>
+      </SafeAreaProvider>
     </AuthProvider>
   );
 }

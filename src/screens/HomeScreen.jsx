@@ -178,18 +178,19 @@ const [me, setMe] = useState(null);
               </View>
             )}
 
-            <PointsStepperBar
-  points={points}                      // 1000 (para el número grande)
-  progressPoints={Math.min(points, 200)} // barra a 200 (o tu lógica)
-  totalAccumulated={lifetimePoints}    // “Acumulados: 146”
-  maxPoints={200}
-  steps={[50, 100, 150, 200]}
-  title="Buddy Coins"
-  subtitle="Buddy Coins"
-  iconSource={LondonBuddyLogo}
-  iconSize={30}
-  onPress={() => navigation.navigate("Rewards")}
-/>
+           <PointsStepperBar
+              points={points}                      // 1000 (para el número grande)
+              progressPoints={Math.min(points, 200)} // barra a 200 (o tu lógica)
+              totalAccumulated={lifetimePoints}    // “Acumulados: 146”
+              maxPoints={200}
+              steps={[50, 100, 150, 200]}
+              title="Buddy Coins"
+              subtitle="Buddy Coins"
+              iconSource={LondonBuddyLogo}
+              iconSize={30}
+              onPress={() => navigation.navigate("Rewards")}
+
+            />  
 
 
 
@@ -222,7 +223,7 @@ const [me, setMe] = useState(null);
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
 
-  hero: { paddingHorizontal: 20, paddingVertical: 30 },
+  hero: { paddingHorizontal: 20, paddingVertical: 0},
   heroHeader: { marginBottom: 16 },
   heroTextBox: { marginBottom: 16 },
 

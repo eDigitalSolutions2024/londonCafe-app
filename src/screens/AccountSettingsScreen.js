@@ -4,9 +4,10 @@ import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
 import AvatarPreview from "../components/AvatarPreview";
 import { apiFetch } from "../api/client";
+import Screen from "../components/Screen"; // ✅ NUEVO
 
 export default function AccountSettingsScreen({ navigation }) {
-  const { signOut, token } = useContext(AuthContext);
+  const { token } = useContext(AuthContext);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,9 +31,7 @@ export default function AccountSettingsScreen({ navigation }) {
     accessory: null,
   });
 
-  const authHeaders = token
-    ? { Authorization: `Bearer ${token}` }
-    : {};
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   const loadMe = useCallback(async () => {
     try {
@@ -43,14 +42,16 @@ export default function AccountSettingsScreen({ navigation }) {
       setFullName(u?.name || "");
       setUsername(u?.username || "");
       setEmail(u?.email || "");
-      setAvatarConfig(u?.avatarConfig || {
-        skin: "skin_01",
-        hair: "hair_01",
-        top: "top_01",
-        bottom: "bottom_01",
-        shoes: "shoes_01",
-        accessory: null,
-      });
+      setAvatarConfig(
+        u?.avatarConfig || {
+          skin: "skin_01",
+          hair: "hair_01",
+          top: "top_01",
+          bottom: "bottom_01",
+          shoes: "shoes_01",
+          accessory: null,
+        }
+      );
     } catch (e) {
       console.log("❌ loadMe:", e?.data || e?.message);
       Alert.alert("Error", "No se pudo cargar tu perfil.");
@@ -71,30 +72,21 @@ export default function AccountSettingsScreen({ navigation }) {
       await apiFetch("/me", {
         method: "PUT",
         headers: authHeaders,
-        body: JSON.stringify({
-          name: fullName,
-          username,
-          email,
-        }),
+        body: JSON.stringify({ name: fullName, username, email }),
       });
 
       // 2) Avatar
       await apiFetch("/me/avatar", {
         method: "PUT",
         headers: authHeaders,
-        body: JSON.stringify({
-          avatarConfig,
-        }),
+        body: JSON.stringify({ avatarConfig }),
       });
 
       // 3) Password (todavía no hay endpoint)
       if ((currentPassword && !newPassword) || (!currentPassword && newPassword)) {
         Alert.alert("Aviso", "Para cambiar contraseña, llena ambos campos.");
       } else if (currentPassword && newPassword) {
-        Alert.alert(
-          "Pendiente",
-          "Aún falta crear el endpoint para cambiar contraseña en el backend."
-        );
+        Alert.alert("Pendiente", "Aún falta crear el endpoint para cambiar contraseña en el backend.");
       }
 
       Alert.alert("Listo", "Cambios guardados ✅");
@@ -104,7 +96,6 @@ export default function AccountSettingsScreen({ navigation }) {
     } catch (e) {
       console.log("❌ save:", e?.data || e?.message);
 
-      // errores típicos del backend
       if (e?.status === 401) return Alert.alert("Sesión", "Tu sesión expiró. Inicia de nuevo.");
       if (e?.status === 409) return Alert.alert("Duplicado", "Ese usuario o correo ya existe.");
       if (e?.status === 400 && e?.data?.error === "BAD_USERNAME") {
@@ -118,118 +109,129 @@ export default function AccountSettingsScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.wrap} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Configuración</Text>
-          <Text style={styles.sub}>Cuenta, seguridad y preferencias</Text>
+    <Screen style={styles.screen} edges={["top", "left", "right"]}>
+      <ScrollView
+        style={styles.wrap}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>Configuración</Text>
+            <Text style={styles.sub}>Cuenta, seguridad y preferencias</Text>
+          </View>
+
+          <Pressable onPress={() => navigation.goBack()} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>regresar</Text>
+          </Pressable>
         </View>
 
-        <Pressable onPress={() => navigation.goBack()} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>regresar</Text>
-        </Pressable>
+        {/* Card: Perfil */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Perfil</Text>
 
-      </View>
+          <Text style={styles.label}>Nombre</Text>
+          <TextInput
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder="Tu nombre"
+            placeholderTextColor={colors.textMuted}
+            style={styles.input}
+          />
 
-      {/* Card: Perfil */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Perfil</Text>
+          <Text style={styles.label}>Usuario</Text>
+          <TextInput
+            value={username}
+            onChangeText={setUsername}
+            placeholder="@usuario"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            style={styles.input}
+          />
 
-        <Text style={styles.label}>Nombre</Text>
-        <TextInput
-          value={fullName}
-          onChangeText={setFullName}
-          placeholder="Tu nombre"
-          placeholderTextColor={colors.textMuted}
-          style={styles.input}
-        />
+          <Text style={styles.label}>Correo electrónico</Text>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="correo@ejemplo.com"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={styles.input}
+          />
 
-        <Text style={styles.label}>Usuario</Text>
-        <TextInput
-          value={username}
-          onChangeText={setUsername}
-          placeholder="@usuario"
-          placeholderTextColor={colors.textMuted}
-          autoCapitalize="none"
-          style={styles.input}
-        />
+          {/* Preview del avatar */}
+          <Pressable
+            onPress={() => navigation.navigate("AvatarCustomize", { avatarConfig })}
+            style={styles.avatarPreviewRow}
+          >
+            <View style={styles.avatarCircle}>
+              <AvatarPreview config={avatarConfig} size={56} />
+            </View>
 
-        <Text style={styles.label}>Correo electrónico</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="correo@ejemplo.com"
-          placeholderTextColor={colors.textMuted}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          style={styles.input}
-        />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.avatarTitle}>Tu avatar</Text>
+              <Text style={styles.avatarHint}>Toca para cambiar cabello, ropa y más.</Text>
+            </View>
+          </Pressable>
 
-        {/* Preview del avatar */}
+          <Pressable
+            onPress={() => navigation.navigate("AvatarCustomize", { avatarConfig })}
+            style={styles.secondaryBtn}
+          >
+            <Text style={styles.secondaryBtnText}>Personalizar avatar</Text>
+          </Pressable>
+        </View>
+
+        {/* Card: Seguridad */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Seguridad</Text>
+
+          <Text style={styles.label}>Contraseña actual</Text>
+          <TextInput
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
+            placeholder="••••••••"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+            style={styles.input}
+          />
+
+          <Text style={styles.label}>Nueva contraseña</Text>
+          <TextInput
+            value={newPassword}
+            onChangeText={setNewPassword}
+            placeholder="••••••••"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+            style={styles.input}
+          />
+        </View>
+
         <Pressable
-          onPress={() => navigation.navigate("AvatarCustomize", { avatarConfig })}
-          style={styles.avatarPreviewRow}
+          onPress={onSave}
+          style={[styles.primaryBtn, (saving || loading) && { opacity: 0.7 }]}
+          disabled={saving || loading}
         >
-          <View style={styles.avatarCircle}>
-            <AvatarPreview config={avatarConfig} size={56} />
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.avatarTitle}>Tu avatar</Text>
-            <Text style={styles.avatarHint}>Toca para cambiar cabello, ropa y más.</Text>
-          </View>
+          <Text style={styles.primaryBtnText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
         </Pressable>
 
-        <Pressable
-          onPress={() => navigation.navigate("AvatarCustomize", { avatarConfig })}
-          style={styles.secondaryBtn}
-        >
-          <Text style={styles.secondaryBtnText}>Personalizar avatar</Text>
-        </Pressable>
-      </View>
-
-      {/* Card: Seguridad (UI lista, backend pendiente) */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Seguridad</Text>
-
-        <Text style={styles.label}>Contraseña actual</Text>
-        <TextInput
-          value={currentPassword}
-          onChangeText={setCurrentPassword}
-          placeholder="••••••••"
-          placeholderTextColor={colors.textMuted}
-          secureTextEntry
-          style={styles.input}
-        />
-
-        <Text style={styles.label}>Nueva contraseña</Text>
-        <TextInput
-          value={newPassword}
-          onChangeText={setNewPassword}
-          placeholder="••••••••"
-          placeholderTextColor={colors.textMuted}
-          secureTextEntry
-          style={styles.input}
-        />
-      </View>
-
-      <Pressable
-        onPress={onSave}
-        style={[styles.primaryBtn, (saving || loading) && { opacity: 0.7 }]}
-        disabled={saving || loading}
-      >
-        <Text style={styles.primaryBtnText}>
-          {saving ? "Guardando..." : "Guardar cambios"}
-        </Text>
-      </Pressable>
-    </ScrollView>
+        {/* espacio al final para que no se encime con tab bar */}
+        <View style={{ height: 18 }} />
+      </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 20, paddingBottom: 28 },
+  // ✅ Screen ya maneja paddingHorizontal, aquí solo aseguras el fondo
+  screen: { backgroundColor: colors.background },
+
+  wrap: { flex: 1, backgroundColor: "transparent" },
+
+  // ✅ IMPORTANTE: ya NO pongas paddingHorizontal aquí (lo pone Screen)
+  content: { paddingBottom: 28 },
 
   header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
   title: { color: colors.text, fontSize: 22, fontWeight: "900" },

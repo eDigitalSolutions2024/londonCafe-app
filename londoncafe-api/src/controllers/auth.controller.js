@@ -15,7 +15,7 @@ function isValidEmail(email) {
 
 async function register(req, res) {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, gender } = req.body;
 
     if (!name || !email || !password) return res.status(400).json({ error: "MISSING_FIELDS" });
     if (!isValidEmail(email)) return res.status(400).json({ error: "INVALID_EMAIL" });
@@ -24,6 +24,31 @@ async function register(req, res) {
     const exists = await User.findOne({ email: email.toLowerCase() });
     if (exists) return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
 
+    // ✅ validar gender
+    const allowed = ["male", "female", "other"];
+    const safeGender = allowed.includes(String(gender)) ? String(gender) : "other";
+
+    // ✅ DEFAULT AVATAR POR GENERO (ajusta IDs a los tuyos)
+    const DEFAULT_HAIR_BY_GENDER = {
+  female: "hair_f_01", // ✅ este lo vas a mapear en avatarAssets
+  male: "hair_01",
+  other: "hair_01",
+};
+
+const avatarConfig = {
+  skin: "skin_01",
+  hair: DEFAULT_HAIR_BY_GENDER[safeGender] || "hair_01",
+  top: "top_01",
+  bottom: "bottom_01",
+  shoes: "shoes_01",
+  accessory: null,
+};
+
+    console.log("REGISTER BODY:", req.body);
+    console.log("REGISTER gender received:", gender);
+    console.log("REGISTER safeGender:", safeGender);
+    console.log("REGISTER avatarConfig default:", avatarConfig);
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await User.create({
@@ -31,7 +56,11 @@ async function register(req, res) {
       email: email.toLowerCase(),
       passwordHash,
       isEmailVerified: false,
+      gender: safeGender,
+      avatarConfig, // ✅ AQUI queda guardado en BD
     });
+
+    console.log("✅ CREATED USER:", user._id.toString(), "gender:", user.gender);
 
     // OTP
     const code = generateOtp6();
@@ -48,23 +77,25 @@ async function register(req, res) {
       resendAvailableAt,
     });
 
-    //await sendVerificationEmail({ to: user.email, code });
-
     const showOtp = process.env.DEV_SHOW_OTP === "true";
-
     if (process.env.NODE_ENV === "development" && showOtp) {
-    console.log(`🟣 [DEV OTP] Email: ${user.email} | Code: ${code}`);
+      console.log(`🟣 [DEV OTP] Email: ${user.email} | Code: ${code}`);
     } else {
-    await sendVerificationEmail({ to: user.email, code });
+      await sendVerificationEmail({ to: user.email, code });
     }
 
-
-    return res.json({ ok: true, next: "VERIFY_EMAIL", email: user.email, cooldown: RESEND_COOLDOWN_SEC });
+    return res.json({
+      ok: true,
+      next: "VERIFY_EMAIL",
+      email: user.email,
+      cooldown: RESEND_COOLDOWN_SEC,
+    });
   } catch (err) {
     console.error("REGISTER ERROR:", err);
     return res.status(500).json({ error: "SERVER_ERROR", detail: err.message });
   }
 }
+
 
 async function verifyEmail(req, res) {
   try {

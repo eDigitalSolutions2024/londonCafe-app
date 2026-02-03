@@ -6,4 +6,6 @@ export const avatarAssets = {
   hair_05: require("../../assets/avatar/hair/white_hair.png"),
   
   
+   // ✅ NUEVO femenino
+  hair_f_01: require("../../assets/avatar/hair/female_white_hair.png"),
 };
