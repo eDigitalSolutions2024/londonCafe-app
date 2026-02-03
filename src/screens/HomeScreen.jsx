@@ -179,14 +179,19 @@ const [me, setMe] = useState(null);
             )}
 
             <PointsStepperBar
-              points={points}
-              maxPoints={200}
-              steps={[50, 100, 150, 200]}
-              title="Buddy Coins"
-              subtitle="Buddy Coins"
-              iconSource={LondonBuddyLogo}   // ✅ aquí reemplaza la estrella por el logo
-              iconSize={30}                  // opcional
-            />
+  points={points}                      // 1000 (para el número grande)
+  progressPoints={Math.min(points, 200)} // barra a 200 (o tu lógica)
+  totalAccumulated={lifetimePoints}    // “Acumulados: 146”
+  maxPoints={200}
+  steps={[50, 100, 150, 200]}
+  title="Buddy Coins"
+  subtitle="Buddy Coins"
+  iconSource={LondonBuddyLogo}
+  iconSize={30}
+  onPress={() => navigation.navigate("Rewards")}
+/>
+
+
 
 
             {/* opcional: mostrar acumulados de por vida */}

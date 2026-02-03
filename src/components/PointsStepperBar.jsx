@@ -1,24 +1,46 @@
 import React, { useMemo } from "react";
-import { View, Text, StyleSheet, Image } from "react-native";
+import { View, Text, StyleSheet, Image, Pressable } from "react-native";
 import { colors } from "../theme/colors";
 import { appStyles } from "../theme/styles";
 import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
 
 export default function PointsStepperBar({
-  points = 68,
+  // ✅ número grande (puede ser total, ej 1000)
+  points = 0,
+
+  // ✅ barra (0–200)
+  progressPoints = 0,
+
+  // ✅ texto abajo
+  totalAccumulated = 0,
+
   maxPoints = 200,
   steps = [50, 100, 150, 200],
-  title = "Puntos",
-  subtitle = "Buddy Points",
+  title = "Buddy Coins",
+  subtitle = "Buddy Coins",
 
-  // ✅ icono para mostrar (número + pill)
   iconSource = LondonBuddyLogo,
   iconSize = 25,
-
-  // ✅ tamaño para el icono dentro del pill
   pillIconSize = 14,
+
+  // ✅ NUEVO: click al card completo
+  onPress,
+  disabledPress = false,
 }) {
-  const clamped = Math.max(0, Math.min(maxPoints, points));
+  const rawPoints = Number(points) || 0;
+  const rawProgress = Number(progressPoints) || 0;
+  const rawTotal = Number(totalAccumulated) || 0;
+
+  const clampedProgress = Math.max(0, Math.min(maxPoints, rawProgress));
+  const progressPct = maxPoints > 0 ? (clampedProgress / maxPoints) * 100 : 0;
+
+  const displayPoints = useMemo(() => {
+    try { return rawPoints.toLocaleString(); } catch { return String(rawPoints); }
+  }, [rawPoints]);
+
+  const displayTotal = useMemo(() => {
+    try { return rawTotal.toLocaleString(); } catch { return String(rawTotal); }
+  }, [rawTotal]);
 
   const normalizedSteps = useMemo(() => {
     const s = Array.from(new Set(steps))
@@ -27,15 +49,21 @@ export default function PointsStepperBar({
     return s.length ? s : [maxPoints];
   }, [steps, maxPoints]);
 
-  const progressPct = (clamped / maxPoints) * 100;
-
   return (
-    <View style={styles.card}>
+    <Pressable
+      onPress={disabledPress ? undefined : onPress}
+      style={({ pressed }) => [
+        styles.card,
+        onPress && !disabledPress && pressed && styles.cardPressed,
+      ]}
+      android_ripple={
+        onPress && !disabledPress ? { color: "rgba(0,0,0,0.06)" } : undefined
+      }
+    >
       <View style={styles.header}>
         <View>
-          {/* ✅ Número + moneda */}
           <View style={styles.bigRow}>
-            <Text style={styles.bigNumber}>{clamped}</Text>
+            <Text style={styles.bigNumber}>{displayPoints}</Text>
 
             {iconSource ? (
               <Image
@@ -52,10 +80,8 @@ export default function PointsStepperBar({
           <Text style={styles.smallLabel}>{title}</Text>
         </View>
 
-        {/* ✅ Pill: texto + moneda (SIN estrella) */}
         <View style={styles.pill}>
           <Text style={styles.pillText}>{subtitle}</Text>
-
           {iconSource ? (
             <Image
               source={iconSource}
@@ -81,14 +107,11 @@ export default function PointsStepperBar({
 
         <View style={styles.stepsRow}>
           {normalizedSteps.map((stepValue, idx) => {
-            const pct = (stepValue / maxPoints) * 100;
-            const reached = clamped >= stepValue;
+            const pct = maxPoints > 0 ? (stepValue / maxPoints) * 100 : 0;
+            const reached = clampedProgress >= stepValue;
 
             return (
-              <View
-                key={`${stepValue}-${idx}`}
-                style={[styles.stepItem, { left: `${pct}%` }]}
-              >
+              <View key={`${stepValue}-${idx}`} style={[styles.stepItem, { left: `${pct}%` }]}>
                 <View style={[styles.stepDot, reached && styles.stepDotActive]} />
                 <Text style={styles.stepText}>{stepValue}</Text>
               </View>
@@ -97,10 +120,14 @@ export default function PointsStepperBar({
         </View>
       </View>
 
-      <Text style={styles.hint}>
-        Acumula puntos y cámbialos por productos gratis ☕
-      </Text>
-    </View>
+      <Text style={styles.hint}>Acumula puntos y cámbialos por productos gratis ☕</Text>
+
+      {/* ✅ Total acumulado abajo */}
+      <View style={styles.totalRow}>
+        <Text style={styles.totalLabel}>Acumulados:</Text>
+        <Text style={styles.totalValue}>{displayTotal}</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -108,6 +135,10 @@ const styles = StyleSheet.create({
   card: {
     marginTop: 14,
     ...appStyles.card,
+  },
+  cardPressed: {
+    transform: [{ scale: 0.99 }],
+    opacity: 0.98,
   },
 
   header: {
@@ -117,29 +148,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  bigRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
+  bigRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  bigNumber: { color: colors.text, fontSize: 30, fontWeight: "800", lineHeight: 36 },
+  coinIcon: { marginTop: 2, backgroundColor: "transparent" },
 
-  bigNumber: {
-    color: colors.text,
-    fontSize: 30,
-    fontWeight: "800",
-    lineHeight: 36,
-  },
-
-  coinIcon: {
-    marginTop: 2,
-    backgroundColor: "transparent",
-  },
-
-  smallLabel: {
-    marginTop: 2,
-    color: colors.textMuted,
-    fontSize: 12,
-  },
+  smallLabel: { marginTop: 2, color: colors.textMuted, fontSize: 12 },
 
   pill: {
     borderRadius: 999,
@@ -148,29 +161,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     backgroundColor: "#FFFFFF",
-
-    // ✅ para meter texto + icono
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
+  pillText: { color: colors.primary, fontWeight: "700", fontSize: 12 },
+  pillIcon: { backgroundColor: "transparent" },
 
-  pillText: {
-    color: colors.primary,
-    fontWeight: "700",
-    fontSize: 12,
-  },
-
-  pillIcon: {
-    backgroundColor: "transparent",
-  },
-
-  barWrap: {
-    position: "relative",
-    height: 58,
-    justifyContent: "center",
-  },
-
+  barWrap: { position: "relative", height: 58, justifyContent: "center" },
   track: {
     position: "absolute",
     left: 6,
@@ -179,7 +177,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.primarySoft,
   },
-
   fill: {
     position: "absolute",
     left: 6,
@@ -188,21 +185,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
 
-  pinWrap: {
-    position: "absolute",
-    top: 0,
-    transform: [{ translateX: -8 }],
-    alignItems: "center",
-  },
-
-  pin: {
-    width: 2,
-    height: 16,
-    backgroundColor: colors.primary,
-    borderRadius: 999,
-    opacity: 0.9,
-  },
-
+  pinWrap: { position: "absolute", top: 0, transform: [{ translateX: -8 }], alignItems: "center" },
+  pin: { width: 2, height: 16, backgroundColor: colors.primary, borderRadius: 999, opacity: 0.9 },
   pinDot: {
     marginTop: 2,
     width: 12,
@@ -213,42 +197,15 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
 
-  stepsRow: {
-    position: "absolute",
-    left: 6,
-    right: 6,
-    top: 26,
-    height: 28,
-  },
+  stepsRow: { position: "absolute", left: 6, right: 6, top: 26, height: 28 },
+  stepItem: { position: "absolute", transform: [{ translateX: -8 }], alignItems: "center" },
+  stepDot: { width: 10, height: 10, borderRadius: 999, backgroundColor: "#D9D9D9", borderWidth: 2, borderColor: "#fff" },
+  stepDotActive: { backgroundColor: colors.primary },
+  stepText: { marginTop: 6, fontSize: 10, color: colors.textMuted },
 
-  stepItem: {
-    position: "absolute",
-    transform: [{ translateX: -8 }],
-    alignItems: "center",
-  },
+  hint: { marginTop: 10, fontSize: 12, color: colors.textMuted },
 
-  stepDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: "#D9D9D9",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-
-  stepDotActive: {
-    backgroundColor: colors.primary,
-  },
-
-  stepText: {
-    marginTop: 6,
-    fontSize: 10,
-    color: colors.textMuted,
-  },
-
-  hint: {
-    marginTop: 10,
-    fontSize: 12,
-    color: colors.textMuted,
-  },
+  totalRow: { marginTop: 6, flexDirection: "row", gap: 6 },
+  totalLabel: { fontSize: 12, color: colors.textMuted },
+  totalValue: { fontSize: 12, color: colors.text, fontWeight: "800" },
 });

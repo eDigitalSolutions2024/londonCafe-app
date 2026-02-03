@@ -1,6 +1,9 @@
+
+const dotenv = require("dotenv");
+dotenv.config();
 const express = require("express");
 const cors = require("cors");
-const dotenv = require("dotenv");
+
 
 const { connectDB } = require("./config/db");
 
@@ -9,11 +12,13 @@ const menuRoutes = require("./routes/menu.routes");
 const promoRoutes = require("./routes/promo.routes");
 const branchRoutes = require("./routes/branch.routes");
 const pointsRoutes = require("./routes/points.routes");
+const rewardsRoutes = require("./routes/rewards.routes");
+
 // auth (cuando lo agreguemos)
 const authRoutes = require("./routes/auth.routes");
 const salesRoutes = require("./routes/sales");
 
-dotenv.config();
+
 
 const app = express();
 app.use(cors({
@@ -35,8 +40,10 @@ app.use("/api", require("./routes/me.routes"));
 app.use("/api/points", pointsRoutes);
 app.use("/api/sales", salesRoutes);
 app.use("/api/dev", require("./routes/dev"));
+app.use("/api/rewards", rewardsRoutes);
 
-const PORT = process.env.PORT || 4000;
+
+const PORT = process.env.PORT ;
 
 connectDB(process.env.MONGO_URI)
   .then(() => {

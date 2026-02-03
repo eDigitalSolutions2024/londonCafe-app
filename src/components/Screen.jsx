@@ -1,9 +1,10 @@
 import React from "react";
 import { SafeAreaView, View, StyleSheet } from "react-native";
+import { colors } from "../theme/colors";
 
-export default function Screen({ children, style }) {
+export default function Screen({ children, style, safeStyle }) {
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, safeStyle]}>
       <View style={[styles.container, style]}>{children}</View>
     </SafeAreaView>
   );
@@ -12,11 +13,11 @@ export default function Screen({ children, style }) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#0b0b0f", // pon el mismo fondo que usas
+    backgroundColor: colors.background, // ✅ usa el mismo fondo que Home
   },
   container: {
     flex: 1,
-    paddingTop: 14, // 👈 aquí bajas TODO globalmente
+    paddingTop: 14,
     paddingHorizontal: 20,
   },
 });
