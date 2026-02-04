@@ -123,7 +123,8 @@ function RootNav() {
 export default function App() {
   return (
     <AuthProvider>
-      <SafeAreaProvider> {/* ✅ NUEVO */}
+      <SafeAreaProvider>
+         {/* ✅ NUEVO */}
         <NavigationContainer>
           <RootNav />
         </NavigationContainer>

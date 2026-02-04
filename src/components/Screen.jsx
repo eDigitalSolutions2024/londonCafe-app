@@ -14,6 +14,9 @@ export default function Screen({
   // ✅ Ajuste fino: mínimo 6, máximo 12 (para que NO se vea exagerado)
   const padTop = Math.min(12, Math.max(6, Math.round(top * 0)));
 
+
+ 
+
   return (
     <SafeAreaView style={[styles.safe, safeStyle]} edges={edges}>
       <View style={[styles.container, { paddingTop: padTop }, style]}>
