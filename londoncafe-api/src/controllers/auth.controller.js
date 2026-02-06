@@ -24,8 +24,8 @@ const ENERGY_LOSS_PER_DAY = 50;
 const MINUTES_PER_DAY = 1440;
 const LOSS_PER_MIN = ENERGY_LOSS_PER_DAY / MINUTES_PER_DAY;
 
-const DAILY_ADD_COFFEE = 2;
-const DAILY_ADD_BREAD = 2;
+const DAILY_ADD_COFFEE = 1;
+const DAILY_ADD_BREAD = 1;
 const MAX_STACK = 20; // opcional (para no acumular infinito). Sube/baja a tu gusto.
 
 function clamp(n, min, max) {
