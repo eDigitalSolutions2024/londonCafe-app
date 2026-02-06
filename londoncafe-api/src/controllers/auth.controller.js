@@ -1,3 +1,5 @@
+// src/controllers/auth.controller.js
+
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const EmailVerification = require("../models/EmailVerification");
@@ -8,6 +10,93 @@ const { signAccessToken } = require("../utils/tokens");
 const OTP_EXPIRE_MIN = 10;
 const RESEND_COOLDOWN_SEC = 60;
 const MAX_ATTEMPTS = 5;
+
+// =========================
+// ✅ BUDDY / ENERGÍA LOGIC
+// =========================
+
+// ✅ NUEVAS REGLAS:
+// - En 1 día baja 50 puntos (2 días = -100)
+// - Café/pan se acumulan por día (no se resetean)
+// - El +40 de café/pan se aplica en buddy.controller.js (feed), no aquí
+
+const ENERGY_LOSS_PER_DAY = 50;
+const MINUTES_PER_DAY = 1440;
+const LOSS_PER_MIN = ENERGY_LOSS_PER_DAY / MINUTES_PER_DAY;
+
+const DAILY_ADD_COFFEE = 2;
+const DAILY_ADD_BREAD = 2;
+const MAX_STACK = 20; // opcional (para no acumular infinito). Sube/baja a tu gusto.
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function startOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function isSameDay(a, b) {
+  return startOfDay(a).getTime() === startOfDay(b).getTime();
+}
+
+
+
+
+function ensureBuddy(user, now = new Date()) {
+  if (!user.buddy) user.buddy = {};
+
+  if (typeof user.buddy.energy !== "number") user.buddy.energy = 80;
+  if (typeof user.buddy.coffee !== "number") user.buddy.coffee = 0;
+  if (typeof user.buddy.bread !== "number") user.buddy.bread = 0;
+
+  if (!user.buddy.lastEnergyAt) user.buddy.lastEnergyAt = now;
+  if (user.buddy.lastLoginAt === undefined) user.buddy.lastLoginAt = null;
+  if (user.buddy.lastRefillAt === undefined) user.buddy.lastRefillAt = null;
+}
+
+// ✅ Decay continuo: 50 puntos por día
+function applyEnergyDecay(user, now = new Date()) {
+  ensureBuddy(user, now);
+
+  const last = new Date(user.buddy.lastEnergyAt || now);
+  const minutes = Math.floor((now.getTime() - last.getTime()) / (1000 * 60));
+  if (minutes <= 0) return;
+
+  const lost = minutes * LOSS_PER_MIN;
+
+  user.buddy.energy = clamp(Math.round((user.buddy.energy ?? 0) - lost), 0, 100);
+  user.buddy.lastEnergyAt = now;
+}
+
+// ✅ Refill diario ACUMULABLE (solo 1 vez por día)
+function applyLoginRefill(user, now = new Date()) {
+  ensureBuddy(user, now);
+
+  const lastRefill = user.buddy.lastRefillAt ? new Date(user.buddy.lastRefillAt) : null;
+
+  if (!lastRefill || !isSameDay(lastRefill, now)) {
+    user.buddy.coffee = clamp((user.buddy.coffee ?? 0) + DAILY_ADD_COFFEE, 0, MAX_STACK);
+    user.buddy.bread = clamp((user.buddy.bread ?? 0) + DAILY_ADD_BREAD, 0, MAX_STACK);
+    user.buddy.lastRefillAt = now;
+  }
+
+  user.buddy.lastLoginAt = now;
+}
+
+function moodFromEnergy(energy) {
+  const e = Number(energy ?? 80);
+  if (e >= 80) return "HAPPY";
+  if (e >= 50) return "OK";
+  if (e >= 20) return "TIRED";
+  return "SAD";
+}
+
+// =========================
+// ✅ AUTH LOGIC
+// =========================
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").toLowerCase());
@@ -24,30 +113,23 @@ async function register(req, res) {
     const exists = await User.findOne({ email: email.toLowerCase() });
     if (exists) return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
 
-    // ✅ validar gender
     const allowed = ["male", "female", "other"];
     const safeGender = allowed.includes(String(gender)) ? String(gender) : "other";
 
-    // ✅ DEFAULT AVATAR POR GENERO (ajusta IDs a los tuyos)
     const DEFAULT_HAIR_BY_GENDER = {
-  female: "hair_f_01", // ✅ este lo vas a mapear en avatarAssets
-  male: "hair_01",
-  other: "hair_01",
-};
+      female: "hair_f_01",
+      male: "hair_01",
+      other: "hair_01",
+    };
 
-const avatarConfig = {
-  skin: "skin_01",
-  hair: DEFAULT_HAIR_BY_GENDER[safeGender] || "hair_01",
-  top: "top_01",
-  bottom: "bottom_01",
-  shoes: "shoes_01",
-  accessory: null,
-};
-
-    console.log("REGISTER BODY:", req.body);
-    console.log("REGISTER gender received:", gender);
-    console.log("REGISTER safeGender:", safeGender);
-    console.log("REGISTER avatarConfig default:", avatarConfig);
+    const avatarConfig = {
+      skin: "skin_01",
+      hair: DEFAULT_HAIR_BY_GENDER[safeGender] || "hair_01",
+      top: "top_01",
+      bottom: "bottom_01",
+      shoes: "shoes_01",
+      accessory: null,
+    };
 
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -57,10 +139,10 @@ const avatarConfig = {
       passwordHash,
       isEmailVerified: false,
       gender: safeGender,
-      avatarConfig, // ✅ AQUI queda guardado en BD
+      avatarConfig,
+      // si quieres inicializar buddy desde el inicio:
+      // buddy: { energy: 80, coffee: 0, bread: 0, lastEnergyAt: new Date(), lastRefillAt: null, lastLoginAt: null },
     });
-
-    console.log("✅ CREATED USER:", user._id.toString(), "gender:", user.gender);
 
     // OTP
     const code = generateOtp6();
@@ -95,7 +177,6 @@ const avatarConfig = {
     return res.status(500).json({ error: "SERVER_ERROR", detail: err.message });
   }
 }
-
 
 async function verifyEmail(req, res) {
   try {
@@ -161,15 +242,12 @@ async function resendVerification(req, res) {
       resendAvailableAt,
     });
 
-    //await sendVerificationEmail({ to: user.email, code });
     const showOtp = process.env.DEV_SHOW_OTP === "true";
-
     if (process.env.NODE_ENV === "development" && showOtp) {
-    console.log(`🟣 [DEV OTP - RESEND] Email: ${user.email} | Code: ${code}`);
+      console.log(`🟣 [DEV OTP - RESEND] Email: ${user.email} | Code: ${code}`);
     } else {
-    await sendVerificationEmail({ to: user.email, code });
+      await sendVerificationEmail({ to: user.email, code });
     }
-
 
     return res.json({ ok: true, cooldown: RESEND_COOLDOWN_SEC });
   } catch (err) {
@@ -191,11 +269,33 @@ async function login(req, res) {
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) return res.status(401).json({ error: "INVALID_CREDENTIALS" });
 
+    // ✅ Energía “viva”
+    const now = new Date();
+    applyEnergyDecay(user, now);  // primero decay por tiempo
+    applyLoginRefill(user, now);  // luego refill diario acumulable
+    await user.save();
+
     const token = signAccessToken({ uid: user._id });
 
     return res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        gender: user.gender,
+        avatarConfig: user.avatarConfig,
+        buddy: {
+          energy: user.buddy?.energy ?? 80,
+          mood: moodFromEnergy(user.buddy?.energy ?? 80),
+          coffee: user.buddy?.coffee ?? 0,
+          bread: user.buddy?.bread ?? 0,
+          lastLoginAt: user.buddy?.lastLoginAt ?? null,
+          lastRefillAt: user.buddy?.lastRefillAt ?? null,
+          lastEnergyAt: user.buddy?.lastEnergyAt ?? null,
+        },
+      },
     });
   } catch (err) {
     console.error(err);
@@ -205,12 +305,27 @@ async function login(req, res) {
 
 async function me(req, res) {
   try {
-    const User = require("../models/User");
-    const user = await User.findById(req.user.uid).select("_id name email isEmailVerified");
+    const user = await User.findById(req.user.uid);
     if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
 
+    // ✅ cada refresh recalcula energía por tiempo
+    const now = new Date();
+    applyEnergyDecay(user, now);
+    await user.save();
+
     return res.json({
-      user: { id: user._id, name: user.name, email: user.email, isEmailVerified: user.isEmailVerified },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        gender: user.gender,
+        isEmailVerified: user.isEmailVerified,
+        avatarConfig: user.avatarConfig,
+        buddy: user.buddy,
+        points: user.points,
+        lifetimePoints: user.lifetimePoints,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -219,5 +334,3 @@ async function me(req, res) {
 }
 
 module.exports = { register, verifyEmail, resendVerification, login, me };
-
-

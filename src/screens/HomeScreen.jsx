@@ -1,4 +1,4 @@
-import React, { useEffect, useContext, useState, useCallback } from "react";
+import React, { useEffect, useContext, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 
@@ -27,6 +28,15 @@ import PromosSection from "../components/PromoSection";
 // ✅ Modal avatar grande
 import AvatarPreview from "../components/AvatarPreview";
 
+// ✅ mood por energía (front fallback)
+function moodLabelFromEnergy(energy = 0) {
+  const e = Number(energy) || 0;
+  if (e >= 70) return "Feliz";
+  if (e >= 30) return "Más o menos";
+  if (e >= 1) return "Triste";
+  return "Muerto 💀";
+}
+
 export default function HomeScreen({ navigation }) {
   const { signOut, user, token } = useContext(AuthContext);
 
@@ -37,10 +47,56 @@ export default function HomeScreen({ navigation }) {
   const [lifetimePoints, setLifetimePoints] = useState(0);
   const [loadingPoints, setLoadingPoints] = useState(false);
 
-  // ✅ AVATAR REAL DEL BACKEND (SIN DEFAULTS)
+  // ✅ perfil/avatar/buddy
   const [avatarConfig, setAvatarConfig] = useState(null);
+  const [buddy, setBuddy] = useState(null);
   const [loadingMe, setLoadingMe] = useState(false);
-const [me, setMe] = useState(null);
+  const [feeding, setFeeding] = useState(false);
+  const [me, setMe] = useState(null);
+
+  const [liveEnergy, setLiveEnergy] = useState(0);
+
+const ENERGY_LOSS_PER_DAY = 50; // igual que backend
+const LOSS_PER_SEC = (ENERGY_LOSS_PER_DAY / 1440) / 60; // 50 pts por día
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+/**
+ * ✅ UI “en vivo”:
+ * Calcula desgaste desde buddy.energy y buddy.lastEnergyAt
+ * y solo actualiza cuando cambia cada 5%.
+ */
+useEffect(() => {
+  if (!buddy?.lastEnergyAt) return;
+
+  const baseEnergy = Number.isFinite(Number(buddy?.energy)) ? Number(buddy.energy) : 0;
+  const baseTime = new Date(buddy.lastEnergyAt).getTime();
+
+  setLiveEnergy(baseEnergy);
+
+  let lastBucket = Math.floor(baseEnergy / 5) * 5;
+
+  const id = setInterval(() => {
+    const elapsedSec = Math.floor((Date.now() - baseTime) / 1000);
+    if (elapsedSec <= 0) return;
+
+    const decayed = clamp(baseEnergy - elapsedSec * LOSS_PER_SEC, 0, 100);
+
+    const bucket = Math.floor(decayed / 5) * 5;
+    if (bucket !== lastBucket) {
+      lastBucket = bucket;
+      setLiveEnergy(bucket);
+    }
+  }, 1000);
+
+  return () => clearInterval(id);
+}, [buddy?.energy, buddy?.lastEnergyAt]);
+
+/**
+ * ✅ Sync real con backend:
+ * cada 30s vuelve a traer /me para que no se desfasen.
+ */
+
+
 
   const fetchPoints = useCallback(async () => {
     if (!token) return;
@@ -62,33 +118,96 @@ const [me, setMe] = useState(null);
     }
   }, [token]);
 
-  // ✅ Traer /me para obtener avatarConfig real del backend
+  // ✅ Traer /me para obtener avatarConfig y buddy real
   const fetchMe = useCallback(async () => {
+    if (!token) return;
+
+    try {
+      setLoadingMe(true);
+
+      const r = await apiFetch("/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const u = r?.user ?? user ?? null;
+      setMe(u);
+
+      setAvatarConfig(u?.avatarConfig ?? null);
+      setBuddy(u?.buddy ?? null);
+    } catch (e) {
+      console.log("❌ /me:", e?.data || e?.message);
+
+      const u = user ?? null;
+      setMe(u);
+      setAvatarConfig(u?.avatarConfig ?? null);
+      setBuddy(u?.buddy ?? null);
+    } finally {
+      setLoadingMe(false);
+    }
+  }, [token, user]);
+
+  useEffect(() => {
   if (!token) return;
 
-  try {
-    setLoadingMe(true);
+  const id = setInterval(() => {
+    fetchMe();
+  }, 30000);
 
-    const r = await apiFetch("/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  return () => clearInterval(id);
+}, [token, fetchMe]);
 
-    const u = r?.user ?? user ?? null;
-    setMe(u);
 
-    const cfg = u?.avatarConfig ?? null;
-    setAvatarConfig(cfg);
-  } catch (e) {
-    console.log("❌ /me:", e?.data || e?.message);
+  // ✅ alimentar (coffee/bread)
+  const handleFeed = useCallback(
+    async (type) => {
+      if (!token) return;
 
-    const u = user ?? null;
-    setMe(u);
-    setAvatarConfig(u?.avatarConfig ?? null);
-  } finally {
-    setLoadingMe(false);
-  }
-}, [token, user]);
+      // bloqueo simple para no spamear
+      if (feeding) return;
 
+      // validación local (si buddy ya existe)
+      if (buddy && type === "coffee" && Number(buddy?.coffee || 0) <= 0) {
+        Alert.alert("Sin café", "Hoy ya no te queda café. Inicia sesión mañana para recargar.");
+        return;
+      }
+      if (buddy && type === "bread" && Number(buddy?.bread || 0) <= 0) {
+        Alert.alert("Sin pan", "Hoy ya no te queda pan. Inicia sesión mañana para recargar.");
+        return;
+      }
+
+      try {
+        setFeeding(true);
+
+        const r = await apiFetch("/buddy/feed", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ type }), // "coffee" | "bread"
+        });
+
+        if (!r?.ok) {
+          Alert.alert("Error", r?.message || r?.error || "No se pudo alimentar.");
+          return;
+        }
+
+        if (r?.buddy) {
+          setBuddy(r.buddy);
+          setMe((prev) => (prev ? { ...prev, buddy: r.buddy } : prev));
+        } else {
+          // si el backend no mandó buddy, al menos recargamos /me
+          await fetchMe();
+        }
+      } catch (e) {
+        console.log("❌ feed:", e?.status, e?.data || e?.message);
+        Alert.alert("Error", e?.data?.error || e?.message || "No se pudo alimentar.");
+      } finally {
+        setFeeding(false);
+      }
+    },
+    [token, feeding, buddy, fetchMe]
+  );
 
   useEffect(() => {
     apiFetch("/health")
@@ -96,7 +215,7 @@ const [me, setMe] = useState(null);
       .catch((e) => console.log("❌ HEALTH ERROR:", e?.data || e.message));
   }, []);
 
-  // ✅ cada vez que abres Home, refresca puntos + perfil (avatar)
+  // ✅ cada vez que abres Home, refresca puntos + perfil
   useFocusEffect(
     useCallback(() => {
       fetchPoints();
@@ -104,11 +223,26 @@ const [me, setMe] = useState(null);
     }, [fetchPoints, fetchMe])
   );
 
-  const displayName = (() => {
-  const n = (me?.name || user?.name || "London Buddy").trim();
-  const un = (me?.username || user?.username || "").trim();
-  return un ? `${n} (@${un})` : n;
-})();
+  const displayName = useMemo(() => {
+    const n = (me?.name || user?.name || "London Buddy").trim();
+    const un = (me?.username || user?.username || "").trim();
+    return un ? `${n} (@${un})` : n;
+  }, [me, user]);
+
+  // ✅ valores “reales” con fallback
+ // ✅ valores reales (sin NaN)
+const energy =
+  Number.isFinite(Number(liveEnergy)) && buddy?.lastEnergyAt
+    ? liveEnergy
+    : Number.isFinite(Number(buddy?.energy))
+    ? Number(buddy.energy)
+    : 0;
+
+
+const coffee = Number.isFinite(Number(buddy?.coffee)) ? Number(buddy.coffee) : 0;
+const bread  = Number.isFinite(Number(buddy?.bread)) ? Number(buddy.bread) : 0;
+
+const mood = moodLabelFromEnergy(energy);
 
 
   return (
@@ -135,11 +269,7 @@ const [me, setMe] = useState(null);
               <View style={styles.titleRow}>
                 <Text style={styles.title}>LondonCafe</Text>
 
-                <TouchableOpacity
-                  onPress={signOut}
-                  activeOpacity={0.85}
-                  style={styles.logoutBtn}
-                >
+                <TouchableOpacity onPress={signOut} activeOpacity={0.85} style={styles.logoutBtn}>
                   <Text style={styles.logoutText}>Salir</Text>
                 </TouchableOpacity>
               </View>
@@ -148,20 +278,21 @@ const [me, setMe] = useState(null);
 
           {/* Avatar + Puntos */}
           <View style={styles.avatarSection}>
-            {/* ✅ NO mostrar avatar default: solo cuando ya existe avatarConfig real */}
             {avatarConfig ? (
               <AvatarWidget
                 name={displayName}
-                mood="Con energía"
-                energy={80}
+                mood={mood}
+                energy={energy}
+                coffee={coffee}
+                bread={bread}
+                feeding={feeding}
                 avatarConfig={avatarConfig}
-                onFeedCoffee={() => console.log("Dar café")}
-                onFeedBread={() => console.log("Dar pan")}
+                onFeedCoffee={() => handleFeed("coffee")}
+                onFeedBread={() => handleFeed("bread")}
                 onAvatarPress={() => navigation.navigate("AccountSettings")}
                 onAvatarLongPress={() => setShowAvatarPeek(true)}
                 onAvatarPressOut={() => setShowAvatarPeek(false)}
               />
-
             ) : (
               <View
                 style={{
@@ -178,10 +309,10 @@ const [me, setMe] = useState(null);
               </View>
             )}
 
-           <PointsStepperBar
-              points={points}                      // 1000 (para el número grande)
-              progressPoints={Math.min(points, 200)} // barra a 200 (o tu lógica)
-              totalAccumulated={lifetimePoints}    // “Acumulados: 146”
+            <PointsStepperBar
+              points={points}
+              progressPoints={Math.min(points, 200)}
+              totalAccumulated={lifetimePoints}
               maxPoints={200}
               steps={[50, 100, 150, 200]}
               title="Buddy Coins"
@@ -189,23 +320,14 @@ const [me, setMe] = useState(null);
               iconSource={LondonBuddyLogo}
               iconSize={30}
               onPress={() => navigation.navigate("Rewards")}
+            />
 
-            />  
-
-
-
-
-            {/* opcional: mostrar acumulados de por vida */}
             <Text style={styles.pointsMeta}>Acumulados: {lifetimePoints}</Text>
           </View>
         </View>
 
         {/* Promociones */}
-        <PromosSection
-          limit={5}
-          onViewAll={() => navigation.navigate("Promos")}
-        />
-
+        <PromosSection limit={5} onViewAll={() => navigation.navigate("Promos")} />
       </ScrollView>
 
       {/* ✅ MODAL PEEK */}
@@ -223,7 +345,7 @@ const [me, setMe] = useState(null);
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
 
-  hero: { paddingHorizontal: 20, paddingVertical: 0},
+  hero: { paddingHorizontal: 20, paddingVertical: 0 },
   heroHeader: { marginBottom: 16 },
   heroTextBox: { marginBottom: 16 },
 
@@ -267,93 +389,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
   },
-
-  promosSection: { paddingHorizontal: 20, paddingBottom: 24 },
-
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-
-  sectionHint: { marginTop: 2, fontSize: 12, color: colors.textMuted },
-
-  seeAllBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: "transparent",
-  },
-  seeAllText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
-
-  promoCardV: {
-    height: 150,
-    borderRadius: 18,
-    overflow: "hidden",
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: colors.card,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
-  },
-
-  promoImageV: { width: "100%", height: "100%" },
-
-  promoOverlayV: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-
-  promoMetaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-
-  promoBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.95)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    color: "#111",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0.4,
-  },
-
-  promoTag: { color: "#fff", fontWeight: "900", fontSize: 12 },
-
-  promoTitle: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "900",
-    marginBottom: 2,
-  },
-
-  promoSubtitle: { color: "rgba(255,255,255,0.88)", fontSize: 12 },
 
   peekBackdrop: {
     flex: 1,

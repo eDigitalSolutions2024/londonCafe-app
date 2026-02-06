@@ -13,6 +13,7 @@ const promoRoutes = require("./routes/promo.routes");
 const branchRoutes = require("./routes/branch.routes");
 const pointsRoutes = require("./routes/points.routes");
 const rewardsRoutes = require("./routes/rewards.routes");
+const buddyRoutes = require("./routes/buddy.routes");
 
 // auth (cuando lo agreguemos)
 const authRoutes = require("./routes/auth.routes");
@@ -41,7 +42,7 @@ app.use("/api/points", pointsRoutes);
 app.use("/api/sales", salesRoutes);
 app.use("/api/dev", require("./routes/dev"));
 app.use("/api/rewards", rewardsRoutes);
-
+app.use("/api/buddy", buddyRoutes);
 
 const PORT = process.env.PORT ;
 

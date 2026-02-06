@@ -25,6 +25,23 @@ const pointsHistorySchema = new mongoose.Schema(
   { _id: false }
 );
 
+// ✅ Buddy (energía + inventario + control de recarga por login)
+const buddySchema = new mongoose.Schema(
+  {
+    energy: { type: Number, default: 80, min: 0, max: 100 },
+
+    // inventario acumulable
+    coffee: { type: Number, default: 0, min: 0 },
+    bread: { type: Number, default: 0, min: 0 },
+
+    // timestamps para lógica "solo cuando entra"
+    lastEnergyAt: { type: Date, default: Date.now }, // última vez que calculaste decaimiento
+    lastRefillAt: { type: Date, default: null },     // última vez que diste +1/+1
+    lastLoginAt: { type: Date, default: null },      // tracking
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -58,8 +75,13 @@ const userSchema = new mongoose.Schema(
     points: { type: Number, default: 0 },          // disponibles para canje
     lifetimePoints: { type: Number, default: 0 },  // acumulados históricos
     pointsHistory: { type: [pointsHistorySchema], default: [] },
+
+    // ✅ Buddy
+    buddy: { type: buddySchema, default: () => ({}) },
   },
   { timestamps: true }
 );
+
+
 
 module.exports = mongoose.model("User", userSchema);

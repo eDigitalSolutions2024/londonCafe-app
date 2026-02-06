@@ -13,8 +13,9 @@ async function getMe(req, res) {
     if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
     const user = await User.findById(uid).select(
-      "name gender username email isEmailVerified avatarConfig createdAt"
-    );
+  "name gender username email isEmailVerified avatarConfig createdAt buddy points lifetimePoints"
+);
+
 
     if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
 
