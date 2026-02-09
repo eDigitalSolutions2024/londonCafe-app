@@ -1,15 +1,17 @@
-import React, { useEffect, useContext, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useContext, useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
   Modal,
   RefreshControl,
   Alert,
+  Animated,
+  Easing,
 } from "react-native";
+
 import { useFocusEffect } from "@react-navigation/native";
 
 import { colors } from "../theme/colors";
@@ -17,7 +19,7 @@ import Screen from "../components/Screen";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
-
+import EmojiBurst from "../components/EmojiBurst";
 // Avatar + puntos
 import AvatarWidget from "../components/AvatarWidget";
 import PointsStepperBar from "../components/PointsStepperBar";
@@ -36,6 +38,15 @@ function moodLabelFromEnergy(energy = 0) {
   if (e >= 1) return "Triste";
   return "Muerto 💀";
 }
+
+function moodEmojiFromEnergy(energy = 0) {
+  const e = Number(energy) || 0;
+  if (e >= 70) return "😄";     // feliz
+  if (e >= 30) return "🙂";     // más o menos
+  if (e >= 1)  return "😢";     // triste
+  return "💀";                  // muerto
+}
+
 
 export default function HomeScreen({ navigation }) {
   const { signOut, user, token } = useContext(AuthContext);
@@ -56,6 +67,25 @@ export default function HomeScreen({ navigation }) {
 
   const [liveEnergy, setLiveEnergy] = useState(0);
 
+  // ✅ reward animation state
+const [rewardVisible, setRewardVisible] = useState(false);
+const [rewardDelta, setRewardDelta] = useState(0);
+const [rewardMood, setRewardMood] = useState("Feliz");
+const [rewardEmoji, setRewardEmoji] = useState("😄");
+const [energyFlash, setEnergyFlash] = useState(false); // barra verde temporal
+
+// Animated values
+const rewardScale = useRef(new Animated.Value(0.92)).current;
+const rewardOpacity = useRef(new Animated.Value(0)).current;
+const deltaY = useRef(new Animated.Value(10)).current;
+const deltaOpacity = useRef(new Animated.Value(0)).current;
+
+const emojiScale = useRef(new Animated.Value(0.6)).current;
+const emojiY = useRef(new Animated.Value(8)).current;
+const emojiOpacity = useRef(new Animated.Value(0)).current;
+
+
+
 const ENERGY_LOSS_PER_DAY = 50; // igual que backend
 const LOSS_PER_SEC = (ENERGY_LOSS_PER_DAY / 1440) / 60; // 50 pts por día
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -71,25 +101,29 @@ useEffect(() => {
   const baseEnergy = Number.isFinite(Number(buddy?.energy)) ? Number(buddy.energy) : 0;
   const baseTime = new Date(buddy.lastEnergyAt).getTime();
 
-  setLiveEnergy(baseEnergy);
+  // inicia igual que backend
+  setLiveEnergy(Math.round(baseEnergy));
 
-  let lastBucket = Math.floor(baseEnergy / 5) * 5;
+  let lastShown = Math.round(baseEnergy);
 
   const id = setInterval(() => {
-    const elapsedSec = Math.floor((Date.now() - baseTime) / 1000);
+    const elapsedSec = (Date.now() - baseTime) / 1000; // ✅ NO floor
     if (elapsedSec <= 0) return;
 
     const decayed = clamp(baseEnergy - elapsedSec * LOSS_PER_SEC, 0, 100);
 
-    const bucket = Math.floor(decayed / 5) * 5;
-    if (bucket !== lastBucket) {
-      lastBucket = bucket;
-      setLiveEnergy(bucket);
+    // ✅ 1% real (sin saltos de 5)
+    const shown = Math.round(decayed);
+
+    if (shown !== lastShown) {
+      lastShown = shown;
+      setLiveEnergy(shown);
     }
   }, 1000);
 
   return () => clearInterval(id);
 }, [buddy?.energy, buddy?.lastEnergyAt]);
+
 
 /**
  * ✅ Sync real con backend:
@@ -157,6 +191,80 @@ useEffect(() => {
 }, [token, fetchMe]);
 
 
+const playRewardAnimation = useCallback(({ prevEnergy, nextEnergy }) => {
+  const delta = Math.max(0, Math.round(nextEnergy - prevEnergy));
+  const nextMood = moodLabelFromEnergy(nextEnergy);
+  const nextEmoji = moodEmojiFromEnergy(nextEnergy);
+
+  setRewardDelta(delta);
+  setRewardMood(nextMood);
+  setRewardEmoji(nextEmoji);
+
+  setRewardVisible(true);
+  setEnergyFlash(true);
+
+  // ✅ espera a que el Modal se pinte y luego animas
+  requestAnimationFrame(() => {
+    // reset anim values
+    rewardScale.setValue(0.92);
+    rewardOpacity.setValue(0);
+    deltaY.setValue(10);
+    deltaOpacity.setValue(0);
+
+    emojiScale.setValue(0.6);
+    emojiY.setValue(8);
+    emojiOpacity.setValue(0);
+
+    Animated.parallel([
+      Animated.timing(rewardOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(rewardScale, {
+        toValue: 1,
+        friction: 6,
+        tension: 90,
+        useNativeDriver: true,
+      }),
+
+      Animated.sequence([
+        Animated.timing(deltaOpacity, { toValue: 1, duration: 160, useNativeDriver: true }),
+        Animated.timing(deltaY, {
+          toValue: -18,
+          duration: 700,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(deltaOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]),
+
+      // ✅ emoji
+      Animated.sequence([
+        Animated.timing(emojiOpacity, { toValue: 1, duration: 140, useNativeDriver: true }),
+        Animated.spring(emojiScale, { toValue: 1.25, friction: 5, tension: 120, useNativeDriver: true }),
+        Animated.spring(emojiScale, { toValue: 1.0, friction: 6, tension: 80, useNativeDriver: true }),
+      ]),
+      Animated.timing(emojiY, {
+        toValue: -10,
+        duration: 700,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setTimeout(() => setRewardVisible(false), 350);
+      setTimeout(() => setEnergyFlash(false), 650);
+    });
+  });
+}, [
+  rewardScale, rewardOpacity, deltaY, deltaOpacity,
+  emojiScale, emojiY, emojiOpacity
+]);
+
+
+
+
+
   // ✅ alimentar (coffee/bread)
   const handleFeed = useCallback(
     async (type) => {
@@ -174,6 +282,7 @@ useEffect(() => {
         Alert.alert("Sin pan", "Hoy ya no te queda pan. Inicia sesión mañana para recargar.");
         return;
       }
+const prevEnergy = Number.isFinite(Number(buddy?.energy)) ? Number(buddy.energy) : energy;
 
       try {
         setFeeding(true);
@@ -193,8 +302,17 @@ useEffect(() => {
         }
 
         if (r?.buddy) {
+
+          const nextEnergy = Number.isFinite(Number(r.buddy?.energy))
+    ? Number(r.buddy.energy)
+    : prevEnergy;
+
           setBuddy(r.buddy);
           setMe((prev) => (prev ? { ...prev, buddy: r.buddy } : prev));
+          // ✅ dispara reward anim (solo si subió energía)
+  if (nextEnergy > prevEnergy) {
+    playRewardAnimation({ prevEnergy, nextEnergy });
+  }
         } else {
           // si el backend no mandó buddy, al menos recargamos /me
           await fetchMe();
@@ -206,7 +324,8 @@ useEffect(() => {
         setFeeding(false);
       }
     },
-    [token, feeding, buddy, fetchMe]
+    [token, feeding, buddy, fetchMe, energy, playRewardAnimation]
+
   );
 
   useEffect(() => {
@@ -292,6 +411,7 @@ const mood = moodLabelFromEnergy(energy);
                 onAvatarPress={() => navigation.navigate("AccountSettings")}
                 onAvatarLongPress={() => setShowAvatarPeek(true)}
                 onAvatarPressOut={() => setShowAvatarPeek(false)}
+                energyFlash={energyFlash}
               />
             ) : (
               <View
@@ -338,6 +458,49 @@ const mood = moodLabelFromEnergy(energy);
           </View>
         </View>
       </Modal>
+
+      {/* ✅ REWARD MODAL */}
+<Modal visible={rewardVisible} transparent animationType="fade">
+  <View style={styles.rewardBackdrop}>
+
+  <EmojiBurst visible={rewardVisible} emoji={rewardEmoji} count={18} />
+
+
+    <Animated.View
+      style={[
+        styles.rewardCard,
+        { opacity: rewardOpacity, transform: [{ scale: rewardScale }] },
+      ]}
+    >
+    
+
+
+
+      <View style={styles.rewardCircle}>
+        {avatarConfig ? <AvatarPreview config={avatarConfig} size={260} /> : null}
+      </View>
+
+      <Animated.Text
+        style={[
+          styles.rewardDelta,
+          { opacity: deltaOpacity, transform: [{ translateY: deltaY }] },
+        ]}
+      >
+        +{rewardDelta}%
+      </Animated.Text>
+
+      <View style={styles.moodRow}>
+  <Text style={styles.rewardMood}>{rewardMood}</Text>
+
+  
+</View>
+
+<Text style={styles.rewardSmall}>¡Tu buddy se siente mejor!</Text>
+
+    </Animated.View>
+  </View>
+</Modal>
+
     </Screen>
   );
 }
@@ -407,4 +570,61 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primarySoft,
   },
+
+  rewardBackdrop: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.28)",
+  alignItems: "center",
+  justifyContent: "center",
+},
+rewardCard: {
+  width: "86%",
+  borderRadius: 18,
+  backgroundColor: "#fff",
+  paddingVertical: 18,
+  paddingHorizontal: 14,
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+},
+rewardCircle: {
+  width: 300,
+  height: 300,
+  borderRadius: 150,
+  backgroundColor: "#fff",
+  alignItems: "center",
+  justifyContent: "center",
+  overflow: "hidden",
+  zIndex: 1,
+},
+
+rewardDelta: {
+  position: "absolute",
+  top: 26,
+  right: 22,
+  fontSize: 28,
+  fontWeight: "900",
+  color: "#22c55e",
+},
+rewardMood: {
+  marginTop: 10,
+  fontSize: 20,
+  fontWeight: "900",
+  color: colors.text,
+},
+rewardSmall: {
+  marginTop: 6,
+  fontSize: 12,
+  color: colors.textMuted,
+},
+rewardEmoji: {
+  position: "absolute",
+  top: 8,
+  alignSelf: "center",
+  fontSize: 46,
+  zIndex: 999,
+  elevation: 999, // Android
+},
+
+
 });

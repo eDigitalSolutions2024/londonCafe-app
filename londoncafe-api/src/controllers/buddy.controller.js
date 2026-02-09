@@ -56,13 +56,13 @@ async function feedBuddy(req, res) {
         return res.status(400).json({ ok: false, error: "NO_COFFEE" });
       }
       user.buddy.coffee -= 1;
-      user.buddy.energy = clamp(user.buddy.energy + 12, 0, 100);
+      user.buddy.energy = clamp(user.buddy.energy + 40, 0, 100);
     } else {
       if ((user.buddy.bread ?? 0) <= 0) {
         return res.status(400).json({ ok: false, error: "NO_BREAD" });
       }
       user.buddy.bread -= 1;
-      user.buddy.energy = clamp(user.buddy.energy + 8, 0, 100);
+      user.buddy.energy = clamp(user.buddy.energy + 40, 0, 100);
     }
 
     await user.save();
