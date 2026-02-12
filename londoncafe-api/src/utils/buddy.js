@@ -8,21 +8,25 @@ function daysPassed(from, to) {
   return Math.floor(ms / (24 * 60 * 60 * 1000));
 }
 
-function applyLoginRefill(user, now = new Date()) {
+// ✅ Nuevo nombre y propiedades: recarga diaria al abrir app
+function applyDailyRefillOnAppOpen(user, now = new Date()) {
   if (!user.buddy) user.buddy = {};
 
-  const last = user.buddy.lastRefillAt || user.buddy.lastLoginAt || null;
+  // usa lastRefillAt o lastAppOpenAt como última apertura
+  const last = user.buddy.lastRefillAt || user.buddy.lastAppOpenAt || null;
 
   // primera vez: solo marca fecha
   if (!last) {
-    user.buddy.lastRefillAt = now;
-    user.buddy.lastLoginAt = now;
+    user.buddy.lastRefillAt   = now;
+    user.buddy.lastAppOpenAt = now;
     return;
   }
 
+  // cuántos días han pasado desde el último refill/apertura
   const d = daysPassed(new Date(last), now);
   if (d > 0) {
-    user.buddy.coffee = (Number(user.buddy.coffee) || 0) + d; // 1 por día
+    // acumula +1 café y +1 pan por día de diferencia
+    user.buddy.coffee = (Number(user.buddy.coffee) || 0) + d;
     user.buddy.bread  = (Number(user.buddy.bread)  || 0) + d;
 
     // opcional: cap para no acumular infinito
@@ -32,7 +36,8 @@ function applyLoginRefill(user, now = new Date()) {
     user.buddy.lastRefillAt = now;
   }
 
-  user.buddy.lastLoginAt = now;
+  // actualiza última apertura de la app
+  user.buddy.lastAppOpenAt = now;
 }
 
 function applyEnergyDecay(user, now = new Date()) {
@@ -42,7 +47,7 @@ function applyEnergyDecay(user, now = new Date()) {
   const hours = Math.floor((now - last) / (60 * 60 * 1000));
   if (hours <= 0) return;
 
-  const DECAY_PER_HOUR = 2; // AJUSTA: 2 por hora = -48 en 24h
+  const DECAY_PER_HOUR = 2; // 2 puntos de energía por hora = -48 en 24h
 
   const current = Number(user.buddy.energy ?? 80);
   const next = clamp(current - hours * DECAY_PER_HOUR, 0, 100);
@@ -59,4 +64,10 @@ function moodFromEnergy(energy) {
   return "dead";
 }
 
-module.exports = { applyLoginRefill, applyEnergyDecay, moodFromEnergy, clamp };
+// ✅ exporta la nueva función en lugar de applyLoginRefill
+module.exports = {
+  applyDailyRefillOnAppOpen,
+  applyEnergyDecay,
+  moodFromEnergy,
+  clamp,
+};

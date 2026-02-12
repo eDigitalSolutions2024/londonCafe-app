@@ -1,4 +1,13 @@
+// src/controllers/me.controller.js
+
 const User = require("../models/User");
+
+// 👇 agrega esto (ajusta la ruta según dónde lo pusiste)
+const {
+  applyEnergyDecay,
+  applyDailyRefillOnAppOpen,
+} = require("../utils/buddy"); 
+
 
 /** helper: saca uid del token */
 function getUid(req) {
@@ -12,14 +21,23 @@ async function getMe(req, res) {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
-    const user = await User.findById(uid).select(
-  "name gender username email isEmailVerified avatarConfig createdAt buddy points lifetimePoints"
-);
-
-
+    // Trae al usuario entero para poder modificar su buddy
+    const user = await User.findById(uid);
     if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
 
-    return res.json({ ok: true, user });
+    // ✅ Aplica decaimiento continuo y refill diario
+    const now = new Date();
+    applyEnergyDecay(user, now);
+    applyDailyRefillOnAppOpen(user, now);
+
+    await user.save();
+
+    // Ahora sí, selecciona sólo los campos que quieres enviar al cliente
+    const sanitizedUser = await User.findById(uid).select(
+      "name gender username email isEmailVerified avatarConfig createdAt buddy points lifetimePoints"
+    );
+
+    return res.json({ ok: true, user: sanitizedUser });
   } catch (err) {
     console.log("getMe error:", err?.message);
     return res.status(500).json({ error: "SERVER_ERROR" });

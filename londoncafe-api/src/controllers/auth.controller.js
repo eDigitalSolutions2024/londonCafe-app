@@ -71,18 +71,19 @@ function applyEnergyDecay(user, now = new Date()) {
   user.buddy.lastEnergyAt = now;
 }
 
-// ✅ Refill diario ACUMULABLE (solo 1 vez por día)
-function applyLoginRefill(user, now = new Date()) {
+// utils/buddy.js  (o el archivo donde tengas tu lógica de buddy)
+function applyDailyRefillOnAppOpen(user, now = new Date()) {
   ensureBuddy(user, now);
 
   const lastRefill = user.buddy.lastRefillAt ? new Date(user.buddy.lastRefillAt) : null;
 
   if (!lastRefill || !isSameDay(lastRefill, now)) {
     user.buddy.coffee = clamp((user.buddy.coffee ?? 0) + DAILY_ADD_COFFEE, 0, MAX_STACK);
-    user.buddy.bread = clamp((user.buddy.bread ?? 0) + DAILY_ADD_BREAD, 0, MAX_STACK);
+    user.buddy.bread  = clamp((user.buddy.bread  ?? 0) + DAILY_ADD_BREAD,  0, MAX_STACK);
     user.buddy.lastRefillAt = now;
   }
 
+  // opcional: guardar la última vez que entró a la app
   user.buddy.lastLoginAt = now;
 }
 
@@ -272,7 +273,7 @@ async function login(req, res) {
     // ✅ Energía “viva”
     const now = new Date();
     applyEnergyDecay(user, now);  // primero decay por tiempo
-    applyLoginRefill(user, now);  // luego refill diario acumulable
+    //applyLoginRefill(user, now);  // luego refill diario acumulable
     await user.save();
 
     const token = signAccessToken({ uid: user._id });
