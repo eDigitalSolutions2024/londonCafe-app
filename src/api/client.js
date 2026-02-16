@@ -1,5 +1,14 @@
 const BASE_URL = "http://192.168.1.90:3001/api";
-const POS_URL  = "http://192.168.1.90:4000/api";
+const POS_URL  = "https://api.londoncafejrz.com/api";
+
+async function parseJsonSafe(res) {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return {};
+  }
+}
 
 export async function apiFetch(path, options = {}) {
   const url = `${BASE_URL}${path}`;
@@ -13,13 +22,7 @@ export async function apiFetch(path, options = {}) {
     },
   });
 
-  const text = await res.text();
-  let data = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = {};
-  }
+  const data = await parseJsonSafe(res);
 
   if (!res.ok) {
     const err = new Error(data?.error || "REQUEST_FAILED");
@@ -31,7 +34,7 @@ export async function apiFetch(path, options = {}) {
   return data;
 }
 
-// ✅ NUEVO: para consumir endpoints del POS (LondonCafe) en :4000
+// ✅ Para consumir tu API en AWS (promos puente)
 export async function posFetch(path, options = {}) {
   const url = `${POS_URL}${path}`;
 
@@ -44,13 +47,7 @@ export async function posFetch(path, options = {}) {
     },
   });
 
-  const text = await res.text();
-  let data = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = {};
-  }
+  const data = await parseJsonSafe(res);
 
   if (!res.ok) {
     const err = new Error(data?.error || "REQUEST_FAILED");

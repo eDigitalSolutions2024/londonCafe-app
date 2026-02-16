@@ -11,7 +11,7 @@ import {
   Animated,
   Easing,
 } from "react-native";
-
+import { AppState } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 
 import { colors } from "../theme/colors";
@@ -47,6 +47,94 @@ function moodEmojiFromEnergy(energy = 0) {
   return "💀";                  // muerto
 }
 
+function WeeklyStreakBar({
+  streakCount = 0,
+  bestStreak = 0,
+  claimedToday = false,
+  onClaim,
+  loading = false,
+}) {
+  const weekProgress = ((streakCount % 7) + 7) % 7; // 0..6
+const filled = weekProgress; // <- NO forces 7
+
+  const days = ["L", "M", "M", "J", "V", "S", "D"];
+
+  // ✅ animaciones
+  const pop = useRef(days.map(() => new Animated.Value(1))).current;
+  const glow = useRef(new Animated.Value(0)).current;
+
+  // cuando cambia "filled", anima los que se llenaron
+  useEffect(() => {
+    // glow suave en card
+    glow.setValue(0);
+    Animated.timing(glow, { toValue: 1, duration: 300, useNativeDriver: false }).start(() => {
+      Animated.timing(glow, { toValue: 0, duration: 600, useNativeDriver: false }).start();
+    });
+
+    // pop en los dots llenos
+    pop.forEach((v, idx) => {
+      if (idx < filled) {
+        v.setValue(0.85);
+        Animated.spring(v, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }).start();
+      } else {
+        v.setValue(1);
+      }
+    });
+  }, [filled]);
+
+  const bg = glow.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colors.card, "#fff4f1"], // leve highlight
+  });
+
+  return (
+    <Animated.View style={[styles.streakCard, { backgroundColor: bg }]}>
+      <View style={styles.streakTopRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.streakTitle}>🎁 Recompensa diaria</Text>
+          <Text style={styles.streakSub}>
+            Racha: <Text style={styles.streakBold}>{streakCount}</Text> 🔥  Mejor:{" "}
+            <Text style={styles.streakBold}>{bestStreak}</Text>
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.streakBtn, (claimedToday || loading) && styles.streakBtnDisabled]}
+          onPress={onClaim}
+          disabled={claimedToday || loading}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.streakBtnText}>
+            {claimedToday ? "Reclamada ✅" : loading ? "..." : "Reclamar"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.weekRow}>
+        {days.map((d, idx) => {
+          const isFilled = idx < filled;
+
+          return (
+            <View key={idx} style={styles.dayCell}>
+              <Animated.View style={{ transform: [{ scale: pop[idx] }] }}>
+                <View style={[styles.dayDot, isFilled && styles.dayDotFilled]} />
+              </Animated.View>
+
+              <Text style={[styles.dayLabel, isFilled && styles.dayLabelFilled]}>{d}</Text>
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={styles.weekBottomRow}>
+        <Text style={styles.weekHint}>Semana: {filled}/7</Text>
+        {filled === 7 ? <Text style={styles.weekBadge}>🎉 Completa</Text> : null}
+      </View>
+    </Animated.View>
+  );
+}
+
+
 
 export default function HomeScreen({ navigation }) {
   const { signOut, user, token } = useContext(AuthContext);
@@ -64,6 +152,12 @@ export default function HomeScreen({ navigation }) {
   const [loadingMe, setLoadingMe] = useState(false);
   const [feeding, setFeeding] = useState(false);
   const [me, setMe] = useState(null);
+
+
+  // ✅ Daily Reward / Streak
+const [claimingDaily, setClaimingDaily] = useState(false);
+const [streak, setStreak] = useState({ count: 0, best: 0, claimedToday: false });
+
 
   const [liveEnergy, setLiveEnergy] = useState(0);
 
@@ -168,6 +262,8 @@ useEffect(() => {
 
       setAvatarConfig(u?.avatarConfig ?? null);
       setBuddy(u?.buddy ?? null);
+      setStreak(r?.streak || { count: 0, best: 0, claimedToday: false });
+
     } catch (e) {
       console.log("❌ /me:", e?.data || e?.message);
 
@@ -175,6 +271,7 @@ useEffect(() => {
       setMe(u);
       setAvatarConfig(u?.avatarConfig ?? null);
       setBuddy(u?.buddy ?? null);
+      setStreak({ count: 0, best: 0, claimedToday: false });
     } finally {
       setLoadingMe(false);
     }
@@ -189,6 +286,18 @@ useEffect(() => {
 
   return () => clearInterval(id);
 }, [token, fetchMe]);
+
+
+useEffect(() => {
+  const sub = AppState.addEventListener("change", (state) => {
+    if (state === "active") {
+      fetchMe();      // ✅ sincroniza streak al volver a la app
+      fetchPoints();
+    }
+  });
+
+  return () => sub.remove();
+}, [fetchMe, fetchPoints]);
 
 
 const playRewardAnimation = useCallback(({ prevEnergy, nextEnergy }) => {
@@ -265,6 +374,7 @@ const playRewardAnimation = useCallback(({ prevEnergy, nextEnergy }) => {
 
 
 
+
   // ✅ alimentar (coffee/bread)
   const handleFeed = useCallback(
     async (type) => {
@@ -327,6 +437,47 @@ const prevEnergy = Number.isFinite(Number(buddy?.energy)) ? Number(buddy.energy)
     [token, feeding, buddy, fetchMe, energy, playRewardAnimation]
 
   );
+
+  const onClaimDaily = useCallback(async () => {
+  if (!token) return;
+  if (claimingDaily) return;
+
+  try {
+    setClaimingDaily(true);
+
+    const r = await apiFetch("/me/daily-reward", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const claim = r?.claim;
+
+    if (claim?.ok === false && claim?.reason === "ALREADY_CLAIMED") {
+      Alert.alert("Recompensa diaria", "Ya reclamaste tu recompensa de hoy ✅");
+    } else if (claim?.ok) {
+      Alert.alert(
+        "🎁 Recompensa diaria",
+        `+${claim.reward?.coins || 0} BuddyCoins\nRacha: ${claim.streak} días 🔥`
+      );
+    } else {
+      Alert.alert("Recompensa diaria", "No se pudo reclamar.");
+    }
+
+    // ✅ actualiza estado local
+    setStreak(r?.streak || { count: 0, best: 0, claimedToday: true });
+
+    // ✅ si el backend regresó buddy/points, actualiza UI
+    if (r?.buddy) setBuddy(r.buddy);
+    if (Number.isFinite(Number(r?.points))) setPoints(Number(r.points));
+
+  } catch (e) {
+    console.log("❌ daily-reward:", e?.data || e?.message);
+    Alert.alert("Error", e?.data?.error || e?.message || "No se pudo reclamar.");
+  } finally {
+    setClaimingDaily(false);
+  }
+}, [token, claimingDaily]);
+
 
   useEffect(() => {
     apiFetch("/health")
@@ -429,6 +580,20 @@ const mood = moodLabelFromEnergy(energy);
               </View>
             )}
 
+
+
+                        {/* ✅ Recompensa diaria (streak) */}
+<WeeklyStreakBar
+  streakCount={streak.count}
+  bestStreak={streak.best}
+  claimedToday={streak.claimedToday}
+  onClaim={onClaimDaily}
+  loading={claimingDaily}
+/>
+
+
+
+
             <PointsStepperBar
               points={points}
               progressPoints={Math.min(points, 200)}
@@ -441,6 +606,10 @@ const mood = moodLabelFromEnergy(energy);
               iconSize={30}
               onPress={() => navigation.navigate("Rewards")}
             />
+
+  
+
+
 
             <Text style={styles.pointsMeta}>Acumulados: {lifetimePoints}</Text>
           </View>
@@ -624,6 +793,130 @@ rewardEmoji: {
   fontSize: 46,
   zIndex: 999,
   elevation: 999, // Android
+},
+
+dailyBox: {
+  marginTop: 12,
+  backgroundColor: colors.card,
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 12,
+},
+dailyTitle: {
+  color: colors.text,
+  fontSize: 14,
+  fontWeight: "900",
+},
+dailySubtitle: {
+  color: colors.textMuted,
+  fontSize: 12,
+  marginTop: 2,
+},
+dailyBtn: {
+  backgroundColor: colors.primary,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 999,
+},
+dailyBtnDisabled: {
+  opacity: 0.6,
+},
+dailyBtnText: {
+  color: colors.accent,
+  fontWeight: "900",
+  fontSize: 12,
+},
+
+streakCard: {
+  marginTop: 12,
+  backgroundColor: colors.card,
+  borderRadius: 16,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+},
+streakTopRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 12,
+},
+streakTitle: {
+  color: colors.text,
+  fontSize: 14,
+  fontWeight: "900",
+},
+streakSub: {
+  marginTop: 2,
+  color: colors.textMuted,
+  fontSize: 12,
+},
+streakBold: {
+  color: colors.text,
+  fontWeight: "900",
+},
+streakBtn: {
+  backgroundColor: colors.primary,
+  paddingVertical: 10,
+  paddingHorizontal: 14,
+  borderRadius: 999,
+},
+streakBtnDisabled: { opacity: 0.6 },
+streakBtnText: {
+  color: colors.accent,
+  fontWeight: "900",
+  fontSize: 12,
+},
+
+weekRow: {
+  marginTop: 12,
+  flexDirection: "row",
+  justifyContent: "space-between",
+},
+dayCell: {
+  alignItems: "center",
+  width: "13%", // ~7 columnas
+},
+dayDot: {
+  width: 12,
+  height: 12,
+  borderRadius: 6,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+  backgroundColor: "transparent",
+  marginBottom: 6,
+},
+dayDotFilled: {
+  backgroundColor: colors.primary,
+  borderColor: colors.primary,
+},
+dayLabel: {
+  fontSize: 11,
+  color: colors.textMuted,
+  fontWeight: "800",
+},
+dayLabelFilled: {
+  color: colors.text,
+},
+weekHint: {
+  marginTop: 10,
+  fontSize: 11,
+  color: colors.textMuted,
+  textAlign: "right",
+},
+weekBottomRow: {
+  marginTop: 10,
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+weekBadge: {
+  fontSize: 11,
+  color: colors.text,
+  fontWeight: "900",
 },
 
 

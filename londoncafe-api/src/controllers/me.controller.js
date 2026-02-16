@@ -1,13 +1,46 @@
 // src/controllers/me.controller.js
-
 const User = require("../models/User");
 
 // 👇 agrega esto (ajusta la ruta según dónde lo pusiste)
 const {
   applyEnergyDecay,
   applyDailyRefillOnAppOpen,
-} = require("../utils/buddy"); 
+  claimDailyReward, 
+   getRefillTimer, // ✅
+  dayKeyLocal,   
+  normalizeStreakAutoReset,      // ✅
+} = require("../utils/buddy");
 
+async function claimReward(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    const now = new Date();
+    const result = claimDailyReward(user, now);
+    user.markModified("buddy");
+    await user.save();
+
+    return res.json({
+      ok: true,
+      claim: result,
+      streak: {
+        count: user.buddy?.streakCount || 0,
+        best: user.buddy?.bestStreak || 0,
+        claimedToday: (user.buddy?.lastClaimDay === dayKeyLocal(now)),
+      },
+      buddy: user.buddy,
+      points: user.points,
+    });
+  } catch (err) {
+  console.log("claimReward FULL:", err); // 👈 para ver stack completo
+  return res.status(500).json({ error: "SERVER_ERROR", message: err?.message });
+}
+
+}
 
 /** helper: saca uid del token */
 function getUid(req) {
@@ -21,28 +54,45 @@ async function getMe(req, res) {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
-    // Trae al usuario entero para poder modificar su buddy
     const user = await User.findById(uid);
     if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
 
-    // ✅ Aplica decaimiento continuo y refill diario
     const now = new Date();
+
     applyEnergyDecay(user, now);
     applyDailyRefillOnAppOpen(user, now);
+    normalizeStreakAutoReset(user, now); // ✅ AQUÍ
+user.markModified("buddy");          // ✅ recomendado
+
+
+    // ✅ calcula cuánto falta / si ya está listo
+    const refillTimer = getRefillTimer(user, now);
 
     await user.save();
 
-    // Ahora sí, selecciona sólo los campos que quieres enviar al cliente
     const sanitizedUser = await User.findById(uid).select(
       "name gender username email isEmailVerified avatarConfig createdAt buddy points lifetimePoints"
     );
 
-    return res.json({ ok: true, user: sanitizedUser });
+    // ✅ manda el timer junto al user
+    return res.json({
+  ok: true,
+  user: sanitizedUser,
+  refillTimer,
+  streak: {
+    count: user.buddy?.streakCount || 0,
+    best: user.buddy?.bestStreak || 0,
+    claimedToday: user.buddy?.lastClaimDay === dayKeyLocal(now),
+  },
+});
+
   } catch (err) {
-    console.log("getMe error:", err?.message);
-    return res.status(500).json({ error: "SERVER_ERROR" });
-  }
+  console.log("getMe FULL:", err);
+  return res.status(500).json({ error: "SERVER_ERROR", message: err?.message });
 }
+
+}
+
 
 async function updateMe(req, res) {
   try {
@@ -130,4 +180,4 @@ async function updateAvatar(req, res) {
   }
 }
 
-module.exports = { getMe, updateMe, updateAvatar };
+module.exports = { getMe, updateMe, updateAvatar, claimReward };

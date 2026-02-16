@@ -30,17 +30,37 @@ const buddySchema = new mongoose.Schema(
   {
     energy: { type: Number, default: 80, min: 0, max: 100 },
 
-    // inventario acumulable
     coffee: { type: Number, default: 0, min: 0 },
     bread: { type: Number, default: 0, min: 0 },
 
-    // timestamps para lógica "solo cuando entra"
-    lastEnergyAt: { type: Date, default: Date.now }, // última vez que calculaste decaimiento
-    lastRefillAt: { type: Date, default: null },     // última vez que diste +1/+1
-    lastLoginAt: { type: Date, default: null },      // tracking
+    lastEnergyAt: { type: Date, default: Date.now },
+    lastRefillAt: { type: Date, default: null },
+    lastLoginAt: { type: Date, default: null },
+
+    // ✅ Daily reward / rachas
+    streakCount: { type: Number, default: 0, min: 0 },
+    bestStreak: { type: Number, default: 0, min: 0 },
+    lastClaimDay: { type: String, default: "" },  // "YYYY-MM-DD"
+    lastStreakDay: { type: String, default: "" }, // "YYYY-MM-DD"
+   // ✅ cupones (si los vas a usar)
+    coupons: {
+      type: [
+        {
+          id: String,
+          type: String,
+          title: String,
+          description: String,
+          createdAt: Date,
+          expiresAt: Date,
+          redeemedAt: Date,
+        },
+      ],
+      default: [],
+    },
   },
   { _id: false }
 );
+
 
 const userSchema = new mongoose.Schema(
   {
@@ -78,6 +98,7 @@ const userSchema = new mongoose.Schema(
 
     // ✅ Buddy
     buddy: { type: buddySchema, default: () => ({}) },
+    
   },
   { timestamps: true }
 );
