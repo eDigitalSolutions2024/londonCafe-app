@@ -54,27 +54,21 @@ function WeeklyStreakBar({
   onClaim,
   loading = false,
 }) {
-  const weekProgress = ((streakCount % 7) + 7) % 7; // 0..6
-const filled = weekProgress; // <- NO forces 7
+  // 0..6 (progreso dentro de la semana visual)
+  const filled = ((streakCount % 7) + 7) % 7;
 
+  // 🔥 duolingo muestra checks y un “hoy” más grande
   const days = ["L", "M", "M", "J", "V", "S", "D"];
+  const todayIdx = (new Date().getDay() + 6) % 7; // JS: 0=Dom → lo pasamos a 6, 1=Lun→0
 
-  // ✅ animaciones
+  // anim leve (pop al llenar)
   const pop = useRef(days.map(() => new Animated.Value(1))).current;
-  const glow = useRef(new Animated.Value(0)).current;
 
-  // cuando cambia "filled", anima los que se llenaron
   useEffect(() => {
-    // glow suave en card
-    glow.setValue(0);
-    Animated.timing(glow, { toValue: 1, duration: 300, useNativeDriver: false }).start(() => {
-      Animated.timing(glow, { toValue: 0, duration: 600, useNativeDriver: false }).start();
-    });
-
-    // pop en los dots llenos
     pop.forEach((v, idx) => {
-      if (idx < filled) {
-        v.setValue(0.85);
+      const isFilled = idx < filled;
+      if (isFilled) {
+        v.setValue(0.9);
         Animated.spring(v, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }).start();
       } else {
         v.setValue(1);
@@ -82,57 +76,65 @@ const filled = weekProgress; // <- NO forces 7
     });
   }, [filled]);
 
-  const bg = glow.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.card, "#fff4f1"], // leve highlight
-  });
-
   return (
-    <Animated.View style={[styles.streakCard, { backgroundColor: bg }]}>
-      <View style={styles.streakTopRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.streakTitle}>🎁 Recompensa diaria</Text>
-          <Text style={styles.streakSub}>
-            Racha: <Text style={styles.streakBold}>{streakCount}</Text> 🔥  Mejor:{" "}
-            <Text style={styles.streakBold}>{bestStreak}</Text>
-          </Text>
-        </View>
+    <View style={styles.duoCard}>
+      {/* Left: texto */}
+      <View style={{ flex: 1 }}>
+  <View style={styles.duoTopRow}>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.duoTitle}>🔥 {streakCount} días</Text>
+      <Text style={styles.duoSubtitle}>
+        {claimedToday ? "¡Ya reclamaste hoy!" : "¡Reclama tu recompensa!"}
+      </Text>
+    </View>
+  </View>
 
-        <TouchableOpacity
-          style={[styles.streakBtn, (claimedToday || loading) && styles.streakBtnDisabled]}
-          onPress={onClaim}
-          disabled={claimedToday || loading}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.streakBtnText}>
-            {claimedToday ? "Reclamada ✅" : loading ? "..." : "Reclamar"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+  <View style={styles.duoWeekAndBtnRow}>
+    <View style={styles.duoWeekRow}>
+      {days.map((d, idx) => {
+        const isFilled = idx < filled;
+        const isToday = idx === todayIdx;
 
-      <View style={styles.weekRow}>
-        {days.map((d, idx) => {
-          const isFilled = idx < filled;
+        return (
+          <View key={idx} style={styles.duoDayCell}>
+            <Animated.View style={{ transform: [{ scale: pop[idx] }] }}>
+              <View
+                style={[
+                  styles.duoDot,
+                  isFilled && styles.duoDotFilled,
+                  isToday && styles.duoDotToday,
+                  isFilled && isToday && styles.duoDotFilledToday,
+                ]}
+              >
+                {isFilled ? <Text style={styles.duoCheck}>✓</Text> : null}
+              </View>
+            </Animated.View>
 
-          return (
-            <View key={idx} style={styles.dayCell}>
-              <Animated.View style={{ transform: [{ scale: pop[idx] }] }}>
-                <View style={[styles.dayDot, isFilled && styles.dayDotFilled]} />
-              </Animated.View>
+            <Text style={[styles.duoDayLabel, isFilled && styles.duoDayLabelFilled]}>
+              {d}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
 
-              <Text style={[styles.dayLabel, isFilled && styles.dayLabelFilled]}>{d}</Text>
-            </View>
-          );
-        })}
-      </View>
+    <TouchableOpacity
+      style={[styles.duoBtnCompact, (claimedToday || loading) && styles.duoBtnDisabled]}
+      onPress={onClaim}
+      disabled={claimedToday || loading}
+      activeOpacity={0.85}
+    >
+      <Text style={styles.duoBtnTextCompact}>
+        {claimedToday ? "✅" : loading ? "..." : "Reclamar"}
+      </Text>
+    </TouchableOpacity>
+  </View>
+</View>
 
-      <View style={styles.weekBottomRow}>
-        <Text style={styles.weekHint}>Semana: {filled}/7</Text>
-        {filled === 7 ? <Text style={styles.weekBadge}>🎉 Completa</Text> : null}
-      </View>
-    </Animated.View>
+    </View>
   );
 }
+
 
 
 
@@ -611,7 +613,7 @@ const mood = moodLabelFromEnergy(energy);
 
 
 
-            <Text style={styles.pointsMeta}>Acumulados: {lifetimePoints}</Text>
+            
           </View>
         </View>
 
@@ -917,6 +919,132 @@ weekBadge: {
   fontSize: 11,
   color: colors.text,
   fontWeight: "900",
+},
+duoCard: {
+  marginTop: 12,
+  borderRadius: 18,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+  backgroundColor: colors.primary, // vibe duolingo/teal (ajústalo si quieres)
+  flexDirection: "row",
+  alignItems: "center",
+},
+
+duoTitle: {
+  fontSize: 26,
+  fontWeight: "900",
+  color: "#ffffff",
+},
+
+duoSubtitle: {
+  marginTop: 2,
+  fontSize: 13,
+  fontWeight: "800",
+  color: "rgba(255,255,255,0.95)",
+},
+
+
+
+
+
+
+
+
+
+duoDotFilled: {
+  backgroundColor: "#ffffff",
+  borderColor: "#ffffff",
+},
+
+duoDotToday: {
+  transform: [{ scale: 1.08 }],
+  borderColor: "rgba(255,255,255,0.95)",
+},
+
+duoDotFilledToday: {
+  backgroundColor: "#ffffff",
+  borderColor: "#ffffff",
+},
+
+duoCheck: {
+   color: colors.primary,
+  fontSize: 14,
+  fontWeight: "900",
+  marginTop: -1,
+},
+
+
+
+duoDayLabelFilled: {
+  color: "#ffffff",
+},
+
+
+
+duoBtnDisabled: {
+  opacity: 0.6,
+},
+
+
+duoTopRow: {
+  flexDirection: "row",
+  alignItems: "center",
+},
+
+duoWeekAndBtnRow: {
+  marginTop: 10,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+},
+
+// 👇 para que la fila de días no se estire raro
+duoWeekRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "flex-start",
+  gap: 8,
+},
+
+duoDayCell: {
+  alignItems: "center",
+  width: 22,
+},
+
+duoDot: {
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  borderWidth: 2,
+  borderColor: "rgba(255,255,255,0.55)",
+  backgroundColor: "rgba(255,255,255,0.18)",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+duoDayLabel: {
+  marginTop: 5,
+  fontSize: 10,
+  fontWeight: "900",
+  color: "rgba(255,255,255,0.8)",
+},
+
+// ✅ botón compacto
+duoBtnCompact: {
+  height: 34,
+  paddingHorizontal: 12,
+  borderRadius: 999,
+  backgroundColor: "rgba(255,255,255,0.95)",
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+duoBtnTextCompact: {
+  fontSize: 12,
+  fontWeight: "900",
+  color: colors.primary, // tu rojo london
 },
 
 

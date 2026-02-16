@@ -72,9 +72,7 @@ export default function PromosSection({
           <Text style={styles.sectionHint}>Novedades de LondonCafe</Text>
         </View>
 
-        <TouchableOpacity style={styles.seeAllBtn} onPress={onViewAll} activeOpacity={0.9}>
-          <Text style={styles.seeAllText}>Ver todas</Text>
-        </TouchableOpacity>
+        
       </View>
 
       {loading && (

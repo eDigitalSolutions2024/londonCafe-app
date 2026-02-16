@@ -62,7 +62,7 @@ async function getMe(req, res) {
     applyEnergyDecay(user, now);
     applyDailyRefillOnAppOpen(user, now);
     normalizeStreakAutoReset(user, now); // ✅ AQUÍ
-user.markModified("buddy");          // ✅ recomendado
+    user.markModified("buddy");          // ✅ recomendado
 
 
     // ✅ calcula cuánto falta / si ya está listo

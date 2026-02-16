@@ -5,13 +5,8 @@ import { appStyles } from "../theme/styles";
 import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
 
 export default function PointsStepperBar({
-  // ✅ número grande (puede ser total, ej 1000)
   points = 0,
-
-  // ✅ barra (0–200)
   progressPoints = 0,
-
-  // ✅ texto abajo
   totalAccumulated = 0,
 
   maxPoints = 200,
@@ -20,12 +15,14 @@ export default function PointsStepperBar({
   subtitle = "Buddy Coins",
 
   iconSource = LondonBuddyLogo,
-  iconSize = 25,
-  pillIconSize = 14,
+  iconSize = 22,
+  pillIconSize = 12,
 
-  // ✅ NUEVO: click al card completo
   onPress,
   disabledPress = false,
+
+  // ✅ extra opcional (por si luego quieres)
+  showStepLabels = true,
 }) {
   const rawPoints = Number(points) || 0;
   const rawProgress = Number(progressPoints) || 0;
@@ -60,8 +57,9 @@ export default function PointsStepperBar({
         onPress && !disabledPress ? { color: "rgba(0,0,0,0.06)" } : undefined
       }
     >
+      {/* Header compacto */}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <View style={styles.bigRow}>
             <Text style={styles.bigNumber}>{displayPoints}</Text>
 
@@ -75,11 +73,18 @@ export default function PointsStepperBar({
                 resizeMode="contain"
               />
             ) : null}
+
+            {/* ✅ badge acumulados en el header */}
+            <View style={styles.accBadge}>
+              <Text style={styles.accBadgeText}>Acum: {displayTotal}</Text>
+            </View>
           </View>
 
+          {/* ✅ deja solo un label (sin duplicar) */}
           <Text style={styles.smallLabel}>{title}</Text>
         </View>
 
+        {/* Pill compacto */}
         <View style={styles.pill}>
           <Text style={styles.pillText}>{subtitle}</Text>
           {iconSource ? (
@@ -95,7 +100,7 @@ export default function PointsStepperBar({
         </View>
       </View>
 
-      {/* Barra */}
+      {/* Barra compacta */}
       <View style={styles.barWrap}>
         <View style={styles.track} />
         <View style={[styles.fill, { width: `${progressPct}%` }]} />
@@ -113,28 +118,28 @@ export default function PointsStepperBar({
             return (
               <View key={`${stepValue}-${idx}`} style={[styles.stepItem, { left: `${pct}%` }]}>
                 <View style={[styles.stepDot, reached && styles.stepDotActive]} />
-                <Text style={styles.stepText}>{stepValue}</Text>
+                {showStepLabels ? (
+                  <Text style={styles.stepText}>{stepValue}</Text>
+                ) : null}
               </View>
             );
           })}
         </View>
       </View>
 
-      <Text style={styles.hint}>Acumula puntos y cámbialos por productos gratis ☕</Text>
-
-      {/* ✅ Total acumulado abajo */}
-      <View style={styles.totalRow}>
-        <Text style={styles.totalLabel}>Acumulados:</Text>
-        <Text style={styles.totalValue}>{displayTotal}</Text>
-      </View>
+      {/* ✅ quitamos hint + quitamos totalRow (ya vive arriba) */}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    marginTop: 14,
+    marginTop: 12,
     ...appStyles.card,
+
+    // ✅ compacta el card
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   cardPressed: {
     transform: [{ scale: 0.99 }],
@@ -145,67 +150,87 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 8,
+    gap: 10,
   },
 
-  bigRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  bigNumber: { color: colors.text, fontSize: 30, fontWeight: "800", lineHeight: 36 },
-  coinIcon: { marginTop: 2, backgroundColor: "transparent" },
+  bigRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  bigNumber: { color: colors.text, fontSize: 26, fontWeight: "900", lineHeight: 30 },
+  coinIcon: { marginTop: 1, backgroundColor: "transparent" },
 
-  smallLabel: { marginTop: 2, color: colors.textMuted, fontSize: 12 },
+  smallLabel: { marginTop: 2, color: colors.textMuted, fontSize: 11, fontWeight: "700" },
+
+  // ✅ badge “Acum: 276”
+  accBadge: {
+    marginLeft: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.06)",
+  },
+  accBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.textMuted,
+  },
 
   pill: {
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
-  pillText: { color: colors.primary, fontWeight: "700", fontSize: 12 },
+  pillText: { color: colors.primary, fontWeight: "800", fontSize: 11 },
   pillIcon: { backgroundColor: "transparent" },
 
-  barWrap: { position: "relative", height: 58, justifyContent: "center" },
+  // ✅ compacta barra
+  barWrap: { position: "relative", height: 44, justifyContent: "center" },
+
   track: {
     position: "absolute",
     left: 6,
     right: 6,
-    height: 8,
+    height: 6,
     borderRadius: 999,
     backgroundColor: colors.primarySoft,
   },
   fill: {
     position: "absolute",
     left: 6,
-    height: 8,
+    height: 6,
     borderRadius: 999,
     backgroundColor: colors.primary,
   },
 
-  pinWrap: { position: "absolute", top: 0, transform: [{ translateX: -8 }], alignItems: "center" },
-  pin: { width: 2, height: 16, backgroundColor: colors.primary, borderRadius: 999, opacity: 0.9 },
+  pinWrap: { position: "absolute", top: 0, transform: [{ translateX: -7 }], alignItems: "center" },
+  pin: { width: 2, height: 14, backgroundColor: colors.primary, borderRadius: 999, opacity: 0.9 },
   pinDot: {
     marginTop: 2,
-    width: 12,
-    height: 12,
+    width: 10,
+    height: 10,
     borderRadius: 999,
     backgroundColor: colors.primary,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: "#fff",
   },
 
-  stepsRow: { position: "absolute", left: 6, right: 6, top: 26, height: 28 },
-  stepItem: { position: "absolute", transform: [{ translateX: -8 }], alignItems: "center" },
-  stepDot: { width: 10, height: 10, borderRadius: 999, backgroundColor: "#D9D9D9", borderWidth: 2, borderColor: "#fff" },
+  stepsRow: { position: "absolute", left: 6, right: 6, top: 20, height: 22 },
+  stepItem: { position: "absolute", transform: [{ translateX: -7 }], alignItems: "center" },
+  stepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "#D9D9D9",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   stepDotActive: { backgroundColor: colors.primary },
-  stepText: { marginTop: 6, fontSize: 10, color: colors.textMuted },
-
-  hint: { marginTop: 10, fontSize: 12, color: colors.textMuted },
-
-  totalRow: { marginTop: 6, flexDirection: "row", gap: 6 },
-  totalLabel: { fontSize: 12, color: colors.textMuted },
-  totalValue: { fontSize: 12, color: colors.text, fontWeight: "800" },
+  stepText: { marginTop: 4, fontSize: 9, color: colors.textMuted },
 });
