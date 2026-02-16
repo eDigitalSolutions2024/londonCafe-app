@@ -99,12 +99,23 @@ function getRefillTimer(user, now = new Date()) {
 const TEST_DAY_MS = 60 * 1000; // puedes poner 10*1000 para cada 10s
 
 // ✅ Modo test: 1 "día" = 1 minuto
-function dayKeyLocal(now = new Date()) {
-  return String(Math.floor(now.getTime() / 60000)); // minuto unix
+function dayKeyLocal(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`; // ✅ día local
 }
 
 function gapBetweenKeys(a, b) {
-  return Number(b) - Number(a); // gap en "días" (minutos en modo test)
+  // a,b: "YYYY-MM-DD"
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+
+  // medianoche local
+  const da = new Date(ay, am - 1, ad).getTime();
+  const db = new Date(by, bm - 1, bd).getTime();
+
+  return Math.floor((db - da) / (24 * 60 * 60 * 1000));
 }
 
 
