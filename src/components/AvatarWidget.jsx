@@ -5,36 +5,33 @@ import { appStyles } from "../theme/styles";
 import AvatarPreview from "./AvatarPreview";
 
 export default function AvatarWidget({
-  // ✅ NO defaults “bonitos” para no hardcodear
   name,
   mood,
   energy, // number | null
 
-  // inventario (acumulable)
   coffee = 0,
   bread = 0,
 
-  // cuando estás pegándole al backend
   feeding = false,
 
-  // avatar
   avatarConfig,
 
   onFeedCoffee = () => {},
   onFeedBread = () => {},
 
-  // tap / long press
   onAvatarPress = () => {},
   onAvatarLongPress = () => {},
   onAvatarPressIn = () => {},
   onAvatarPressOut = () => {},
+  // ✅ opcional: si lo estás pasando desde Home
+  energyFlash = false,
 }) {
   const hasEnergy = energy !== null && energy !== undefined && !Number.isNaN(Number(energy));
   const energyPct = hasEnergy ? Math.max(0, Math.min(100, Number(energy))) : 0;
 
   const displayName = (name || "Tu avatar").trim();
   const displayMood = hasEnergy ? (mood || "") : "Cargando estado...";
-  const displayEnergyText = hasEnergy ? `${energyPct}%` : "--";
+  const displayEnergyText = hasEnergy ? `${Math.round(energyPct)}%` : "--";
 
   const canCoffee = hasEnergy && !feeding && Number(coffee) > 0;
   const canBread = hasEnergy && !feeding && Number(bread) > 0;
@@ -43,7 +40,6 @@ export default function AvatarWidget({
   const longPressedRef = useRef(false);
   const longPressAtRef = useRef(0);
   const resetTimerRef = useRef(null);
-
   const LONGPRESS_GUARD_MS = 450;
 
   const clearResetTimer = () => {
@@ -88,7 +84,7 @@ export default function AvatarWidget({
     }, LONGPRESS_GUARD_MS);
   };
 
-  // ✅ fallback SOLO para que no truene AvatarPreview, no para “inventar”
+  // ✅ fallback SOLO para que no truene AvatarPreview
   const safeConfig = {
     hair: "hair_01",
     ...(avatarConfig || {}),
@@ -110,25 +106,45 @@ export default function AvatarWidget({
             <AvatarPreview config={safeConfig} size={72} />
           </Pressable>
 
-          <Text style={styles.avatarName}>{displayName}</Text>
+          <Text style={styles.avatarName} numberOfLines={2}>
+            {displayName}
+          </Text>
           <Text style={styles.avatarMood}>{displayMood}</Text>
         </View>
       </View>
 
       {/* Lado derecho */}
       <View style={styles.right}>
-        <Text style={styles.label}>Energía</Text>
-
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${energyPct}%` }]} />
+        {/* ✅ Energía + % en una sola fila */}
+        <View style={styles.energyRow}>
+          <Text style={styles.label}>Energía</Text>
+          <Text style={styles.energyText}>{displayEnergyText}</Text>
         </View>
 
-        <Text style={styles.energyText}>{displayEnergyText}</Text>
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${energyPct}%` },
+              energyFlash && styles.progressFillFlash,
+            ]}
+          />
+        </View>
 
-        {/* Inventario */}
-        <Text style={styles.inventory}>
-          Café: {Number(coffee) || 0}  •  Pan: {Number(bread) || 0}
-        </Text>
+        {/* ✅ Chips compactos */}
+        <View style={styles.chipsRow}>
+          <View style={[styles.chip, !canCoffee && styles.chipDisabled]}>
+            <Text style={[styles.chipText, !canCoffee && styles.chipTextDisabled]}>
+              ☕ {Number(coffee) || 0}
+            </Text>
+          </View>
+
+          <View style={[styles.chip, !canBread && styles.chipDisabled]}>
+            <Text style={[styles.chipText, !canBread && styles.chipTextDisabled]}>
+              🥖 {Number(bread) || 0}
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.actions}>
           <Pressable
@@ -136,9 +152,7 @@ export default function AvatarWidget({
             style={[styles.actionBtn, !canCoffee && styles.disabledBtn]}
             disabled={!canCoffee}
           >
-            <Text style={styles.actionText}>
-              {feeding ? "..." : "Dar café"}
-            </Text>
+            <Text style={styles.actionText}>{feeding ? "..." : "Dar ☕"}</Text>
           </Pressable>
 
           <Pressable
@@ -147,13 +161,13 @@ export default function AvatarWidget({
             disabled={!canBread}
           >
             <Text style={[styles.actionTextOutline, !canBread && styles.disabledTextOutline]}>
-              {feeding ? "..." : "Dar pan"}
+              {feeding ? "..." : "Dar 🥖"}
             </Text>
           </Pressable>
         </View>
 
         {!hasEnergy ? (
-          <Text style={styles.hint}>Falta cargar buddy desde el backend.</Text>
+          <Text style={styles.hint}>Cargando buddy…</Text>
         ) : (
           <Text style={styles.hint}>Tip: aliméntalo para mantenerlo feliz.</Text>
         )}
@@ -166,13 +180,14 @@ const styles = StyleSheet.create({
   card: {
     ...appStyles.card,
     flexDirection: "row",
-    gap: 14,
+    gap: 12,
+    paddingVertical: 12,
   },
 
-  left: { width: 120, justifyContent: "center" },
+  left: { width: 112, justifyContent: "center" },
   right: { flex: 1, justifyContent: "center" },
 
-  avatarBox: { alignItems: "center", gap: 6 },
+  avatarBox: { alignItems: "center", gap: 4 },
 
   avatarCircle: {
     width: 78,
@@ -186,10 +201,17 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  avatarName: { color: colors.text, fontWeight: "800" },
-  avatarMood: { color: colors.textMuted, fontSize: 12 },
+  avatarName: { color: colors.text, fontWeight: "900", fontSize: 12, textAlign: "center" },
+  avatarMood: { color: colors.textMuted, fontSize: 11 },
 
-  label: { color: colors.textMuted, fontSize: 12, marginBottom: 6 },
+  energyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+
+  label: { color: colors.textMuted, fontSize: 11 },
 
   progressTrack: {
     height: 8,
@@ -199,38 +221,67 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: "100%", backgroundColor: colors.primary, borderRadius: 999 },
 
-  energyText: { color: colors.text, marginTop: 6, fontWeight: "800" },
-
-  inventory: {
-    marginTop: 6,
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: "800",
+  // ✅ opcional: pequeño flash cuando sube energía
+  progressFillFlash: {
+    // sin colores nuevos; usa opacidad
+    opacity: 0.92,
   },
 
-  actions: { flexDirection: "row", gap: 10, marginTop: 10 },
+  energyText: { color: colors.text, fontWeight: "900", fontSize: 12 },
+
+  chipsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(128,16,35,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(128,16,35,0.18)",
+  },
+
+  chipText: {
+    color: colors.primary,
+    fontWeight: "900",
+    fontSize: 12,
+  },
+
+  chipDisabled: { opacity: 0.55 },
+  chipTextDisabled: { opacity: 0.9 },
+
+  actions: { flexDirection: "row", gap: 8, marginTop: 10 },
 
   actionBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    flex: 1,
+    height: 34,
     borderRadius: 999,
     backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
   },
-  actionText: { color: "#fff", fontWeight: "800", fontSize: 12 },
+  actionText: { color: "#fff", fontWeight: "900", fontSize: 12 },
 
   actionBtnOutline: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    flex: 1,
+    height: 34,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.primary,
     backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
   },
-  actionTextOutline: { color: colors.primary, fontWeight: "800", fontSize: 12 },
+  actionTextOutline: { color: colors.primary, fontWeight: "900", fontSize: 12 },
 
   disabledBtn: { opacity: 0.45 },
   disabledBtnOutline: { opacity: 0.45 },
   disabledTextOutline: { opacity: 0.9 },
 
-  hint: { color: colors.textMuted, fontSize: 11, marginTop: 10, lineHeight: 14 },
+  hint: { color: colors.textMuted, fontSize: 10, marginTop: 8, lineHeight: 13 },
 });

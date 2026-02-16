@@ -67,13 +67,25 @@ export default function PromosSection({
   return (
     <View style={styles.promosSection}>
       <View style={styles.sectionHeader}>
-        <View>
-          <Text style={styles.sectionTitle}>Promociones</Text>
-          <Text style={styles.sectionHint}>Novedades de LondonCafe</Text>
-        </View>
+  <View style={styles.sectionLeft}>
+    {/*<View style={styles.sectionPill}>
+      <Text style={styles.sectionIcon}>🔥</Text>
+      <Text style={styles.sectionTitle}>Promociones</Text>
+    </View>*/}
 
-        
-      </View>
+    {/* si quieres, esto puede ser badge en vez de texto 
+    <View style={styles.sectionMiniRow}>
+      <View style={styles.sectionDot} />
+      <Text style={styles.sectionHint}>Novedades</Text>
+    </View>*/}
+  </View>
+
+  {/* opcional: si luego quieres volver a poner "ver todas" aquí */}
+  {/* <TouchableOpacity style={styles.seeAllBtn} onPress={onViewAll}>
+    <Text style={styles.seeAllText}>Ver todas</Text>
+  </TouchableOpacity> */}
+</View>
+{/* <View style={styles.sectionUnderline} />*/}
 
       {loading && (
         <View style={styles.loadingRow}>
@@ -141,33 +153,75 @@ export default function PromosSection({
 const styles = StyleSheet.create({
   promosSection: { paddingHorizontal: 20, paddingBottom: 24 },
 
+  // ===== Header (nuevo estilo) =====
   sectionHeader: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 8,
   },
+
+  sectionLeft: { gap: 6 },
+
+  sectionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "rgba(128,16,35,0.08)", // rojito suave
+    borderWidth: 1,
+    borderColor: "rgba(128,16,35,0.18)",
+    alignSelf: "flex-start",
+  },
+
+  sectionIcon: { fontSize: 13 },
 
   sectionTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 2,
+    color: colors.primary, // rojo London
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 0.2,
   },
 
-  sectionHint: { marginTop: 2, fontSize: 12, color: colors.textMuted },
-
-  seeAllBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: "transparent",
+  sectionMiniRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: 6,
   },
-  seeAllText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
 
-  loadingRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
+  sectionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 99,
+    backgroundColor: colors.primary,
+    opacity: 0.9,
+  },
+
+  sectionHint: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontWeight: "700",
+  },
+
+  sectionUnderline: {
+    height: 3,
+    width: 74,
+    borderRadius: 99,
+    backgroundColor: colors.primary,
+    opacity: 0.9,
+    marginBottom: 10,
+  },
+
+  // ===== Loading / Error / Empty =====
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+  },
   loadingText: { color: colors.textMuted, fontWeight: "700", fontSize: 12 },
 
   errorBox: {
@@ -199,6 +253,7 @@ const styles = StyleSheet.create({
   },
   emptyText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
 
+  // ===== Promo Card =====
   promoCardV: {
     height: 220,
     borderRadius: 18,
@@ -221,12 +276,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 80,                 // ✅ NUEVO (controla cuánto tapa)
+    height: 80,
     paddingHorizontal: 14,
-    paddingVertical: 10,        // ✅ un poco menos
-    backgroundColor: "rgba(0,0,0,0.38)", // ✅ menos opaco
+    paddingVertical: 10,
+    backgroundColor: "rgba(0,0,0,0.38)",
+    borderTopWidth: 1,                    // opcional (se ve pro)
+    borderTopColor: "rgba(255,255,255,0.10)",
   },
-
 
   promoMetaRow: {
     flexDirection: "row",
@@ -259,3 +315,5 @@ const styles = StyleSheet.create({
 
   promoSubtitle: { color: "rgba(255,255,255,0.88)", fontSize: 12 },
 });
+
+
