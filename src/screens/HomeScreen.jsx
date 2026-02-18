@@ -605,7 +605,7 @@ const mood = moodLabelFromEnergy(energy);
               title="Buddy Coins"
               subtitle="Buddy Coins"
               iconSource={LondonBuddyLogo}
-              iconSize={30}
+        
               onPress={() => navigation.navigate("Rewards")}
             />
 
@@ -716,7 +716,6 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
 
-  avatarSection: { marginTop: 14 },
 
   pointsMeta: {
     marginTop: 8,

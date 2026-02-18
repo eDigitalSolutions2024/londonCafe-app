@@ -103,7 +103,7 @@ export default function AvatarWidget({
             delayLongPress={250}
             style={styles.avatarCircle}
           >
-            <AvatarPreview config={safeConfig} size={72} />
+            <AvatarPreview config={safeConfig} size={90} />
           </Pressable>
 
           <Text style={styles.avatarName} numberOfLines={2}>
@@ -190,8 +190,8 @@ const styles = StyleSheet.create({
   avatarBox: { alignItems: "center", gap: 4 },
 
   avatarCircle: {
-    width: 78,
-    height: 78,
+    width: 88,
+    height: 88,
     borderRadius: 39,
     backgroundColor: colors.primarySoft,
     borderWidth: 1,

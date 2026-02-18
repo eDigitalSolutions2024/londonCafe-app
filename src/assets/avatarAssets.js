@@ -4,6 +4,7 @@ export const avatarAssets = {
   hair_03: require("../../assets/avatar/hair/Red_hair.png"),
   hair_04: require("../../assets/avatar/hair/rubio_hair.png"),
   hair_05: require("../../assets/avatar/hair/white_hair.png"),
+  hair_07: require("../../assets/avatar/hair/admin_narumi.png"),
   
   
    // ✅ NUEVO femenino

@@ -11,7 +11,7 @@ const OPTIONS = {
   skin: ["skin_01", "skin_f_01"],
 
   // ✅ pelo
-  hair: ["hair_01", "hair_02", "hair_03", "hair_04", "hair_05", "hair_f_01"],
+  hair: ["hair_01", "hair_02", "hair_03", "hair_04", "hair_05", "hair_f_01" , "hair_07"],
 
   // ✅ ropa
   top: ["top_01", "top_02", "top_03"],

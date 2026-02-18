@@ -15,8 +15,8 @@ export default function PointsStepperBar({
   subtitle = "Buddy Coins",
 
   iconSource = LondonBuddyLogo,
-  iconSize = 24,
-  pillIconSize = 12,
+  iconSize =60,
+  pillIconSize = 24,
 
   onPress,
   disabledPress = false,
@@ -83,9 +83,7 @@ export default function PointsStepperBar({
               </View>
             ) : null}
 
-            <View style={styles.accBadge}>
-              <Text style={styles.accBadgeText}>Acum: {displayTotal}</Text>
-            </View>
+       
           </View>
 
           <Text style={styles.smallLabel}>{title}</Text>
@@ -179,8 +177,8 @@ const styles = StyleSheet.create({
 
   // ✅ moneda dentro de “ring” suave
   coinRing: {
-    width: 30,
-    height: 30,
+    width: 50,
+    height: 50,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
