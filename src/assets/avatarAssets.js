@@ -8,5 +8,11 @@ export const avatarAssets = {
   
   
    // ✅ NUEVO femenino
-  hair_f_01: require("../../assets/avatar/hair/female_white_hair.png"),
+  hair_f_01: require("../../assets/avatar/hair/female_white_hair (2).png"),
+  hair_f_02: require("../../assets/avatar/hair/female_black_hair.png"),
+  hair_f_03: require("../../assets/avatar/hair/female_brown_hair.png"),
+  hair_f_04: require("../../assets/avatar/hair/female_yellow_hair.png"),
+  hair_f_05: require("../../assets/avatar/hair/female_red_hair.png"),
+ 
+
 };

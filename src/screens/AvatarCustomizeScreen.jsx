@@ -11,7 +11,7 @@ const OPTIONS = {
   skin: ["skin_01", "skin_f_01"],
 
   // ✅ pelo
-  hair: ["hair_01", "hair_02", "hair_03", "hair_04", "hair_05", "hair_f_01" , "hair_07"],
+  hair: ["hair_01", "hair_02", "hair_03", "hair_04", "hair_05", "hair_f_01" , "hair_07" , "hair_f_02" , "hair_f_03" , "hair_f_04" , "hair_f_05" ],
 
   // ✅ ropa
   top: ["top_01", "top_02", "top_03"],
@@ -30,6 +30,10 @@ function prettyLabel(key, v) {
   }
   if (key === "hair") {
     if (v === "hair_f_01") return "hair 06";
+    if (v === "hair_f_02") return "hair 08";
+    if (v === "hair_f_03") return "hair 09";
+    if (v === "hair_f_04") return "hair 10";
+    if (v === "hair_f_05") return "hair 11";
   }
   return String(v).replace(/_/g, " ");
 }

@@ -159,36 +159,23 @@ function genId(prefix = "coupon") {
  * ✅ Recompensa según día de semana (1..7)
  * Ajusta números a tu gusto
  */
+/**
+ * ✅ Recompensas SEMANALES (1..7) — se repiten
+ * (excepto día 28 que es BONUS 100)
+ */
 function calcDailyRewardByWeekDay(weekDay) {
   switch (weekDay) {
-    case 1:
-      return { coins: 5, coffee: 0, bread: 0, coupon: null };
-    case 2:
-      return { coins: 0, coffee: 1, bread: 1, coupon: null };
-    case 3:
-      return { coins: 10, coffee: 0, bread: 0, coupon: null };
-    case 4:
-      return { coins: 0, coffee: 1, bread: 0, coupon: null };
-    case 5:
-      return { coins: 15, coffee: 0, bread: 0, coupon: null };
-    case 6:
-      return { coins: 0, coffee: 0, bread: 2, coupon: null };
-    case 7:
-      return {
-        coins: 20, // opcional
-        coffee: 0,
-        bread: 0,
-        coupon: {
-          type: "FREE_COFFEE",
-          title: "Café gratis ☕",
-          description: "Canjea 1 café gratis en mostrador.",
-          expiresInDays: 7,
-        },
-      };
-    default:
-      return { coins: 5, coffee: 0, bread: 0, coupon: null };
+    case 1: return { coins: 2, coffee: 0, bread: 0, coupon: null };                 // Día 1
+    case 2: return { coins: 0, coffee: 1, bread: 0, coupon: null };                 // Día 2 (Buddy Cafe)
+    case 3: return { coins: 3, coffee: 0, bread: 0, coupon: null };                 // Día 3
+    case 4: return { coins: 5, coffee: 0, bread: 0, coupon: null };                 // Día 4
+    case 5: return { coins: 0, coffee: 1, bread: 1, coupon: null };                 // Día 5 (Cafe + Pan)
+    case 6: return { coins: 7, coffee: 0, bread: 0, coupon: null };                 // Día 6
+    case 7: return { coins: 8, coffee: 0, bread: 0, coupon: null };                 // Día 7
+    default: return { coins: 2, coffee: 0, bread: 0, coupon: null };
   }
 }
+
 
 function grantReward(user, reward, now = new Date()) {
   if (!user.buddy) user.buddy = {};
@@ -289,25 +276,32 @@ function claimDailyReward(user, now = new Date()) {
   user.buddy.lastStreakDay = today;
   user.buddy.lastClaimDay = today;
 
-  // ✅ (4) Semana 1..7 basada en la racha (se reinicia cada 7)
-  const weekDay = ((user.buddy.streakCount - 1) % 7) + 1;
+  // ✅ (4) Día dentro del ciclo 1..28
+const cycleDay = ((user.buddy.streakCount - 1) % 28) + 1;
 
-  // ✅ (5) Calcula y aplica recompensa
-  const reward = calcDailyRewardByWeekDay(weekDay);
-  grantReward(user, reward, now);
+// ✅ (5) Semana 1..7 (repetible)
+const weekDay = ((cycleDay - 1) % 7) + 1;
 
-  // ✅ (6) Respuesta
+// ✅ (6) Calcula recompensa (día 28 siempre BONUS)
+const reward =
+  cycleDay === 28
+    ? { coins: 100, coffee: 0, bread: 0, coupon: null }   // ✅ BONUS SIEMPRE
+    : calcDailyRewardByWeekDay(weekDay);
+
+grantReward(user, reward, now);
+
   return {
-    ok: true,
-    today,
-    streak: user.buddy.streakCount,
-    bestStreak: user.buddy.bestStreak,
-    weekDay,
-    reward,
-    buddy: user.buddy,
-    points: user.points,
-    lifetimePoints: user.lifetimePoints,
-  };
+  ok: true,
+  today,
+  streak: user.buddy.streakCount,
+  bestStreak: user.buddy.bestStreak,
+  cycleDay,   // ✅ NUEVO
+  weekDay,
+  reward,
+  buddy: user.buddy,
+  points: user.points,
+  lifetimePoints: user.lifetimePoints,
+};
 }
 
 function normalizeStreakAutoReset(user, now = new Date()) {

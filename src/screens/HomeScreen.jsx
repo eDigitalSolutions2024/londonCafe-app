@@ -10,7 +10,9 @@ import {
   Alert,
   Animated,
   Easing,
+  Image,
 } from "react-native";
+
 import { AppState } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 
@@ -23,6 +25,9 @@ import EmojiBurst from "../components/EmojiBurst";
 // Avatar + puntos
 import AvatarWidget from "../components/AvatarWidget";
 import PointsStepperBar from "../components/PointsStepperBar";
+import MaskedView from "@react-native-masked-view/masked-view";
+
+import BoothMask from "../assets/markers/London.png";
 
 // Promociones desde POS
 import PromosSection from "../components/PromoSection";
@@ -47,93 +52,93 @@ function moodEmojiFromEnergy(energy = 0) {
   return "💀";                  // muerto
 }
 
-function WeeklyStreakBar({
+function BoothStreakBar({
   streakCount = 0,
-  bestStreak = 0,
   claimedToday = false,
   onClaim,
   loading = false,
+  totalDays = 28,
 }) {
-  // 0..6 (progreso dentro de la semana visual)
-  const filled = ((streakCount % 7) + 7) % 7;
 
-  // 🔥 duolingo muestra checks y un “hoy” más grande
-  const days = ["L", "M", "M", "J", "V", "S", "D"];
-  const todayIdx = (new Date().getDay() + 6) % 7; // JS: 0=Dom → lo pasamos a 6, 1=Lun→0
+  // ✅ convierte count (racha total) a día dentro del ciclo 28
+  const day = Math.max(1, Math.min(totalDays, ((Number(streakCount) || 0) - 1) % totalDays + 1));
 
-  // anim leve (pop al llenar)
-  const pop = useRef(days.map(() => new Animated.Value(1))).current;
+  // ✅ si NO ha reclamado hoy, el llenado va “hasta ayer”
+  const shown = claimedToday ? day : Math.max(0, day - 1);
+  const pct = shown / totalDays; // 0..1
+
+  const BOOTH_H = 160; // debe ser igual a styles.boothBox.height
+
+  // ✅ animación del llenado
+ const fillAnim = useRef(new Animated.Value(pct * BOOTH_H)).current;
+
 
   useEffect(() => {
-    pop.forEach((v, idx) => {
-      const isFilled = idx < filled;
-      if (isFilled) {
-        v.setValue(0.9);
-        Animated.spring(v, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }).start();
-      } else {
-        v.setValue(1);
-      }
-    });
-  }, [filled]);
+  Animated.timing(fillAnim, {
+    toValue: pct * BOOTH_H,
+    duration: 550,
+    easing: Easing.out(Easing.quad),
+    useNativeDriver: false,
+  }).start();
+}, [pct]);
+
+
+  
 
   return (
-    <View style={styles.duoCard}>
-      {/* Left: texto */}
-      <View style={{ flex: 1 }}>
-  <View style={styles.duoTopRow}>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.duoTitle}>🔥 {streakCount} días</Text>
-      <Text style={styles.duoSubtitle}>
-        {claimedToday ? "¡Ya reclamaste hoy!" : "¡Reclama tu recompensa!"}
-      </Text>
-    </View>
-  </View>
+  <View style={styles.duoCard}>
+    <View style={styles.streakGrid}>
+      {/* ✅ IZQUIERDA: texto + botón + hint */}
+      <View style={styles.streakLeft}>
+        <Text style={styles.duoTitle}>🔥 Día {day}/{totalDays}</Text>
+        <Text style={styles.duoSubtitle}>
+          {claimedToday ? "¡Ya reclamaste hoy!" : "¡Reclama tu recompensa!"}
+        </Text>
 
-  <View style={styles.duoWeekAndBtnRow}>
-    <View style={styles.duoWeekRow}>
-      {days.map((d, idx) => {
-        const isFilled = idx < filled;
-        const isToday = idx === todayIdx;
+        <TouchableOpacity
+          style={[styles.duoBtnCompact, (claimedToday || loading) && styles.duoBtnDisabled]}
+          onPress={onClaim}
+          disabled={claimedToday || loading}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.duoBtnTextCompact}>
+            {claimedToday ? "✅" : loading ? "..." : "Reclamar"}
+          </Text>
+        </TouchableOpacity>
 
-        return (
-          <View key={idx} style={styles.duoDayCell}>
-            <Animated.View style={{ transform: [{ scale: pop[idx] }] }}>
-              <View
-                style={[
-                  styles.duoDot,
-                  isFilled && styles.duoDotFilled,
-                  isToday && styles.duoDotToday,
-                  isFilled && isToday && styles.duoDotFilledToday,
-                ]}
-              >
-                {isFilled ? <Text style={styles.duoCheck}>✓</Text> : null}
-              </View>
-            </Animated.View>
+        <Text style={styles.boothHint}>
+          Completa la cabina en 28 días 💥 (Día 28 = Bonus)
+        </Text>
+      </View>
 
-            <Text style={[styles.duoDayLabel, isFilled && styles.duoDayLabelFilled]}>
-              {d}
-            </Text>
+      {/* ✅ DERECHA: cabina pegada arriba */}
+      <View style={styles.streakRight}>
+        <MaskedView
+          style={styles.boothBox}
+          maskElement={
+            <Image source={BoothMask} style={styles.boothImg} resizeMode="contain" />
+          }
+        >
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.10)" }]} />
+
+          <View style={StyleSheet.absoluteFill}>
+            <View style={{ flex: 1 }} />
+            <Animated.View
+          style={{
+            height: fillAnim,
+            backgroundColor: "rgba(255,255,255,0.95)", // ✅ un pelín menos transparente
+            minHeight: shown > 0 ? 2 : 0,              // ✅ que se vea aunque sea poquito
+          }}
+        />
           </View>
-        );
-      })}
+        </MaskedView>
+      </View>
     </View>
-
-    <TouchableOpacity
-      style={[styles.duoBtnCompact, (claimedToday || loading) && styles.duoBtnDisabled]}
-      onPress={onClaim}
-      disabled={claimedToday || loading}
-      activeOpacity={0.85}
-    >
-      <Text style={styles.duoBtnTextCompact}>
-        {claimedToday ? "✅" : loading ? "..." : "Reclamar"}
-      </Text>
-    </TouchableOpacity>
   </View>
-</View>
+);
 
-    </View>
-  );
 }
+
 
 
 
@@ -585,13 +590,15 @@ const mood = moodLabelFromEnergy(energy);
 
 
                         {/* ✅ Recompensa diaria (streak) */}
-<WeeklyStreakBar
+<BoothStreakBar
   streakCount={streak.count}
-  bestStreak={streak.best}
   claimedToday={streak.claimedToday}
   onClaim={onClaimDaily}
   loading={claimingDaily}
+  totalDays={28}
+  
 />
+
 
 
 
@@ -677,6 +684,7 @@ const mood = moodLabelFromEnergy(energy);
 }
 
 const styles = StyleSheet.create({
+  /* Screen / layout base */
   container: { flex: 1, backgroundColor: colors.background },
 
   hero: { paddingHorizontal: 20, paddingVertical: 0 },
@@ -716,13 +724,82 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
 
-
-  pointsMeta: {
-    marginTop: 8,
-    fontSize: 12,
-    color: colors.textMuted,
+  /* ✅ Streak Card (cabina + botón + texto) */
+  duoCard: {
+    marginTop: 12,
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: colors.primary,
   },
 
+  streakGrid: {
+    flexDirection: "row",
+    alignItems: "flex-start", // ✅ cabina arriba
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  streakLeft: {
+    flex: 1,
+    paddingRight: 6,
+  },
+
+  streakRight: {
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+  },
+
+  duoTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#ffffff",
+    marginBottom: 2, // ✅ texto más pegado
+  },
+
+  duoSubtitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.95)",
+    marginBottom: 8, // ✅ espacio justo antes del botón
+  },
+
+  duoBtnCompact: {
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+  },
+  duoBtnDisabled: { opacity: 0.6 },
+
+  duoBtnTextCompact: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.primary,
+  },
+
+  boothBox: {
+    width: 120,
+    height: 160,
+    overflow: "hidden",
+  },
+  boothImg: {
+    width: 120,
+    height: 160,
+  },
+
+  boothHint: {
+    marginTop: 8,
+    fontSize: 10,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.85)",
+  },
+
+  /* ✅ Modal peek (avatar grande) */
   peekBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.18)",
@@ -741,310 +818,51 @@ const styles = StyleSheet.create({
     borderColor: colors.primarySoft,
   },
 
+  /* ✅ Reward modal */
   rewardBackdrop: {
-  flex: 1,
-  backgroundColor: "rgba(0,0,0,0.28)",
-  alignItems: "center",
-  justifyContent: "center",
-},
-rewardCard: {
-  width: "86%",
-  borderRadius: 18,
-  backgroundColor: "#fff",
-  paddingVertical: 18,
-  paddingHorizontal: 14,
-  alignItems: "center",
-  borderWidth: 1,
-  borderColor: colors.primarySoft,
-},
-rewardCircle: {
-  width: 300,
-  height: 300,
-  borderRadius: 150,
-  backgroundColor: "#fff",
-  alignItems: "center",
-  justifyContent: "center",
-  overflow: "hidden",
-  zIndex: 1,
-},
-
-rewardDelta: {
-  position: "absolute",
-  top: 26,
-  right: 22,
-  fontSize: 28,
-  fontWeight: "900",
-  color: "#22c55e",
-},
-rewardMood: {
-  marginTop: 10,
-  fontSize: 20,
-  fontWeight: "900",
-  color: colors.text,
-},
-rewardSmall: {
-  marginTop: 6,
-  fontSize: 12,
-  color: colors.textMuted,
-},
-rewardEmoji: {
-  position: "absolute",
-  top: 8,
-  alignSelf: "center",
-  fontSize: 46,
-  zIndex: 999,
-  elevation: 999, // Android
-},
-
-dailyBox: {
-  marginTop: 12,
-  backgroundColor: colors.card,
-  borderRadius: 16,
-  padding: 14,
-  borderWidth: 1,
-  borderColor: colors.primarySoft,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 12,
-},
-dailyTitle: {
-  color: colors.text,
-  fontSize: 14,
-  fontWeight: "900",
-},
-dailySubtitle: {
-  color: colors.textMuted,
-  fontSize: 12,
-  marginTop: 2,
-},
-dailyBtn: {
-  backgroundColor: colors.primary,
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderRadius: 999,
-},
-dailyBtnDisabled: {
-  opacity: 0.6,
-},
-dailyBtnText: {
-  color: colors.accent,
-  fontWeight: "900",
-  fontSize: 12,
-},
-
-streakCard: {
-  marginTop: 12,
-  backgroundColor: colors.card,
-  borderRadius: 16,
-  padding: 14,
-  borderWidth: 1,
-  borderColor: colors.primarySoft,
-},
-streakTopRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 12,
-},
-streakTitle: {
-  color: colors.text,
-  fontSize: 14,
-  fontWeight: "900",
-},
-streakSub: {
-  marginTop: 2,
-  color: colors.textMuted,
-  fontSize: 12,
-},
-streakBold: {
-  color: colors.text,
-  fontWeight: "900",
-},
-streakBtn: {
-  backgroundColor: colors.primary,
-  paddingVertical: 10,
-  paddingHorizontal: 14,
-  borderRadius: 999,
-},
-streakBtnDisabled: { opacity: 0.6 },
-streakBtnText: {
-  color: colors.accent,
-  fontWeight: "900",
-  fontSize: 12,
-},
-
-weekRow: {
-  marginTop: 12,
-  flexDirection: "row",
-  justifyContent: "space-between",
-},
-dayCell: {
-  alignItems: "center",
-  width: "13%", // ~7 columnas
-},
-dayDot: {
-  width: 12,
-  height: 12,
-  borderRadius: 6,
-  borderWidth: 1,
-  borderColor: colors.primarySoft,
-  backgroundColor: "transparent",
-  marginBottom: 6,
-},
-dayDotFilled: {
-  backgroundColor: colors.primary,
-  borderColor: colors.primary,
-},
-dayLabel: {
-  fontSize: 11,
-  color: colors.textMuted,
-  fontWeight: "800",
-},
-dayLabelFilled: {
-  color: colors.text,
-},
-weekHint: {
-  marginTop: 10,
-  fontSize: 11,
-  color: colors.textMuted,
-  textAlign: "right",
-},
-weekBottomRow: {
-  marginTop: 10,
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-},
-weekBadge: {
-  fontSize: 11,
-  color: colors.text,
-  fontWeight: "900",
-},
-duoCard: {
-  marginTop: 12,
-  borderRadius: 18,
-  padding: 16,
-  borderWidth: 1,
-  borderColor: colors.primarySoft,
-  backgroundColor: colors.primary, // vibe duolingo/teal (ajústalo si quieres)
-  flexDirection: "row",
-  alignItems: "center",
-},
-
-duoTitle: {
-  fontSize: 26,
-  fontWeight: "900",
-  color: "#ffffff",
-},
-
-duoSubtitle: {
-  marginTop: 2,
-  fontSize: 13,
-  fontWeight: "800",
-  color: "rgba(255,255,255,0.95)",
-},
-
-
-
-
-
-
-
-
-
-duoDotFilled: {
-  backgroundColor: "#ffffff",
-  borderColor: "#ffffff",
-},
-
-duoDotToday: {
-  transform: [{ scale: 1.08 }],
-  borderColor: "rgba(255,255,255,0.95)",
-},
-
-duoDotFilledToday: {
-  backgroundColor: "#ffffff",
-  borderColor: "#ffffff",
-},
-
-duoCheck: {
-   color: colors.primary,
-  fontSize: 14,
-  fontWeight: "900",
-  marginTop: -1,
-},
-
-
-
-duoDayLabelFilled: {
-  color: "#ffffff",
-},
-
-
-
-duoBtnDisabled: {
-  opacity: 0.6,
-},
-
-
-duoTopRow: {
-  flexDirection: "row",
-  alignItems: "center",
-},
-
-duoWeekAndBtnRow: {
-  marginTop: 10,
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 10,
-},
-
-// 👇 para que la fila de días no se estire raro
-duoWeekRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "flex-start",
-  gap: 8,
-},
-
-duoDayCell: {
-  alignItems: "center",
-  width: 22,
-},
-
-duoDot: {
-  width: 20,
-  height: 20,
-  borderRadius: 10,
-  borderWidth: 2,
-  borderColor: "rgba(255,255,255,0.55)",
-  backgroundColor: "rgba(255,255,255,0.18)",
-  alignItems: "center",
-  justifyContent: "center",
-},
-
-duoDayLabel: {
-  marginTop: 5,
-  fontSize: 10,
-  fontWeight: "900",
-  color: "rgba(255,255,255,0.8)",
-},
-
-// ✅ botón compacto
-duoBtnCompact: {
-  height: 34,
-  paddingHorizontal: 12,
-  borderRadius: 999,
-  backgroundColor: "rgba(255,255,255,0.95)",
-  alignItems: "center",
-  justifyContent: "center",
-},
-
-duoBtnTextCompact: {
-  fontSize: 12,
-  fontWeight: "900",
-  color: colors.primary, // tu rojo london
-},
-
-
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.28)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rewardCard: {
+    width: "86%",
+    borderRadius: 18,
+    backgroundColor: "#fff",
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+  },
+  rewardCircle: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    zIndex: 1,
+  },
+  rewardDelta: {
+    position: "absolute",
+    top: 26,
+    right: 22,
+    fontSize: 28,
+    fontWeight: "900",
+    color: "#22c55e",
+  },
+  rewardMood: {
+    marginTop: 10,
+    fontSize: 20,
+    fontWeight: "900",
+    color: colors.text,
+  },
+  rewardSmall: {
+    marginTop: 6,
+    fontSize: 12,
+    color: colors.textMuted,
+  },
 });
+
