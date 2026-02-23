@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo } from "react";
+import React, { useState, useContext, useMemo, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from "react-native";
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
@@ -6,25 +6,40 @@ import AvatarPreview from "../components/AvatarPreview";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 
+// ✅ Opciones base (sin filtrar)
 const OPTIONS = {
-  // ✅ NUEVO: skin
-  skin: ["skin_01", "skin_f_01"],
-
-  // ✅ pelo
-  hair: ["hair_01", "hair_02", "hair_03", "hair_04", "hair_05", "hair_f_01" , "hair_07" , "hair_f_02" , "hair_f_03" , "hair_f_04" , "hair_f_05" ],
-
-  // ✅ ropa
-  top: ["top_01", "top_02", "top_03"],
+  hair: [
+    "hair_01",
+    "hair_02",
+    "hair_03",
+    "hair_04",
+    "hair_05",
+    "hair_07",
+    "hair_f_01",
+    "hair_f_02",
+    "hair_f_03",
+    "hair_f_04",
+    "hair_f_05",
+  ],
 };
 
+function isFemaleId(id) {
+  return String(id || "").includes("_f_");
+}
+
+function filterByGender(values, gender) {
+  const g = gender || "other";
+  if (g === "male") return values.filter((v) => !isFemaleId(v));
+  if (g === "female") return values.filter((v) => isFemaleId(v));
+  return values; // other => todo
+}
+
 const labelMap = {
-  skin: "Skin",
-  hair: "Cabello",
-  top: "Ropa",
+  hair: "Personaje",
 };
 
 function prettyLabel(key, v) {
-  if (key === "skin") {
+  if (key === "hair") {
     if (v === "skin_01") return "Default";
     if (v === "skin_f_01") return "Mujer";
   }
@@ -41,6 +56,15 @@ function prettyLabel(key, v) {
 export default function AvatarCustomizeScreen({ navigation }) {
   const { token, setUser, user } = useContext(AuthContext);
   const [saving, setSaving] = useState(false);
+  
+  const gender = user?.gender || "other";
+
+  // ✅ Opciones filtradas por género (other ve todo)
+  const filteredOptions = useMemo(() => {
+    return {
+      hair: filterByGender(OPTIONS.hair, gender),
+    };
+  }, [gender]);
 
   const defaults = useMemo(
     () => ({
@@ -62,6 +86,17 @@ export default function AvatarCustomizeScreen({ navigation }) {
   }, [user, defaults]);
 
   const [avatarConfig, setAvatarConfig] = useState(initialConfig);
+
+  // ✅ Fallback: si el hair guardado no corresponde al género, lo ajustamos
+    useEffect(() => {
+      const allowed = filteredOptions?.hair || [];
+      if (!allowed.length) return;
+
+      const current = avatarConfig?.hair || "hair_01";
+      if (!allowed.includes(current)) {
+        setAvatarConfig((prev) => ({ ...prev, hair: allowed[0] }));
+      }
+    }, [gender, filteredOptions]);
 
   const setPart = (key, value) => {
     setAvatarConfig((prev) => ({ ...prev, [key]: value }));
@@ -124,7 +159,7 @@ export default function AvatarCustomizeScreen({ navigation }) {
           </View>
 
           {/* Opciones */}
-          {Object.entries(OPTIONS).map(([key, values]) => (
+          {Object.entries(filteredOptions).map(([key, values]) => (
             <View key={key} style={styles.section}>
               {/* ✅ anti-error si no existe label */}
               <Text style={styles.sectionTitle}>{labelMap[key] || key}</Text>
