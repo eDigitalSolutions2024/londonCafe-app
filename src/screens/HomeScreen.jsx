@@ -113,26 +113,41 @@ function BoothStreakBar({
 
       {/* ✅ DERECHA: cabina pegada arriba */}
       <View style={styles.streakRight}>
-        <MaskedView
-          style={styles.boothBox}
-          maskElement={
-            <Image source={BoothMask} style={styles.boothImg} resizeMode="contain" />
-          }
-        >
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.10)" }]} />
+  <View style={styles.boothWrap}>
+    <MaskedView
+      style={styles.boothBox}
+      maskElement={<Image source={BoothMask} style={styles.boothImg} resizeMode="contain" />}
+    >
+      {/* Base tenue dentro de la torre */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(255,255,255,0.06)"}]} />
 
-          <View style={StyleSheet.absoluteFill}>
-            <View style={{ flex: 1 }} />
-            <Animated.View
+      {/* ✅ Fill desde abajo (pegado al bottom) */}
+      <View style={StyleSheet.absoluteFill}>
+        <Animated.View
           style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
             height: fillAnim,
-            backgroundColor: "rgba(255,255,255,0.95)", // ✅ un pelín menos transparente
-            minHeight: shown > 0 ? 2 : 0,              // ✅ que se vea aunque sea poquito
+            backgroundColor: "rgb(255, 255, 255)",
+            minHeight: shown > 0 ? 2 : 0,
           }}
         />
-          </View>
-        </MaskedView>
       </View>
+    </MaskedView>
+
+    {/* Contorno visible siempre */}
+    <Image
+      source={BoothMask}
+      resizeMode="contain"
+      style={[
+        styles.boothImg,
+        { position: "absolute", top: 0, left: 0, opacity: 0.30 },
+      ]}
+    />
+  </View>
+</View>
     </View>
   </View>
 );
