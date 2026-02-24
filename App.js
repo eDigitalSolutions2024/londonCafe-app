@@ -10,6 +10,9 @@ import LocationScreen from "./src/screens/LocationScreen";
 
 // Tabs
 import OrderScreen from "./src/screens/OrderScreen";
+import CartScreen from "./src/screens/CartScreen"; 
+import { CartProvider } from "./src/context/CartContext.js";
+// <-- crea/importe tu pantalla
 import ScanScreen from "./src/screens/ScanScreen";
 import GiftsScreen from "./src/screens/GiftsScreen";
 
@@ -32,10 +35,19 @@ import RedeemQRScreen from "./src/screens/RedeemQRScreen";
 import { colors } from "./src/theme/colors";
 import { AuthProvider, AuthContext } from "./src/context/AuthContext";
 
+console.log("PhoneBoothIcon:", PhoneBoothIcon);
+console.log("CartProvider:", CartProvider);
+console.log("CartScreen:", CartScreen);
+console.log("OrderScreen:", OrderScreen);
+console.log("HomeScreen:", HomeScreen);
+console.log("AuthProvider:", AuthProvider);
+console.log("SafeAreaProvider:", SafeAreaProvider);
+console.log("NavigationContainer:", NavigationContainer);
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
-
+const OrderStack = createNativeStackNavigator();
 /** ✅ Stack SOLO para el tab "Inicio"
  *  (así se mantiene el tab bar abajo)
  */
@@ -55,6 +67,18 @@ function HomeStackNav() {
     </HomeStack.Navigator>
   );
 }
+
+
+
+function OrderStackNav() {
+  return (
+    <OrderStack.Navigator screenOptions={{ headerShown: false }}>
+      <OrderStack.Screen name="Order" component={OrderScreen} />
+      <OrderStack.Screen name="Cart" component={CartScreen} />
+    </OrderStack.Navigator>
+  );
+}
+
 
 function MainTabs() {
   return (
@@ -95,7 +119,7 @@ function MainTabs() {
       {/* ✅ Inicio ahora es un Stack (para que AvatarCustomize no quite el tab bar) */}
       <Tab.Screen name="Inicio" component={HomeStackNav} />
 
-      <Tab.Screen name="Ordena" component={OrderScreen} />
+      <Tab.Screen name="Ordena" component={OrderStackNav} />
       <Tab.Screen name="Escanear" component={ScanScreen} />
       <Tab.Screen name="Regalos" component={GiftsScreen} />
       <Tab.Screen name="Ubicación" component={LocationScreen} />
@@ -123,12 +147,13 @@ function RootNav() {
 export default function App() {
   return (
     <AuthProvider>
-      <SafeAreaProvider>
-         {/* ✅ NUEVO */}
-        <NavigationContainer>
-          <RootNav />
-        </NavigationContainer>
-      </SafeAreaProvider>
+      <CartProvider>
+        <SafeAreaProvider>
+          <NavigationContainer>
+            <RootNav />
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </CartProvider>
     </AuthProvider>
   );
 }

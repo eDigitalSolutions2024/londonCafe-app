@@ -11,15 +11,17 @@ import {
 import Screen from "../components/Screen";
 import { getAppMenu } from "../api/appMenu";
 
+import { useCart } from "../context/CartContext";
+
 const COLORS = {
-  bg: "#FFFFFF",          // Caffenio usa blanco
+  bg: "#FFFFFF",
   card: "#FFFFFF",
   ink: "#1B1B1B",
   muted: "rgba(27,27,27,0.55)",
   border: "rgba(27,27,27,0.10)",
-  wine: "#7A1E3A",        // marca LondonCafe
+  wine: "#7A1E3A",
   wineSoft: "rgba(122,30,58,0.12)",
-  green: "#3BAA35",       // toggle tipo cafenio (si quieres, cámbialo por wine)
+  green: "#3BAA35",
 };
 
 const money = (n) =>
@@ -30,33 +32,26 @@ function normalizeCategory(c) {
   return s || "General";
 }
 
-/** ✅ Chips de categorías */
-function CategoryPills({ categories, value, onChange }) {
-  return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-      <Pressable
-        onPress={() => onChange("")}
-        style={({ pressed }) => ({
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-          borderRadius: 999,
-          backgroundColor: value ? "#fff" : COLORS.wineSoft,
-          borderWidth: 1,
-          borderColor: value ? COLORS.border : COLORS.wine,
-          opacity: pressed ? 0.85 : 1,
-        })}
-      >
-        <Text style={{ fontWeight: "900", color: value ? COLORS.ink : COLORS.wine }}>
-          Todo
-        </Text>
-      </Pressable>
+/** ✅ Chips de categorías horizontal */
+function CategoryPillsHorizontal({ categories, value, onChange }) {
+  const data = useMemo(() => ["__ALL__", ...categories], [categories]);
 
-      {categories.map((c) => {
-        const active = value === c;
+  return (
+    <FlatList
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      data={data}
+      keyExtractor={(it) => String(it)}
+      contentContainerStyle={{ paddingRight: 16 }}
+      ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
+      renderItem={({ item }) => {
+        const isAll = item === "__ALL__";
+        const label = isAll ? "Todo" : item;
+        const active = isAll ? !value : value === item;
+
         return (
           <Pressable
-            key={c}
-            onPress={() => onChange(active ? "" : c)}
+            onPress={() => onChange(isAll ? "" : active ? "" : item)}
             style={({ pressed }) => ({
               paddingHorizontal: 12,
               paddingVertical: 8,
@@ -68,12 +63,12 @@ function CategoryPills({ categories, value, onChange }) {
             })}
           >
             <Text style={{ fontWeight: "900", color: active ? COLORS.wine : COLORS.ink }}>
-              {c}
+              {label}
             </Text>
           </Pressable>
         );
-      })}
-    </View>
+      }}
+    />
   );
 }
 
@@ -103,7 +98,6 @@ function ProductTile({ item, onAdd }) {
           resizeMode="cover"
         />
 
-        {/* + flotante */}
         <Pressable
           onPress={() => onAdd(item)}
           style={({ pressed }) => ({
@@ -197,12 +191,10 @@ export default function OrderScreen({ navigation }) {
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [cat, setCat] = useState("");
-
-  // UI state
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
 
-  // ✅ si ya tienes carrito real, conecta esto a tu store/context
-  const [cartCount] = useState(0);
+  // si ya tienes carrito real, conecta esto a tu store/context
+ const { cartCount, add } = useCart();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -236,9 +228,8 @@ export default function OrderScreen({ navigation }) {
   }, [items, cat]);
 
   function onAdd(item) {
-    console.log("ADD", item.title);
-    // aquí luego conectas tu carrito real
-  }
+  add(item);
+}
 
   const isGrid = viewMode === "grid";
 
@@ -249,40 +240,29 @@ export default function OrderScreen({ navigation }) {
         {/* Header */}
         <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
           {/* Top bar: titulo centrado + carrito */}
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
             <View style={{ width: 44 }} />
 
             <View style={{ flex: 1, alignItems: "center" }}>
-  <Text
-    style={{
-      fontSize: 24,
-      fontWeight: "900",
-      color: COLORS.ink,
-      textTransform: "capitalize",
-    }}
-  >
-    Ordena y recoge
-  </Text>
-<View
-    style={{
-      marginTop: 6,
-      height: 3,
-      width: 70,
-      borderRadius: 999,
-      backgroundColor: COLORS.wine,
-    }}
-  />
-  <Text
-    style={{
-      fontSize: 12,
-      color: COLORS.muted,
-      marginTop: 4,
-    }}
-  >
-    Pide desde la app y recoge sin filas
-  </Text>
-  
-</View>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.ink }}>
+                Ordena y recoge
+              </Text>
+
+              <View
+                style={{
+                  marginTop: 6,
+                  height: 3,
+                  width: 76,
+                  borderRadius: 999,
+                  backgroundColor: COLORS.wine,
+                }}
+              />
+
+              <Text style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
+                Pide desde la app y recoge sin filas
+              </Text>
+            </View>
+
             <Pressable
               onPress={() => navigation?.navigate?.("Cart")}
               style={({ pressed }) => ({
@@ -299,7 +279,6 @@ export default function OrderScreen({ navigation }) {
             >
               <Text style={{ fontSize: 18 }}>🛒</Text>
 
-              {/* Badge opcional */}
               {cartCount > 0 ? (
                 <View
                   style={{
@@ -323,83 +302,78 @@ export default function OrderScreen({ navigation }) {
             </Pressable>
           </View>
 
-          {/* Fila principal: chips (izq) + toggle+actualizar (der) */}
+          {/* ✅ FILA A: Categorías horizontal (full width) */}
+          <View style={{ marginTop: 8 }}>
+            <CategoryPillsHorizontal categories={categories} value={cat} onChange={setCat} />
+          </View>
+
+          {/* ✅ FILA B: Toggle + Actualizar (a la derecha) */}
           <View
             style={{
-              marginTop: 2,
+              marginTop: 10,
               flexDirection: "row",
               alignItems: "center",
-              justifyContent: "space-between",
+              justifyContent: "flex-end",
               gap: 10,
             }}
           >
-            {/* IZQ: categorías */}
-            <View style={{ flex: 1 }}>
-              <CategoryPills categories={categories} value={cat} onChange={setCat} />
-            </View>
-
-            {/* DER: toggle + actualizar */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-              {/* Toggle */}
-              <View style={{ flexDirection: "row" }}>
-                <Pressable
-                  onPress={() => setViewMode("grid")}
-                  style={({ pressed }) => ({
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    backgroundColor: viewMode === "grid" ? COLORS.green : "#fff",
-                    borderWidth: 1,
-                    borderColor: COLORS.border,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginRight: 8,
-                    opacity: pressed ? 0.85 : 1,
-                  })}
-                >
-                  <Text style={{ fontSize: 15, color: viewMode === "grid" ? "#fff" : COLORS.ink }}>
-                    ▦
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => setViewMode("list")}
-                  style={({ pressed }) => ({
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    backgroundColor: viewMode === "list" ? COLORS.green : "#fff",
-                    borderWidth: 1,
-                    borderColor: COLORS.border,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    opacity: pressed ? 0.85 : 1,
-                  })}
-                >
-                  <Text style={{ fontSize: 15, color: viewMode === "list" ? "#fff" : COLORS.ink }}>
-                    ≡
-                  </Text>
-                </Pressable>
-              </View>
-
-              {/* Actualizar */}
+            <View style={{ flexDirection: "row" }}>
               <Pressable
-                onPress={load}
+                onPress={() => setViewMode("grid")}
                 style={({ pressed }) => ({
-                  backgroundColor: COLORS.wine,
-                  paddingHorizontal: 14,
+                  width: 40,
                   height: 40,
-                  borderRadius: 14,
+                  borderRadius: 20,
+                  backgroundColor: viewMode === "grid" ? COLORS.green : "#fff",
+                  borderWidth: 1,
+                  borderColor: COLORS.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 8,
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <Text style={{ fontSize: 15, color: viewMode === "grid" ? "#fff" : COLORS.ink }}>
+                  ▦
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setViewMode("list")}
+                style={({ pressed }) => ({
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: viewMode === "list" ? COLORS.green : "#fff",
+                  borderWidth: 1,
+                  borderColor: COLORS.border,
                   alignItems: "center",
                   justifyContent: "center",
                   opacity: pressed ? 0.85 : 1,
                 })}
               >
-                <Text style={{ fontWeight: "900", color: "#fff" }}>
-                  {loading ? "..." : "Actualizar"}
+                <Text style={{ fontSize: 15, color: viewMode === "list" ? "#fff" : COLORS.ink }}>
+                  ≡
                 </Text>
               </Pressable>
             </View>
+
+            <Pressable
+              onPress={load}
+              style={({ pressed }) => ({
+                backgroundColor: COLORS.wine,
+                paddingHorizontal: 14,
+                height: 40,
+                borderRadius: 14,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Text style={{ fontWeight: "900", color: "#fff" }}>
+                {loading ? "..." : "Actualizar"}
+              </Text>
+            </Pressable>
           </View>
 
           {error ? (
@@ -425,7 +399,7 @@ export default function OrderScreen({ navigation }) {
           </View>
         ) : (
           <FlatList
-            key={isGrid ? "grid" : "list"} // fuerza rerender al cambiar columnas
+            key={isGrid ? "grid" : "list"}
             data={filtered}
             keyExtractor={(it) => String(it._id)}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}

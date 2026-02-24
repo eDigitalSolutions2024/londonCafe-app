@@ -132,21 +132,37 @@ export default function AvatarWidget({
         </View>
 
         {/* ✅ Chips compactos */}
-        <View style={styles.chipsRow}>
-          <View style={[styles.chip, !canCoffee && styles.chipDisabled]}>
-            <Text style={[styles.chipText, !canCoffee && styles.chipTextDisabled]}>
-              ☕ {Number(coffee) || 0}
-            </Text>
-          </View>
+       <View style={styles.chipsRow}>
+  <Pressable
+    onPress={onFeedCoffee}
+    disabled={!canCoffee}
+    style={({ pressed }) => [
+      styles.chip,
+      !canCoffee && styles.chipDisabled,
+      pressed && canCoffee && styles.chipPressed,
+    ]}
+  >
+    <Text style={[styles.chipText, !canCoffee && styles.chipTextDisabled]}>
+      ☕ {Number(coffee) || 0}
+    </Text>
+  </Pressable>
 
-          <View style={[styles.chip, !canBread && styles.chipDisabled]}>
-            <Text style={[styles.chipText, !canBread && styles.chipTextDisabled]}>
-              🥖 {Number(bread) || 0}
-            </Text>
-          </View>
-        </View>
+  <Pressable
+    onPress={onFeedBread}
+    disabled={!canBread}
+    style={({ pressed }) => [
+      styles.chip,
+      !canBread && styles.chipDisabled,
+      pressed && canBread && styles.chipPressed,
+    ]}
+  >
+    <Text style={[styles.chipText, !canBread && styles.chipTextDisabled]}>
+      🥖 {Number(bread) || 0}
+    </Text>
+  </Pressable>
+</View>
 
-        <View style={styles.actions}>
+        {/*<View style={styles.actions}>
           <Pressable
             onPress={onFeedCoffee}
             style={[styles.actionBtn, !canCoffee && styles.disabledBtn]}
@@ -164,7 +180,7 @@ export default function AvatarWidget({
               {feeding ? "..." : "Dar 🥖"}
             </Text>
           </Pressable>
-        </View>
+        </View>*/}
 
         {!hasEnergy ? (
           <Text style={styles.hint}>Cargando buddy…</Text>

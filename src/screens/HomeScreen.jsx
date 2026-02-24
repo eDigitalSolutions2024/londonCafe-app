@@ -555,18 +555,21 @@ const mood = moodLabelFromEnergy(energy);
         {/* Hero */}
         <View style={styles.hero}>
           <View style={styles.heroHeader}>
-            <View style={styles.heroTextBox}>
-              <Text style={styles.subtitle}>Bienvenido a</Text>
+  <View style={styles.topBar}>
+    <View style={styles.brandLeft}>
+      {/* ✅ Placeholder del logo (luego lo cambias por <Image source={...} />) */}
+      <View style={styles.logoBubble} />
 
-              <View style={styles.titleRow}>
-                <Text style={styles.title}>LondonCafe</Text>
+      <Text style={styles.welcomeLine} numberOfLines={1}>
+        Bienvenido, <Text style={styles.welcomeName}>{displayName}</Text>
+      </Text>
+    </View>
 
-                <TouchableOpacity onPress={signOut} activeOpacity={0.85} style={styles.logoutBtn}>
-                  <Text style={styles.logoutText}>Salir</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+    <TouchableOpacity onPress={signOut} activeOpacity={0.85} style={styles.logoutBtn}>
+      <Text style={styles.logoutText}>Salir</Text>
+    </TouchableOpacity>
+  </View>
+</View>
 
           {/* Avatar + Puntos */}
           <View style={styles.avatarSection}>
@@ -703,8 +706,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
 
   hero: { paddingHorizontal: 20, paddingVertical: 0 },
-  heroHeader: { marginBottom: 16 },
-  heroTextBox: { marginBottom: 16 },
+  heroHeader: { marginBottom: 6 },
+  heroTextBox: { marginBottom: 6 },
 
   subtitle: {
     color: colors.textMuted,
@@ -879,5 +882,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
   },
+  topBar: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginTop: 6,
+  marginBottom: 8,
+},
+
+brandLeft: {
+  flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 10,
+  minWidth: 0, // importante para ellipsis
+},
+
+logoBubble: {
+  width: 30,
+  height: 30,
+  borderRadius: 10,
+  backgroundColor: colors.card,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+},
+
+welcomeLine: {
+  flex: 1,
+  color: colors.textMuted,
+  fontSize: 13,
+  fontWeight: "800",
+},
+
+welcomeName: {
+  color: colors.text,
+  fontWeight: "900",
+},
 });
 
