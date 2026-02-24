@@ -28,7 +28,7 @@ import PointsStepperBar from "../components/PointsStepperBar";
 import MaskedView from "@react-native-masked-view/masked-view";
 
 import BoothMask from "../assets/markers/London.png";
-
+import LondonCafeLogo from "../assets/markers/londoncafe.jpg";
 // Promociones desde POS
 import PromosSection from "../components/PromoSection";
 
@@ -558,11 +558,14 @@ const mood = moodLabelFromEnergy(energy);
   <View style={styles.topBar}>
     <View style={styles.brandLeft}>
       {/* ✅ Placeholder del logo (luego lo cambias por <Image source={...} />) */}
-      <View style={styles.logoBubble} />
+      <Image source={LondonCafeLogo} style={styles.logoBubble} resizeMode="cover" />
 
-      <Text style={styles.welcomeLine} numberOfLines={1}>
-        Bienvenido, <Text style={styles.welcomeName}>{displayName}</Text>
-      </Text>
+      <View style={styles.welcomeBlock}>
+  <Text style={styles.welcomeLabel}>Bienvenido</Text>
+  <Text style={styles.welcomeNameLine} numberOfLines={1}>
+    {displayName}
+  </Text>
+</View>
     </View>
 
     <TouchableOpacity onPress={signOut} activeOpacity={0.85} style={styles.logoutBtn}>
@@ -707,44 +710,67 @@ const styles = StyleSheet.create({
 
   hero: { paddingHorizontal: 20, paddingVertical: 0 },
   heroHeader: { marginBottom: 6 },
-  heroTextBox: { marginBottom: 6 },
 
-  subtitle: {
-    color: colors.textMuted,
-    fontSize: 12,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    marginBottom: 2,
-  },
-
-  titleRow: {
+  /* ✅ Top header: logo + welcome + logout */
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
+    marginTop: 2,
+    marginBottom: 6,
   },
 
-  title: {
-    color: colors.text,
-    fontSize: 32,
-    fontWeight: "700",
-    marginTop: 4,
+  brandLeft: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minWidth: 0, // importante para ellipsis
+  },
+
+  logoBubble: {
+    width: 50,
+    height: 50,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: colors.card,
+    overflow: "hidden", // ✅ para que el borderRadius recorte la imagen
+  },
+
+  welcomeBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  welcomeLabel: {
+    color: colors.textMuted,
+    fontSize: 15, // ✅ más grande
+    fontWeight: "800",
+    lineHeight: 17,
+  },
+
+  welcomeNameLine: {
+    color: colors.text,
+    fontSize: 17, // ✅ más grande
+    fontWeight: "900",
+    lineHeight: 20, // ✅ NO inflar a 28
   },
 
   logoutBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.primarySoft,
-    backgroundColor: "transparent",
+    backgroundColor: "#fff",
   },
-  logoutText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
+  logoutText: { color: colors.textMuted, fontSize: 11, fontWeight: "900" },
 
   /* ✅ Streak Card (cabina + botón + texto) */
   duoCard: {
-    marginTop: 12,
+    marginTop: 10,
     borderRadius: 18,
     padding: 12,
     borderWidth: 1,
@@ -754,7 +780,7 @@ const styles = StyleSheet.create({
 
   streakGrid: {
     flexDirection: "row",
-    alignItems: "flex-start", // ✅ cabina arriba
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10,
   },
@@ -773,14 +799,14 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
     color: "#ffffff",
-    marginBottom: 2, // ✅ texto más pegado
+    marginBottom: 2,
   },
 
   duoSubtitle: {
     fontSize: 12,
     fontWeight: "800",
     color: "rgba(255,255,255,0.95)",
-    marginBottom: 8, // ✅ espacio justo antes del botón
+    marginBottom: 8,
   },
 
   duoBtnCompact: {
@@ -798,6 +824,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     color: colors.primary,
+  },
+
+  boothWrap: {
+    alignItems: "center",
+    justifyContent: "flex-start",
   },
 
   boothBox: {
@@ -882,42 +913,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
   },
-  topBar: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  marginTop: 6,
-  marginBottom: 8,
-},
-
-brandLeft: {
-  flex: 1,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 10,
-  minWidth: 0, // importante para ellipsis
-},
-
-logoBubble: {
-  width: 30,
-  height: 30,
-  borderRadius: 10,
-  backgroundColor: colors.card,
-  borderWidth: 1,
-  borderColor: colors.primarySoft,
-},
-
-welcomeLine: {
-  flex: 1,
-  color: colors.textMuted,
-  fontSize: 13,
-  fontWeight: "800",
-},
-
-welcomeName: {
-  color: colors.text,
-  fontWeight: "900",
-},
 });
 

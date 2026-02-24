@@ -106,9 +106,9 @@ export default function AvatarWidget({
             <AvatarPreview config={safeConfig} size={90} />
           </Pressable>
 
-          <Text style={styles.avatarName} numberOfLines={2}>
+          {/* <Text style={styles.avatarName} numberOfLines={2}>
             {displayName}
-          </Text>
+          </Text>*/}
           <Text style={styles.avatarMood}>{displayMood}</Text>
         </View>
       </View>
@@ -137,12 +137,12 @@ export default function AvatarWidget({
     onPress={onFeedCoffee}
     disabled={!canCoffee}
     style={({ pressed }) => [
-      styles.chip,
-      !canCoffee && styles.chipDisabled,
-      pressed && canCoffee && styles.chipPressed,
+      styles.feedBtn,
+      !canCoffee && styles.feedBtnDisabled,
+      pressed && canCoffee && styles.feedBtnPressed,
     ]}
   >
-    <Text style={[styles.chipText, !canCoffee && styles.chipTextDisabled]}>
+    <Text style={[styles.feedBtnText, !canCoffee && styles.feedBtnTextDisabled]}>
       ☕ {Number(coffee) || 0}
     </Text>
   </Pressable>
@@ -151,12 +151,12 @@ export default function AvatarWidget({
     onPress={onFeedBread}
     disabled={!canBread}
     style={({ pressed }) => [
-      styles.chip,
-      !canBread && styles.chipDisabled,
-      pressed && canBread && styles.chipPressed,
+      styles.feedBtn,
+      !canBread && styles.feedBtnDisabled,
+      pressed && canBread && styles.feedBtnPressed,
     ]}
   >
-    <Text style={[styles.chipText, !canBread && styles.chipTextDisabled]}>
+    <Text style={[styles.feedBtnText, !canBread && styles.feedBtnTextDisabled]}>
       🥖 {Number(bread) || 0}
     </Text>
   </Pressable>
@@ -193,15 +193,69 @@ export default function AvatarWidget({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    ...appStyles.card,
-    flexDirection: "row",
-    gap: 12,
-    paddingVertical: 12,
-  },
+ card: {
+  ...appStyles.card,
+  flexDirection: "row",
+  gap: 10,
+  paddingVertical: 10,  // ✅ más compacto
+},
 
-  left: { width: 112, justifyContent: "center" },
-  right: { flex: 1, justifyContent: "center" },
+left: { width: 96, justifyContent: "center" }, // ✅ reduce espacio
+right: { flex: 1, justifyContent: "center" },
+
+chipsRow: {
+  flexDirection: "row",
+  gap: 10,
+  marginTop: 10,
+  justifyContent: "center",
+},
+
+
+chip: {
+  flexDirection: "row",      // ✅ para icono + count + dar
+  alignItems: "center",
+  gap: 8,
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 999,
+  backgroundColor: "rgba(128,16,35,0.12)", // ✅ más color
+  borderWidth: 1,
+  borderColor: "rgba(128,16,35,0.25)",
+},
+
+chipPressed: {
+  transform: [{ scale: 0.98 }],
+  opacity: 0.92,
+},
+
+chipText: {
+  color: colors.primary,
+  fontWeight: "900",
+  fontSize: 12,
+},
+
+chipCount: {
+  color: colors.primary,
+  fontWeight: "900",
+  fontSize: 12,
+  minWidth: 18,
+  textAlign: "center",
+},
+
+chipDar: {
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+  borderRadius: 999,
+  backgroundColor: colors.primary,      // ✅ rojo de tu app
+  borderWidth: 1,
+  borderColor: "rgba(0,0,0,0.06)",
+},
+
+chipDarText: {
+  color: "#fff",                        // ✅ texto blanco
+  fontSize: 10,
+  fontWeight: "900",
+},
 
   avatarBox: { alignItems: "center", gap: 4 },
 
@@ -245,20 +299,7 @@ const styles = StyleSheet.create({
 
   energyText: { color: colors.text, fontWeight: "900", fontSize: 12 },
 
-  chipsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
-  },
-
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(128,16,35,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(128,16,35,0.18)",
-  },
+  
 
   chipText: {
     color: colors.primary,
@@ -300,4 +341,35 @@ const styles = StyleSheet.create({
   disabledTextOutline: { opacity: 0.9 },
 
   hint: { color: colors.textMuted, fontSize: 10, marginTop: 8, lineHeight: 13 },
+
+  feedBtn: {
+  minWidth: 86,
+  height: 34,
+  borderRadius: 999,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: colors.primary,     // ✅ rojo app
+  paddingHorizontal: 12,
+},
+
+feedBtnPressed: {
+  transform: [{ scale: 0.98 }],
+  opacity: 0.95,
+},
+
+feedBtnDisabled: {
+  backgroundColor: colors.primarySoft, // ✅ suave cuando no hay
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+},
+
+feedBtnText: {
+  color: "#fff",
+  fontWeight: "900",
+  fontSize: 12,
+},
+
+feedBtnTextDisabled: {
+  color: colors.textMuted,
+},
 });

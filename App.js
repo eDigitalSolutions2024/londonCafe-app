@@ -35,14 +35,14 @@ import RedeemQRScreen from "./src/screens/RedeemQRScreen";
 import { colors } from "./src/theme/colors";
 import { AuthProvider, AuthContext } from "./src/context/AuthContext";
 
-console.log("PhoneBoothIcon:", PhoneBoothIcon);
+/*console.log("PhoneBoothIcon:", PhoneBoothIcon);
 console.log("CartProvider:", CartProvider);
 console.log("CartScreen:", CartScreen);
 console.log("OrderScreen:", OrderScreen);
 console.log("HomeScreen:", HomeScreen);
 console.log("AuthProvider:", AuthProvider);
 console.log("SafeAreaProvider:", SafeAreaProvider);
-console.log("NavigationContainer:", NavigationContainer);
+console.log("NavigationContainer:", NavigationContainer);*/
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
