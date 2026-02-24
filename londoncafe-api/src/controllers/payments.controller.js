@@ -1,17 +1,15 @@
-/*// src/controllers/payments.controller.js
+// src/controllers/payments.controller.js
 const Stripe = require("stripe");
-// const MenuItem = require("../models/MenuItem"); // <-- AJUSTA ESTO a tu modelo real
-// Ej: const Menu = require("../models/Menu"); o Product, etc.
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2023-10-16",
+});
 
 /**
  * ✅ Recibe [{ _id, qty }]
  * ✅ Consulta precios en DB (NO confiar en cliente)
  * ✅ Devuelve amount en centavos (integer)
- 
+ */
 async function calcOrderAmountFromDB(items = []) {
-  // 1) normaliza / consolida
   const map = new Map(); // id -> qty
   for (const it of items) {
     const id = String(it?._id || "").trim();
@@ -24,32 +22,23 @@ async function calcOrderAmountFromDB(items = []) {
   const ids = Array.from(map.keys());
   if (ids.length === 0) return 0;
 
-  // 2) consulta en DB (AJUSTA A TU MODELO/CAMPOS)
-  // Ejemplo esperado de doc: { _id, title, price, active }
+  // ✅ TODO: Conecta tu modelo real.
+  // Ejemplo:
+  // const MenuItem = require("../models/MenuItem");
   // const docs = await MenuItem.find({ _id: { $in: ids }, active: true }).lean();
 
-  // ⚠️ TEMPORAL si aún no conectas el modelo:
-  // Lanza error para que no se te vaya a producción con precio del cliente
   throw new Error("DB_PRICING_NOT_CONNECTED");
 
-  // 3) calcular total
-  /*
-  const byId = new Map(docs.map(d => [String(d._id), d]));
-
-  let total = 0;
-  for (const id of ids) {
-    const doc = byId.get(id);
-    if (!doc) {
-      // si no existe o está inactivo
-      throw new Error(`ITEM_NOT_FOUND:${id}`);
-    }
-    const unit = Number(doc.price) || 0;
-    const qty = map.get(id) || 0;
-    total += unit * qty;
-  }
-
-  return Math.round(total * 100);
-  
+  // const byId = new Map(docs.map(d => [String(d._id), d]));
+  // let total = 0;
+  // for (const id of ids) {
+  //   const doc = byId.get(id);
+  //   if (!doc) throw new Error(`ITEM_NOT_FOUND:${id}`);
+  //   const unit = Number(doc.price) || 0;
+  //   const qty = map.get(id) || 0;
+  //   total += unit * qty;
+  // }
+  // return Math.round(total * 100);
 }
 
 exports.createPaymentSheet = async (req, res) => {
@@ -64,7 +53,6 @@ exports.createPaymentSheet = async (req, res) => {
     try {
       amount = await calcOrderAmountFromDB(items);
     } catch (e) {
-      // Errores controlados
       const msg = String(e?.message || "");
       if (msg.startsWith("ITEM_NOT_FOUND:")) {
         return res.status(400).json({ ok: false, error: "ITEM_NOT_FOUND" });
@@ -86,7 +74,7 @@ exports.createPaymentSheet = async (req, res) => {
       receipt_email: customerEmail || undefined,
       metadata: {
         source: "londoncafe-app",
-        // orderId: "..." // luego lo agregamos
+        userId: req.user?.id ? String(req.user.id) : "",
       },
     });
 
@@ -106,7 +94,7 @@ exports.handleStripeWebhook = async (req, res) => {
   let event;
   try {
     event = stripe.webhooks.constructEvent(
-      req.body, // <-- raw Buffer
+      req.body, // ✅ raw buffer
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
@@ -118,21 +106,18 @@ exports.handleStripeWebhook = async (req, res) => {
   try {
     if (event.type === "payment_intent.succeeded") {
       const pi = event.data.object;
-      console.log("✅ payment_intent.succeeded:", pi.id);
-
-      // TODO: marcar orden pagada
-      // const orderId = pi.metadata?.orderId;
-      // if (orderId) ...
+      console.log("✅ payment_intent.succeeded:", pi.id, pi.metadata);
+      // TODO: marcar orden pagada en DB usando pi.metadata.orderId
     }
 
     if (event.type === "payment_intent.payment_failed") {
       const pi = event.data.object;
-      console.log("⚠️ payment_intent.payment_failed:", pi.id);
+      console.log("⚠️ payment_intent.payment_failed:", pi.id, pi.last_payment_error?.message);
     }
 
-    return res.json({ received: true }); // 2xx OK
+    return res.json({ received: true });
   } catch (e) {
     console.log("❌ webhook handler error:", e?.message || e);
     return res.status(500).json({ error: "WEBHOOK_FAILED" });
   }
-};*/
+};

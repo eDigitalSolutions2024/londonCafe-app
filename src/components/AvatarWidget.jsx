@@ -7,6 +7,7 @@ import AvatarPreview from "./AvatarPreview";
 export default function AvatarWidget({
   name,
   mood,
+  moodEmoji = "🙂",
   energy, // number | null
 
   coffee = 0,
@@ -109,7 +110,10 @@ export default function AvatarWidget({
           {/* <Text style={styles.avatarName} numberOfLines={2}>
             {displayName}
           </Text>*/}
-          <Text style={styles.avatarMood}>{displayMood}</Text>
+          <View style={styles.moodRow}>
+  <Text style={styles.avatarMood}>{displayMood}</Text>
+  <Text style={styles.moodEmoji}>{moodEmoji}</Text>
+</View>
         </View>
       </View>
 
@@ -371,5 +375,14 @@ feedBtnText: {
 
 feedBtnTextDisabled: {
   color: colors.textMuted,
+},
+moodRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+},
+
+moodEmoji: {
+  fontSize: 12,
 },
 });

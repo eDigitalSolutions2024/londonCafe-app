@@ -37,11 +37,11 @@ app.use(
  * OJO: La ruta debe coincidir EXACTA con la configurada en Stripe:
  * /api/payments/webhook
  */
-/*app.post(
+app.post(
   "/api/payments/webhook",
   express.raw({ type: "application/json" }),
   paymentsController.handleStripeWebhook
-);*/
+);
 
 // ✅ Ahora sí, JSON para todo lo demás
 app.use(express.json());
@@ -64,7 +64,7 @@ app.use("/api/rewards", rewardsRoutes);
 app.use("/api/buddy", buddyRoutes);
 
 // ✅ Payments normal: /api/payments/sheet
-//app.use("/api/payments", paymentsRoutes);
+app.use("/api/payments", paymentsRoutes);
 
 // start
 const PORT = process.env.PORT || 3001;

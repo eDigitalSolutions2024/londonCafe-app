@@ -1,11 +1,10 @@
-/*// src/routes/payments.routes.js
+// src/routes/payments.routes.js
 const express = require("express");
 const router = express.Router();
 
 const payments = require("../controllers/payments.controller");
-const auth = require("../middleware/auth.middleware");
+const { requireAuth } = require("../middleware/auth.middleware"); // ✅ aquí
 
-// Crear PaymentIntent / PaymentSheet (requiere login)
-router.post("/sheet", auth, payments.createPaymentSheet);
+router.post("/sheet", requireAuth, payments.createPaymentSheet);
 
-module.exports = router;*/
+module.exports = router;

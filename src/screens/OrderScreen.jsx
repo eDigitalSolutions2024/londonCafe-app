@@ -21,7 +21,7 @@ const COLORS = {
   border: "rgba(27,27,27,0.10)",
   wine: "#7A1E3A",
   wineSoft: "rgba(122,30,58,0.12)",
-  green: "#3BAA35",
+  green: "#7A1E3A",
 };
 
 const money = (n) =>

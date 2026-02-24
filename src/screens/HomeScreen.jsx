@@ -52,6 +52,8 @@ function moodEmojiFromEnergy(energy = 0) {
   return "💀";                  // muerto
 }
 
+
+
 function BoothStreakBar({
   streakCount = 0,
   claimedToday = false,
@@ -535,7 +537,7 @@ const coffee = Number.isFinite(Number(buddy?.coffee)) ? Number(buddy.coffee) : 0
 const bread  = Number.isFinite(Number(buddy?.bread)) ? Number(buddy.bread) : 0;
 
 const mood = moodLabelFromEnergy(energy);
-
+const moodEmoji = moodEmojiFromEnergy(energy);
 
   return (
     <Screen>
@@ -580,6 +582,7 @@ const mood = moodLabelFromEnergy(energy);
               <AvatarWidget
                 name={displayName}
                 mood={mood}
+                moodEmoji={moodEmoji}
                 energy={energy}
                 coffee={coffee}
                 bread={bread}
