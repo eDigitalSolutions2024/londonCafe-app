@@ -16,7 +16,7 @@ const rewardsRoutes = require("./routes/rewards.routes");
 const buddyRoutes = require("./routes/buddy.routes");
 const authRoutes = require("./routes/auth.routes");
 const salesRoutes = require("./routes/sales");
-
+const giftcardsRouter = require("./routes/giftcards");
 // payments
 const paymentsRoutes = require("./routes/payments.routes");
 const paymentsController = require("./controllers/payments.controller"); // para webhook raw
@@ -65,7 +65,7 @@ app.use("/api/buddy", buddyRoutes);
 
 // ✅ Payments normal: /api/payments/sheet
 app.use("/api/payments", paymentsRoutes);
-
+app.use("/api/giftcards", giftcardsRouter);
 // start
 const PORT = process.env.PORT || 3001;
 
