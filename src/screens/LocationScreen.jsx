@@ -51,6 +51,7 @@ export default function LocationScreen() {
 
   return (
     <View style={styles.wrap}>
+      {/*
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
@@ -72,7 +73,7 @@ export default function LocationScreen() {
           />
         </Marker>
       </MapView>
-
+*/}
       <Pressable onPress={openMaps} style={styles.fab}>
         <Text style={styles.fabText}>Abrir en Maps</Text>
       </Pressable>

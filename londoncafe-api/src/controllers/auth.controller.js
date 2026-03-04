@@ -105,14 +105,56 @@ function isValidEmail(email) {
 
 async function register(req, res) {
   try {
-    const { name, email, password, gender } = req.body;
+    const { name, email, password, gender, phone, birthDate } = req.body;
 
-    if (!name || !email || !password) return res.status(400).json({ error: "MISSING_FIELDS" });
-    if (!isValidEmail(email)) return res.status(400).json({ error: "INVALID_EMAIL" });
-    if (String(password).length < 8) return res.status(400).json({ error: "WEAK_PASSWORD" });
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: "MISSING_FIELDS" });
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ error: "INVALID_EMAIL" });
+    }
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: "WEAK_PASSWORD" });
+    }
 
-    const exists = await User.findOne({ email: email.toLowerCase() });
+    // ✅ Validación phone (mínimo 10 dígitos, opcional +)
+    const phoneStr = String(phone || "").trim();
+    if (!phoneStr) {
+      return res.status(400).json({ error: "MISSING_PHONE" });
+    }
+    if (!/^\+?[0-9]{10,16}$/.test(phoneStr)) {
+      return res.status(400).json({ error: "INVALID_PHONE" });
+    }
+
+    // ✅ Validación birthDate (esperamos ISO YYYY-MM-DD)
+    const birthStr = String(birthDate || "").trim();
+    if (!birthStr) {
+      return res.status(400).json({ error: "MISSING_BIRTHDATE" });
+    }
+    const bd = new Date(birthStr);
+    if (Number.isNaN(bd.getTime())) {
+      return res.status(400).json({ error: "INVALID_BIRTHDATE" });
+    }
+    // no futuro
+    const today = new Date();
+    if (bd > today) {
+      return res.status(400).json({ error: "INVALID_BIRTHDATE" });
+    }
+    // mínimo 13 años (igual que frontend)
+    const min = new Date();
+    min.setFullYear(min.getFullYear() - 13);
+    if (bd > min) {
+      return res.status(400).json({ error: "UNDERAGE" });
+    }
+
+    // ✅ Duplicados: email
+    const emailLower = String(email).toLowerCase();
+    const exists = await User.findOne({ email: emailLower });
     if (exists) return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
+
+    // ✅ Duplicados: phone (si lo hiciste unique+sparse en schema, esto también lo atrapará)
+    const phoneExists = await User.findOne({ phone: phoneStr });
+    if (phoneExists) return res.status(409).json({ error: "PHONE_ALREADY_EXISTS" });
 
     const allowed = ["male", "female", "other"];
     const safeGender = allowed.includes(String(gender)) ? String(gender) : "other";
@@ -136,13 +178,15 @@ async function register(req, res) {
 
     const user = await User.create({
       name,
-      email: email.toLowerCase(),
+      email: emailLower,
       passwordHash,
       isEmailVerified: false,
       gender: safeGender,
       avatarConfig,
-      // si quieres inicializar buddy desde el inicio:
-      // buddy: { energy: 80, coffee: 0, bread: 0, lastEnergyAt: new Date(), lastRefillAt: null, lastLoginAt: null },
+
+      // ✅ NUEVO
+      phone: phoneStr,
+      birthDate: bd,
     });
 
     // OTP
@@ -175,10 +219,18 @@ async function register(req, res) {
     });
   } catch (err) {
     console.error("REGISTER ERROR:", err);
+
+    // ✅ Por si se te fue el unique index y tronó aquí
+    if (err && err.code === 11000) {
+      const key = err.keyPattern ? Object.keys(err.keyPattern)[0] : "";
+      if (key === "email") return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
+      if (key === "phone") return res.status(409).json({ error: "PHONE_ALREADY_EXISTS" });
+      return res.status(409).json({ error: "DUPLICATE" });
+    }
+
     return res.status(500).json({ error: "SERVER_ERROR", detail: err.message });
   }
 }
-
 async function verifyEmail(req, res) {
   try {
     const { email, code } = req.body;

@@ -180,7 +180,13 @@ export default function HomeScreen({ navigation }) {
 
   // ✅ Daily Reward / Streak
 const [claimingDaily, setClaimingDaily] = useState(false);
-const [streak, setStreak] = useState({ count: 0, best: 0, claimedToday: false });
+const [streak, setStreak] = useState({
+  count: 0,
+  best: 0,
+  claimedToday: false,
+  canRecover: false,
+  recoveryCost: 25,
+});
 
 
   const [liveEnergy, setLiveEnergy] = useState(0);
@@ -191,6 +197,56 @@ const [rewardDelta, setRewardDelta] = useState(0);
 const [rewardMood, setRewardMood] = useState("Feliz");
 const [rewardEmoji, setRewardEmoji] = useState("😄");
 const [energyFlash, setEnergyFlash] = useState(false); // barra verde temporal
+
+
+// ✅ Recover streak modal
+const [recoverVisible, setRecoverVisible] = useState(false);
+const [recovering, setRecovering] = useState(false);
+
+const recoveryCost = Number(streak?.recoveryCost || 25);
+
+const onRecoverStreak = useCallback(async () => {
+  if (!token) return;
+  if (recovering) return;
+
+  // ✅ check coins local (UX)
+  if (Number(points || 0) < recoveryCost) {
+    Alert.alert("Buddy Coins insuficientes", `Necesitas ${recoveryCost} BuddyCoins para recuperar la racha.`);
+    return;
+  }
+
+  try {
+    setRecovering(true);
+
+    const r = await apiFetch("/me/streak/recover", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!r?.ok) {
+      Alert.alert("No se pudo recuperar", r?.error || "Intenta de nuevo.");
+      return;
+    }
+
+    // ✅ actualiza UI con respuesta del backend
+    if (r?.streak) setStreak(r.streak);
+    if (Number.isFinite(Number(r?.points))) setPoints(Number(r.points));
+    if (r?.buddy) setBuddy(r.buddy);
+
+    setRecoverVisible(false);
+
+    Alert.alert("🔥 Racha recuperada", `Se descontaron ${recoveryCost} BuddyCoins.`);
+  } catch (e) {
+    console.log("❌ recover streak:", e?.data || e?.message);
+    const msg = e?.data?.error === "INSUFFICIENT_COINS"
+      ? `Necesitas ${recoveryCost} BuddyCoins.`
+      : (e?.data?.error || e?.message || "No se pudo recuperar.");
+    Alert.alert("Error", msg);
+  } finally {
+    setRecovering(false);
+  }
+}, [token, recovering, points, recoveryCost]);
+
 
 // Animated values
 const rewardScale = useRef(new Animated.Value(0.92)).current;
@@ -247,7 +303,11 @@ useEffect(() => {
  * ✅ Sync real con backend:
  * cada 30s vuelve a traer /me para que no se desfasen.
  */
-
+// ✅ abre el modal cuando backend diga canRecover
+useEffect(() => {
+  if (streak?.canRecover) setRecoverVisible(true);
+  else setRecoverVisible(false);
+}, [streak?.canRecover]);
 
 
   const fetchPoints = useCallback(async () => {
@@ -286,7 +346,15 @@ useEffect(() => {
 
       setAvatarConfig(u?.avatarConfig ?? null);
       setBuddy(u?.buddy ?? null);
-      setStreak(r?.streak || { count: 0, best: 0, claimedToday: false });
+      setStreak(
+  r?.streak || {
+    count: 0,
+    best: 0,
+    claimedToday: false,
+    canRecover: false,
+    recoveryCost: 25,
+  }
+);
 
     } catch (e) {
       console.log("❌ /me:", e?.data || e?.message);
@@ -295,7 +363,13 @@ useEffect(() => {
       setMe(u);
       setAvatarConfig(u?.avatarConfig ?? null);
       setBuddy(u?.buddy ?? null);
-      setStreak({ count: 0, best: 0, claimedToday: false });
+      setStreak({
+  count: 0,
+  best: 0,
+  claimedToday: false,
+  canRecover: false,
+  recoveryCost: 25,
+});
     } finally {
       setLoadingMe(false);
     }
@@ -703,6 +777,55 @@ const moodEmoji = moodEmojiFromEnergy(energy);
   </View>
 </Modal>
 
+{/* ✅ RECOVER STREAK MODAL */}
+<Modal visible={recoverVisible} transparent animationType="fade">
+  <View style={styles.recoverBackdrop}>
+    <View style={styles.recoverCard}>
+      <Text style={styles.recoverTitle}>🔥 ¡Se rompió tu racha!</Text>
+
+      <Text style={styles.recoverText}>
+        ¿Quieres recuperarla por{" "}
+        <Text style={{ fontWeight: "900" }}>{recoveryCost} BuddyCoins</Text>?
+      </Text>
+
+      <View style={styles.recoverRow}>
+        <Text style={styles.recoverSmall}>Tienes:</Text>
+        <Text style={styles.recoverCoins}>{Number(points || 0)} 🪙</Text>
+      </View>
+
+      <View style={styles.recoverBtns}>
+        <TouchableOpacity
+          style={[styles.recoverBtn, styles.recoverCancel]}
+          onPress={() => setRecoverVisible(false)}
+          disabled={recovering}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.recoverCancelText}>Cancelar</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.recoverBtn,
+            styles.recoverConfirm,
+            (recovering || Number(points || 0) < recoveryCost) && { opacity: 0.6 },
+          ]}
+          onPress={onRecoverStreak}
+          disabled={recovering || Number(points || 0) < recoveryCost}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.recoverConfirmText}>
+            {recovering ? "..." : `Recuperar (-${recoveryCost})`}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {Number(points || 0) < recoveryCost ? (
+        <Text style={styles.recoverWarn}>No tienes suficientes BuddyCoins.</Text>
+      ) : null}
+    </View>
+  </View>
+</Modal>
+
     </Screen>
   );
 }
@@ -916,5 +1039,92 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
   },
+
+  /* ✅ Recover streak modal */
+recoverBackdrop: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.30)",
+  alignItems: "center",
+  justifyContent: "center",
+},
+recoverCard: {
+  width: "86%",
+  borderRadius: 18,
+  backgroundColor: "#fff",
+  paddingVertical: 16,
+  paddingHorizontal: 14,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+},
+recoverTitle: {
+  fontSize: 18,
+  fontWeight: "900",
+  color: colors.text,
+  marginBottom: 8,
+},
+recoverText: {
+  fontSize: 12,
+  color: colors.textMuted,
+  lineHeight: 18,
+},
+recoverRow: {
+  marginTop: 12,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+  backgroundColor: colors.card,
+},
+recoverSmall: {
+  fontSize: 12,
+  fontWeight: "800",
+  color: colors.textMuted,
+},
+recoverCoins: {
+  fontSize: 14,
+  fontWeight: "900",
+  color: colors.text,
+},
+recoverBtns: {
+  marginTop: 12,
+  flexDirection: "row",
+  gap: 10,
+},
+recoverBtn: {
+  flex: 1,
+  height: 40,
+  borderRadius: 999,
+  alignItems: "center",
+  justifyContent: "center",
+},
+recoverCancel: {
+  backgroundColor: "#fff",
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+},
+recoverConfirm: {
+  backgroundColor: colors.primary,
+},
+recoverCancelText: {
+  fontSize: 12,
+  fontWeight: "900",
+  color: colors.textMuted,
+},
+recoverConfirmText: {
+  fontSize: 12,
+  fontWeight: "900",
+  color: "#fff",
+},
+recoverWarn: {
+  marginTop: 10,
+  fontSize: 11,
+  fontWeight: "800",
+  color: "#ef4444",
+  textAlign: "center",
+},
 });
 

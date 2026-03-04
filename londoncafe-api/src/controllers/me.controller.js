@@ -5,11 +5,27 @@ const User = require("../models/User");
 const {
   applyEnergyDecay,
   applyDailyRefillOnAppOpen,
-  claimDailyReward, 
-   getRefillTimer, // ✅
-  dayKeyLocal,   
-  normalizeStreakAutoReset,      // ✅
+  claimDailyReward,
+  getRefillTimer, // ✅
+  dayKeyLocal,
+  normalizeStreakAutoReset, 
+  addDaysToKey,// ✅
 } = require("../utils/buddy");
+
+const RECOVERY_COST = 25;
+
+/** helper: saca uid del token */
+function getUid(req) {
+  return req.user?.uid || req.user?.sub || req.user?.userId || req.user?.id || null;
+}
+
+function calcCanRecover(user) {
+  return (
+    !!user?.buddy?.streakBrokenDay &&
+    user?.buddy?.streakRecoveryUsed === false &&
+    Number(user?.buddy?.streakPrevCount || 0) > 0
+  );
+}
 
 async function claimReward(req, res) {
   try {
@@ -20,9 +36,13 @@ async function claimReward(req, res) {
     if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
 
     const now = new Date();
+
     const result = claimDailyReward(user, now);
+
     user.markModified("buddy");
     await user.save();
+
+    const canRecover = calcCanRecover(user);
 
     return res.json({
       ok: true,
@@ -30,21 +50,97 @@ async function claimReward(req, res) {
       streak: {
         count: user.buddy?.streakCount || 0,
         best: user.buddy?.bestStreak || 0,
-        claimedToday: (user.buddy?.lastClaimDay === dayKeyLocal(now)),
+        claimedToday: user.buddy?.lastClaimDay === dayKeyLocal(now),
+        canRecover,
+        recoveryCost: RECOVERY_COST,
       },
       buddy: user.buddy,
       points: user.points,
     });
   } catch (err) {
-  console.log("claimReward FULL:", err); // 👈 para ver stack completo
-  return res.status(500).json({ error: "SERVER_ERROR", message: err?.message });
+    console.log("claimReward FULL:", err); // 👈 para ver stack completo
+    return res.status(500).json({ error: "SERVER_ERROR", message: err?.message });
+  }
 }
 
-}
+async function recoverStreak(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
-/** helper: saca uid del token */
-function getUid(req) {
-  return req.user?.uid || req.user?.sub || req.user?.userId || req.user?.id || null;
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    const now = new Date();
+
+    // ✅ por si llaman recover sin pasar por /me antes (arma el recovery si aplica)
+    normalizeStreakAutoReset(user, now);
+
+    if (!calcCanRecover(user)) {
+      return res.status(400).json({ ok: false, error: "NO_RECOVERY_AVAILABLE" });
+    }
+
+    const current = Number(user.points || 0);
+    if (current < RECOVERY_COST) {
+      return res.status(400).json({
+        ok: false,
+        error: "INSUFFICIENT_COINS",
+        needed: RECOVERY_COST,
+        current,
+      });
+    }
+
+    // ✅ cobrar
+    user.points = current - RECOVERY_COST;
+
+    // ✅ historial (opcional)
+    if (Array.isArray(user.pointsHistory)) {
+      user.pointsHistory.unshift({
+        type: "REDEEM",
+        points: -RECOVERY_COST,
+        source: "STREAK_RECOVER",
+        ref: user.buddy?.streakBrokenDay || null,
+        note: "Recover streak",
+        createdAt: new Date(),
+      });
+    }
+
+    // ✅ restaurar
+const todayKey = dayKeyLocal(now);
+const restored = Number(user.buddy.streakPrevCount || 0);
+
+user.buddy.streakCount = restored;
+user.buddy.streakRecoveryUsed = true;
+
+// ✅ CLAVE: deja lastStreakDay en "ayer" para que HOY el claim sea consecutivo
+user.buddy.lastStreakDay = addDaysToKey(todayKey, -1);
+
+// ✅ CLAVE: permitir reclamar hoy (si quedara igual a hoy, bloquearía)
+user.buddy.lastClaimDay = "";
+
+    // ✅ limpiar para que NO se pueda repetir
+    user.buddy.streakPrevCount = 0;
+    user.buddy.streakBrokenDay = "";
+
+    user.markModified("buddy");
+    await user.save();
+
+    return res.json({
+      ok: true,
+      points: user.points,
+      buddy: user.buddy,
+      streak: {
+        count: user.buddy?.streakCount || 0,
+        best: user.buddy?.bestStreak || 0,
+        claimedToday: user.buddy?.lastClaimDay === dayKeyLocal(now),
+        canRecover: false,
+        recoveryCost: RECOVERY_COST,
+      },
+    });
+  } catch (err) {
+    console.log("recoverStreak FULL:", err);
+    return res.status(500).json({ error: "SERVER_ERROR", message: err?.message });
+  }
 }
 
 const ALLOWED_GENDERS = new Set(["male", "female", "other"]);
@@ -62,8 +158,7 @@ async function getMe(req, res) {
     applyEnergyDecay(user, now);
     applyDailyRefillOnAppOpen(user, now);
     normalizeStreakAutoReset(user, now); // ✅ AQUÍ
-    user.markModified("buddy");          // ✅ recomendado
-
+    user.markModified("buddy"); // ✅ recomendado
 
     // ✅ calcula cuánto falta / si ya está listo
     const refillTimer = getRefillTimer(user, now);
@@ -74,25 +169,26 @@ async function getMe(req, res) {
       "name gender username email isEmailVerified avatarConfig createdAt buddy points lifetimePoints"
     );
 
+    const canRecover = calcCanRecover(user);
+
     // ✅ manda el timer junto al user
     return res.json({
-  ok: true,
-  user: sanitizedUser,
-  refillTimer,
-  streak: {
-    count: user.buddy?.streakCount || 0,
-    best: user.buddy?.bestStreak || 0,
-    claimedToday: user.buddy?.lastClaimDay === dayKeyLocal(now),
-  },
-});
-
+      ok: true,
+      user: sanitizedUser,
+      refillTimer,
+      streak: {
+        count: user.buddy?.streakCount || 0,
+        best: user.buddy?.bestStreak || 0,
+        claimedToday: user.buddy?.lastClaimDay === dayKeyLocal(now),
+        canRecover,
+        recoveryCost: RECOVERY_COST,
+      },
+    });
   } catch (err) {
-  console.log("getMe FULL:", err);
-  return res.status(500).json({ error: "SERVER_ERROR", message: err?.message });
+    console.log("getMe FULL:", err);
+    return res.status(500).json({ error: "SERVER_ERROR", message: err?.message });
+  }
 }
-
-}
-
 
 async function updateMe(req, res) {
   try {
@@ -169,9 +265,7 @@ async function updateAvatar(req, res) {
       return res.status(400).json({ error: "NO_ALLOWED_FIELDS" });
     }
 
-    const updated = await User.findByIdAndUpdate(uid, { $set }, { new: true }).select(
-      "avatarConfig"
-    );
+    const updated = await User.findByIdAndUpdate(uid, { $set }, { new: true }).select("avatarConfig");
 
     return res.json({ ok: true, avatarConfig: updated.avatarConfig });
   } catch (err) {
@@ -180,4 +274,4 @@ async function updateAvatar(req, res) {
   }
 }
 
-module.exports = { getMe, updateMe, updateAvatar, claimReward };
+module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak };

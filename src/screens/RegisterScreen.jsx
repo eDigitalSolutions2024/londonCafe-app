@@ -24,23 +24,116 @@ export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState("");
   const [gender, setGender] = useState(""); // "male" | "female" | "other"
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState(""); // números o + al inicio
+  const [birthDate, setBirthDate] = useState(""); // DD/MM/AAAA
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const { token } = useContext(AuthContext) || {};
 
+  // ================== Helpers ==================
+  function formatBirthDate(input) {
+    const digits = input.replace(/\D/g, "").slice(0, 8);
+    const d = digits.slice(0, 2);
+    const m = digits.slice(2, 4);
+    const y = digits.slice(4, 8);
+    let out = d;
+    if (m) out += `/${m}`;
+    if (y) out += `/${y}`;
+    return out;
+  }
+
+  function isValidBirthDate(ddmmyyyy) {
+    const m = ddmmyyyy.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return false;
+
+    const dd = Number(m[1]);
+    const mm = Number(m[2]);
+    const yyyy = Number(m[3]);
+
+    if (mm < 1 || mm > 12) return false;
+    if (dd < 1 || dd > 31) return false;
+
+    const dt = new Date(yyyy, mm - 1, dd);
+    if (
+      dt.getFullYear() !== yyyy ||
+      dt.getMonth() !== mm - 1 ||
+      dt.getDate() !== dd
+    )
+      return false;
+
+    // no futuro
+    const today = new Date();
+    if (dt > today) return false;
+
+    // mínimo 13 años
+    const min = new Date();
+    min.setFullYear(min.getFullYear() - 13);
+    if (dt > min) return false;
+
+    return true;
+  }
+
+  function birthDateToISO(ddmmyyyy) {
+    const [dd, mm, yyyy] = ddmmyyyy.split("/");
+    return `${yyyy}-${mm}-${dd}`; // YYYY-MM-DD
+  }
+
+  function normalizePhone(input) {
+    let v = input.trim();
+    if (v.startsWith("+")) v = "+" + v.slice(1).replace(/\D/g, "");
+    else v = v.replace(/\D/g, "");
+    return v.slice(0, 16);
+  }
+
+  // ================== Submit ==================
   async function onSubmit() {
     try {
-      // validaciones rápidas
       if (!name.trim()) return Alert.alert("Falta nombre", "Escribe tu nombre.");
-      if (!email.trim()) return Alert.alert("Falta email", "Escribe tu email.");
-      if (!password.trim()) return Alert.alert("Falta contraseña", "Escribe tu contraseña.");
       if (!gender) return Alert.alert("Falta género", "Selecciona tu género.");
+      if (!email.trim()) return Alert.alert("Falta email", "Escribe tu email.");
+      if (!phone.trim()) return Alert.alert("Falta teléfono", "Escribe tu teléfono.");
+
+      const phoneNorm = normalizePhone(phone);
+      if (phoneNorm.replace("+", "").length < 10) {
+        return Alert.alert(
+          "Teléfono inválido",
+          "Escribe un teléfono válido (mínimo 10 dígitos)."
+        );
+      }
+
+      if (!birthDate.trim()) {
+        return Alert.alert("Falta cumpleaños", "Escribe tu fecha de nacimiento.");
+      }
+      if (!isValidBirthDate(birthDate)) {
+        return Alert.alert(
+          "Fecha inválida",
+          "Usa formato DD/MM/AAAA y que sea una fecha real."
+        );
+      }
+
+      if (!password.trim()) {
+        return Alert.alert("Falta contraseña", "Escribe tu contraseña.");
+      }
 
       setLoading(true);
+      console.log("REGISTER SEND:", {
+  name,
+  email,
+  password,
+  gender,
+  phone: phoneNorm,
+  birthDate: birthDateToISO(birthDate),
+});
 
-      // ⬇️ mandamos gender (ajusta tu backend / API si hace falta)
-      const res = await register({ name, email, password, gender });
+      const res = await register({
+        name,
+        email,
+        password,
+        gender,
+        phone: phoneNorm,
+        birthDate: birthDateToISO(birthDate), // ✅ ISO para backend/Mongo
+      });
 
       navigation.navigate("VerifyEmail", { email: res?.email || email });
     } catch (e) {
@@ -50,18 +143,18 @@ export default function RegisterScreen({ navigation }) {
     }
   }
 
+  // ================== UI Helpers ==================
   const GenderPill = ({ value, label }) => {
     const active = gender === value;
     return (
       <TouchableOpacity
         onPress={() => setGender(value)}
         activeOpacity={0.9}
-        style={[
-          styles.pill,
-          active && styles.pillActive,
-        ]}
+        style={[styles.pill, active && styles.pillActive]}
       >
-        <Text style={[styles.pillText, active && styles.pillTextActive]}>{label}</Text>
+        <Text style={[styles.pillText, active && styles.pillTextActive]}>
+          {label}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -80,7 +173,11 @@ export default function RegisterScreen({ navigation }) {
           {/* Header / Logo (igual que Login) */}
           <View style={styles.header}>
             <View style={styles.logoWrap}>
-              <Image source={LondonCafeLogo} style={styles.logo} resizeMode="contain" />
+              <Image
+                source={LondonCafeLogo}
+                style={styles.logo}
+                resizeMode="contain"
+              />
             </View>
 
             <Text style={styles.title}>Crear cuenta</Text>
@@ -111,9 +208,7 @@ export default function RegisterScreen({ navigation }) {
                 <GenderPill value="female" label="Mujer" />
                 <GenderPill value="other" label="Otro" />
               </View>
-              {!gender ? (
-                <Text style={styles.helper}>Selecciona una opción</Text>
-              ) : null}
+              {!gender ? <Text style={styles.helper}>Selecciona una opción</Text> : null}
             </View>
 
             <View style={styles.field}>
@@ -125,6 +220,36 @@ export default function RegisterScreen({ navigation }) {
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
                 keyboardType="email-address"
+                style={styles.input}
+                returnKeyType="next"
+                autoComplete="email"
+                textContentType="emailAddress"
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Teléfono</Text>
+              <TextInput
+                value={phone}
+                onChangeText={(v) => setPhone(normalizePhone(v))}
+                placeholder="6561234567 o +1..."
+                placeholderTextColor={colors.textMuted}
+                keyboardType="phone-pad"
+                style={styles.input}
+                returnKeyType="next"
+                autoComplete="tel"
+                textContentType="telephoneNumber"
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Fecha de nacimiento</Text>
+              <TextInput
+                value={birthDate}
+                onChangeText={(v) => setBirthDate(formatBirthDate(v))}
+                placeholder="DD/MM/AAAA"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
                 style={styles.input}
                 returnKeyType="next"
               />
@@ -141,6 +266,8 @@ export default function RegisterScreen({ navigation }) {
                 style={styles.input}
                 returnKeyType="done"
                 onSubmitEditing={onSubmit}
+                autoComplete="password"
+                textContentType="newPassword"
               />
             </View>
 
@@ -150,7 +277,9 @@ export default function RegisterScreen({ navigation }) {
               disabled={loading}
               activeOpacity={0.9}
             >
-              <Text style={styles.btnText}>{loading ? "Creando..." : "Registrarme"}</Text>
+              <Text style={styles.btnText}>
+                {loading ? "Creando..." : "Registrarme"}
+              </Text>
             </TouchableOpacity>
 
             <View style={styles.dividerRow}>
@@ -165,7 +294,8 @@ export default function RegisterScreen({ navigation }) {
               style={styles.linkBtn}
             >
               <Text style={styles.linkText}>
-                Ya tengo cuenta <Text style={styles.linkStrong}>Iniciar sesión</Text>
+                Ya tengo cuenta{" "}
+                <Text style={styles.linkStrong}>Iniciar sesión</Text>
               </Text>
             </TouchableOpacity>
           </View>

@@ -16,9 +16,9 @@ const avatarSchema = new mongoose.Schema(
 const pointsHistorySchema = new mongoose.Schema(
   {
     type: { type: String, enum: ["EARN", "REDEEM", "ADJUST"], default: "EARN" },
-    points: { type: Number, required: true },          // + o -
-    source: { type: String, default: "QR" },           // QR / manual / promo / etc
-    ref: { type: String, default: null },              // claimCode / ticketId
+    points: { type: Number, required: true }, // + o -
+    source: { type: String, default: "QR" }, // QR / manual / promo / etc
+    ref: { type: String, default: null }, // claimCode / ticketId
     note: { type: String, default: null },
     createdAt: { type: Date, default: Date.now },
   },
@@ -28,10 +28,10 @@ const pointsHistorySchema = new mongoose.Schema(
 // ✅ Buddy (energía + inventario + control de recarga por login)
 const buddySchema = new mongoose.Schema(
   {
-    energy: { type: Number, default: 80, min: 0, max: 100 },
+    energy: { type: Number, default: 100, min: 0, max: 100 },
 
-    coffee: { type: Number, default: 0, min: 0 },
-    bread: { type: Number, default: 0, min: 0 },
+    coffee: { type: Number, default: 1, min: 0 },
+    bread: { type: Number, default: 1, min: 0 },
 
     lastEnergyAt: { type: Date, default: Date.now },
     lastRefillAt: { type: Date, default: null },
@@ -40,9 +40,15 @@ const buddySchema = new mongoose.Schema(
     // ✅ Daily reward / rachas
     streakCount: { type: Number, default: 0, min: 0 },
     bestStreak: { type: Number, default: 0, min: 0 },
-    lastClaimDay: { type: String, default: "" },  // "YYYY-MM-DD"
+    lastClaimDay: { type: String, default: "" }, // "YYYY-MM-DD"
     lastStreakDay: { type: String, default: "" }, // "YYYY-MM-DD"
-   // ✅ cupones (si los vas a usar)
+
+    // ✅ Recovery de racha (1 vez)
+    streakPrevCount:   { type: Number, default: 0, min: 0 },
+    streakBrokenDay:   { type: String, default: "" }, // "YYYY-MM-DD" (día donde se detectó ruptura)
+    streakRecoveryUsed:{ type: Boolean, default: false },
+
+    // ✅ cupones (si los vas a usar)
     coupons: {
       type: [
         {
@@ -61,19 +67,33 @@ const buddySchema = new mongoose.Schema(
   { _id: false }
 );
 
-
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
 
-     // ✅ NUEVO: Género
+    // ✅ Género
     gender: {
       type: String,
       enum: ["male", "female", "other"],
       default: "other",
       required: true,
     },
-    
+
+    // ✅ NUEVO: Teléfono (E.164 recomendado, ej: +16561234567)
+    phone: {
+      type: String,
+      trim: true,
+      default: null,
+      // opcional: validación básica de E.164 (puedes aflojarla si quieres)
+      match: /^\+?[0-9]{10,16}$/,
+    },
+
+    // ✅ NUEVO: Fecha de nacimiento
+    birthDate: {
+      type: Date,
+      default: null,
+    },
+
     username: {
       type: String,
       trim: true,
@@ -84,7 +104,14 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+
     passwordHash: { type: String, required: true },
     isEmailVerified: { type: Boolean, default: false },
 
@@ -92,17 +119,17 @@ const userSchema = new mongoose.Schema(
     avatarConfig: { type: avatarSchema, default: () => ({}) },
 
     // ✅ Puntos
-    points: { type: Number, default: 0 },          // disponibles para canje
-    lifetimePoints: { type: Number, default: 0 },  // acumulados históricos
+    points: { type: Number, default: 0 }, // disponibles para canje
+    lifetimePoints: { type: Number, default: 0 }, // acumulados históricos
     pointsHistory: { type: [pointsHistorySchema], default: [] },
 
     // ✅ Buddy
     buddy: { type: buddySchema, default: () => ({}) },
-    
   },
   { timestamps: true }
 );
 
-
+// ✅ Índice unique para phone pero sin romper si está null
+userSchema.index({ phone: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("User", userSchema);

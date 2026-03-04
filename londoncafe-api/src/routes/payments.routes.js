@@ -5,6 +5,6 @@ const router = express.Router();
 const payments = require("../controllers/payments.controller");
 const { requireAuth } = require("../middleware/auth.middleware"); // ✅ aquí
 
-router.post("/sheet", requireAuth, payments.createPaymentSheet);
+router.post("/sheet", payments.createPaymentSheet);
 
 module.exports = router;

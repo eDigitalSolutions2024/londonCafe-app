@@ -7,14 +7,23 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "TU_API_KEY_AQUI"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa."
+      }
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -22,11 +31,16 @@
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "android.permission.CAMERA",
         "android.permission.CAMERA"
       ],
-      "package": "com.anonymous.londoncafeapp"
+      "package": "com.anonymous.londoncafeapp",
+      "config": {
+        "googleMaps": {
+          "apiKey": "TU_API_KEY_AQUI"
+        }
+      }
     },
+
     "web": {
       "favicon": "./assets/favicon.png"
     }

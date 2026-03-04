@@ -1,7 +1,9 @@
-import React from "react";
-import { View, Text, FlatList, Image, Pressable } from "react-native";
+import React, { useState } from "react";
+import { View, Text, FlatList, Image, Pressable, ActivityIndicator } from "react-native";
 import Screen from "../components/Screen";
 import { useCart } from "../context/CartContext";
+import { useStripe } from "@stripe/stripe-react-native";
+import { apiFetch } from "../api/client"; // ✅ usa BASE_URL del client.js
 
 const COLORS = {
   bg: "#FFFFFF",
@@ -93,6 +95,61 @@ function CartItem({ item, onInc, onDec, onRemove }) {
 
 export default function CartScreen({ navigation }) {
   const { items, subtotal, inc, dec, remove, clear } = useCart();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const [paying, setPaying] = useState(false);
+
+  const onContinuar = async () => {
+    if (paying) return;
+
+    try {
+      if (!items.length) {
+        alert("Tu carrito está vacío.");
+        return;
+      }
+
+      setPaying(true);
+
+      // ✅ Backend espera [{ _id, qty }]
+      const payloadItems = items.map((it) => ({
+        _id: it.id, // tu CartContext guarda "id"
+        qty: it.qty,
+      }));
+
+      // ✅ usa apiFetch -> BASE_URL del client.js (10.0.2.2:3001/api)
+      const data = await apiFetch("/payments/sheet", {
+        method: "POST",
+        body: JSON.stringify({
+          items: payloadItems,
+          // customerEmail: "cliente@correo.com",
+        }),
+      });
+
+      if (!data?.ok) {
+        throw new Error(data?.error || "No se pudo iniciar el pago.");
+      }
+
+      const clientSecret = data.paymentIntentClientSecret;
+      if (!clientSecret) throw new Error("Stripe: clientSecret vacío.");
+
+      const { error: initError } = await initPaymentSheet({
+        merchantDisplayName: "London Café",
+        paymentIntentClientSecret: clientSecret,
+        allowsDelayedPaymentMethods: true,
+      });
+
+      if (initError) throw new Error(initError.message);
+
+      const { error: payError } = await presentPaymentSheet();
+      if (payError) throw new Error(payError.message);
+
+      alert("Pago realizado ✅");
+      clear();
+    } catch (e) {
+      alert(e?.message || "Pago cancelado o falló.");
+    } finally {
+      setPaying(false);
+    }
+  };
 
   return (
     <Screen>
@@ -147,20 +204,24 @@ export default function CartScreen({ navigation }) {
           </View>
 
           <Pressable
-            disabled={!items.length}
-            onPress={() => {
-              // aquí luego: ir a checkout/pago
-            }}
+            disabled={!items.length || paying}
+            onPress={onContinuar}
             style={{
               marginTop: 12,
               height: 48,
               borderRadius: 16,
-              backgroundColor: items.length ? COLORS.wine : "rgba(122,30,58,0.35)",
+              backgroundColor:
+                items.length && !paying ? COLORS.wine : "rgba(122,30,58,0.35)",
               alignItems: "center",
               justifyContent: "center",
+              flexDirection: "row",
+              gap: 10,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "900" }}>Continuar</Text>
+            {paying ? <ActivityIndicator color="#fff" /> : null}
+            <Text style={{ color: "#fff", fontWeight: "900" }}>
+              {paying ? "Procesando..." : "Continuar"}
+            </Text>
           </Pressable>
         </View>
       </View>

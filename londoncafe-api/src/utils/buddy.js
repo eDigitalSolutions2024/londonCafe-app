@@ -106,6 +106,17 @@ function dayKeyLocal(d = new Date()) {
   return `${y}-${m}-${day}`; // ✅ día local
 }
 
+function addDaysToKey(dayKey, deltaDays) {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + deltaDays);
+
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
 function gapBetweenKeys(a, b) {
   // a,b: "YYYY-MM-DD"
   const [ay, am, ad] = a.split("-").map(Number);
@@ -147,6 +158,10 @@ function ensureDailyReward(user) {
 
   if (typeof user.buddy.coins !== "number") user.buddy.coins = 0;
 
+    // ✅ Recovery (1 vez)
+  if (typeof user.buddy.streakPrevCount !== "number") user.buddy.streakPrevCount = 0;
+  if (typeof user.buddy.streakBrokenDay !== "string") user.buddy.streakBrokenDay = "";
+  if (typeof user.buddy.streakRecoveryUsed !== "boolean") user.buddy.streakRecoveryUsed = false;
   // ✅ cupones
   if (!Array.isArray(user.buddy.coupons)) user.buddy.coupons = [];
 }
@@ -306,6 +321,7 @@ grantReward(user, reward, now);
 
 function normalizeStreakAutoReset(user, now = new Date()) {
   if (!user.buddy) user.buddy = {};
+  ensureDailyReward(user); // ✅ asegura defaults (incluye recovery)
 
   const today = dayKeyLocal(now);
   const last = user.buddy.lastStreakDay || user.buddy.lastClaimDay || "";
@@ -313,15 +329,25 @@ function normalizeStreakAutoReset(user, now = new Date()) {
 
   const gap = gapBetweenKeys(last, today);
 
-  // ✅ si pasaron más de 1 "día" (en test: > 1 minuto), resetea a 0
+  // ✅ si pasaron más de 1 día => se rompió la racha
   if (Number.isFinite(gap) && gap > 1) {
+    // ✅ arma recovery SOLO una vez por ruptura
+    const hadStreak = Number(user.buddy.streakCount || 0) > 0;
+    const alreadyArmed = !!user.buddy.streakBrokenDay;
+    const alreadyUsed = user.buddy.streakRecoveryUsed === true;
+
+    if (hadStreak && !alreadyArmed && !alreadyUsed) {
+      user.buddy.streakPrevCount = Number(user.buddy.streakCount || 0);
+      user.buddy.streakBrokenDay = today;
+      user.buddy.streakRecoveryUsed = false;
+    }
+
+    // ✅ reset actual (tu lógica original)
     user.buddy.streakCount = 0;
     user.buddy.lastStreakDay = "";
-    // lastClaimDay lo puedes dejar como está o vaciarlo también:
-    // user.buddy.lastClaimDay = "";
+    // user.buddy.lastClaimDay = ""; // si quieres también limpiarlo, opcional
   }
 }
-
 
 module.exports = {
   applyDailyRefillOnAppOpen,
@@ -335,4 +361,5 @@ module.exports = {
   dayKeyLocal,
   claimDailyReward,
    normalizeStreakAutoReset,
+   addDaysToKey,
 };

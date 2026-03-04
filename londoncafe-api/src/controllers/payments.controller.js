@@ -4,6 +4,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2023-10-16",
 });
 
+const AppMenuItem = require("../models/AppMenuItem");
+
 /**
  * ✅ Recibe [{ _id, qty }]
  * ✅ Consulta precios en DB (NO confiar en cliente)
@@ -22,23 +24,25 @@ async function calcOrderAmountFromDB(items = []) {
   const ids = Array.from(map.keys());
   if (ids.length === 0) return 0;
 
-  // ✅ TODO: Conecta tu modelo real.
-  // Ejemplo:
-  // const MenuItem = require("../models/MenuItem");
-  // const docs = await MenuItem.find({ _id: { $in: ids }, active: true }).lean();
+   const docs = await AppMenuItem.find({
+    _id: { $in: ids },
+    active: true,
+  }).lean();
 
-  throw new Error("DB_PRICING_NOT_CONNECTED");
+  const byId = new Map(docs.map((d) => [String(d._id), d]));
 
-  // const byId = new Map(docs.map(d => [String(d._id), d]));
-  // let total = 0;
-  // for (const id of ids) {
-  //   const doc = byId.get(id);
-  //   if (!doc) throw new Error(`ITEM_NOT_FOUND:${id}`);
-  //   const unit = Number(doc.price) || 0;
-  //   const qty = map.get(id) || 0;
-  //   total += unit * qty;
-  // }
-  // return Math.round(total * 100);
+  let total = 0;
+  for (const id of ids) {
+    const doc = byId.get(id);
+    if (!doc) throw new Error(`ITEM_NOT_FOUND:${id}`);
+
+    const unit = Number(doc.price) || 0;
+    const qty = map.get(id) || 0;
+
+    total += unit * qty;
+  }
+
+  return Math.round(total * 100);
 }
 
 exports.createPaymentSheet = async (req, res) => {
