@@ -32,6 +32,66 @@ function normalizeCategory(c) {
   return s || "General";
 }
 
+
+function hasChoices(arr) {
+  return Array.isArray(arr) && arr.length > 0;
+}
+
+function getEnabledOptions(item) {
+  const milk =
+    item?.options?.milk?.enabled && hasChoices(item?.options?.milk?.choices);
+
+  const temp =
+    item?.options?.temp?.enabled && hasChoices(item?.options?.temp?.choices);
+
+  const flavors =
+    item?.options?.flavors?.enabled && hasChoices(item?.options?.flavors?.choices);
+
+  return {
+    milk,
+    temp,
+    flavors,
+    hasAny: milk || temp || flavors,
+  };
+}
+
+function getChoiceLabel(choice) {
+  if (typeof choice === "string") return choice;
+  return choice?.label || choice?.name || "";
+}
+
+function getChoiceExtra(choice) {
+  if (typeof choice === "string") return 0;
+  return Number(
+    choice?.extraPrice ??
+    choice?.price ??
+    choice?.extra ??
+    choice?.delta ??
+    0
+  );
+}
+
+function findSelectedChoice(choices = [], selectedValue) {
+  return choices.find((choice) => getChoiceLabel(choice) === selectedValue) || null;
+}
+
+function calcConfiguredPrice(item, selectedOptions) {
+  const base = Number(item?.price || 0);
+
+  const milkChoice = findSelectedChoice(item?.options?.milk?.choices || [], selectedOptions?.milk);
+  const tempChoice = findSelectedChoice(item?.options?.temp?.choices || [], selectedOptions?.temp);
+
+  const flavorChoices = (item?.options?.flavors?.choices || []).filter((choice) =>
+    (selectedOptions?.flavors || []).includes(getChoiceLabel(choice))
+  );
+
+  const milkExtra = getChoiceExtra(milkChoice);
+  const tempExtra = getChoiceExtra(tempChoice);
+  const flavorsExtra = flavorChoices.reduce((acc, choice) => acc + getChoiceExtra(choice), 0);
+
+  return base + milkExtra + tempExtra + flavorsExtra;
+}
+
 /** ✅ Chips de categorías horizontal */
 function CategoryPillsHorizontal({ categories, value, onChange }) {
   const data = useMemo(() => ["__ALL__", ...categories], [categories]);
@@ -120,20 +180,34 @@ function ProductTile({ item, onAdd }) {
       </View>
 
       <Text
-        numberOfLines={2}
-        style={{
-          marginTop: 10,
-          fontWeight: "900",
-          color: COLORS.ink,
-          fontSize: 13,
-        }}
-      >
-        {item.title}
-      </Text>
+  numberOfLines={2}
+  style={{
+    marginTop: 10,
+    fontWeight: "900",
+    color: COLORS.ink,
+    fontSize: 13,
+  }}
+>
+  {item.title}
+</Text>
 
-      <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.wine }}>
-        {money(item.price)}
-      </Text>
+{item.description ? (
+  <Text
+    numberOfLines={2}
+    style={{
+      marginTop: 4,
+      fontSize: 12,
+      color: COLORS.muted,
+      lineHeight: 16,
+    }}
+  >
+    {item.description}
+  </Text>
+) : null}
+
+<Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.wine }}>
+  {money(item.price)}
+</Text>
     </View>
   );
 }
@@ -192,6 +266,13 @@ export default function OrderScreen({ navigation }) {
   const [error, setError] = useState("");
   const [cat, setCat] = useState("");
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
+    const [selectedItem, setSelectedItem] = useState(null);
+  const [showOptions, setShowOptions] = useState(false);
+
+  const [selectedMilk, setSelectedMilk] = useState(null);
+const [selectedTemp, setSelectedTemp] = useState(null);
+const [selectedFlavors, setSelectedFlavors] = useState([]);
+
 
   // si ya tienes carrito real, conecta esto a tu store/context
  const { cartCount, add } = useCart();
@@ -201,6 +282,13 @@ export default function OrderScreen({ navigation }) {
     setError("");
     try {
       const data = await getAppMenu({ active: true });
+        console.log("APP MENU FULL:", JSON.stringify(data, null, 2));
+        console.log(
+  "MILK OPTIONS:",
+  JSON.stringify(data?.[0]?.options?.milk, null, 2)
+);
+
+
       setItems(Array.isArray(data) ? data : []);
     } catch (e) {
       console.log(e);
@@ -228,10 +316,62 @@ export default function OrderScreen({ navigation }) {
   }, [items, cat]);
 
   function onAdd(item) {
-  add(item);
+  const opts = getEnabledOptions(item);
+
+  if (!opts.hasAny) {
+  add({
+    ...item,
+    basePrice: Number(item.price || 0),
+    price: Number(item.price || 0),
+    selectedOptions: {
+      milk: null,
+      temp: null,
+      flavors: [],
+    },
+  });
+  return;
+}
+  setSelectedMilk(null);
+  setSelectedTemp(null);
+  setSelectedFlavors([]);
+  setSelectedItem(item);
+  setShowOptions(true);
 }
 
+
+function closeOptionsModal() {
+  setShowOptions(false);
+  setSelectedItem(null);
+  setSelectedMilk(null);
+  setSelectedTemp(null);
+  setSelectedFlavors([]);
+}
+
+function toggleFlavor(flavor) {
+  const multiple = !!selectedItem?.options?.flavors?.multiple;
+
+  if (!multiple) {
+    setSelectedFlavors([flavor]);
+    return;
+  }
+
+  setSelectedFlavors((prev) =>
+    prev.includes(flavor)
+      ? prev.filter((x) => x !== flavor)
+      : [...prev, flavor]
+  );
+}
   const isGrid = viewMode === "grid";
+
+  const configuredPrice = useMemo(() => {
+  if (!selectedItem) return 0;
+
+  return calcConfiguredPrice(selectedItem, {
+    milk: selectedMilk,
+    temp: selectedTemp,
+    flavors: selectedFlavors,
+  });
+}, [selectedItem, selectedMilk, selectedTemp, selectedFlavors]);
 
   return (
     <Screen>
@@ -423,6 +563,226 @@ export default function OrderScreen({ navigation }) {
             }
           />
         )}
+
+                {showOptions && selectedItem ? (
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.45)",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 20,
+            }}
+          >
+            <View
+              style={{
+                width: "100%",
+                maxWidth: 420,
+                backgroundColor: "#fff",
+                borderRadius: 20,
+                padding: 18,
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: "900", color: COLORS.ink }}>
+                Configurar producto
+              </Text>
+
+              <Text style={{ marginTop: 8, fontWeight: "700", color: COLORS.wine }}>
+                {selectedItem.title}
+              </Text>
+
+              <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.wine, fontSize: 16 }}>
+  Total: {money(configuredPrice || selectedItem.price)}
+</Text>
+
+              {selectedItem?.options?.milk?.enabled &&
+Array.isArray(selectedItem?.options?.milk?.choices) &&
+selectedItem.options.milk.choices.length > 0 ? (
+  <View style={{ marginTop: 14 }}>
+    <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+      Tipo de leche
+    </Text>
+
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+      {selectedItem.options.milk.choices.map((choice, idx) => {
+  const label = getChoiceLabel(choice);
+  const extra = getChoiceExtra(choice);
+  const active = selectedMilk === label;
+
+  return (
+    <Pressable
+      key={`milk-${label}-${idx}`}
+      onPress={() => setSelectedMilk(label)}
+      style={{
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: active ? COLORS.wine : COLORS.border,
+        backgroundColor: active ? COLORS.wineSoft : "#fff",
+      }}
+    >
+      <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
+        {label} {extra > 0 ? `(+${money(extra)})` : ""}
+      </Text>
+    </Pressable>
+  );
+})}
+    </View>
+  </View>
+) : null}
+
+{selectedItem?.options?.temp?.enabled &&
+Array.isArray(selectedItem?.options?.temp?.choices) &&
+selectedItem.options.temp.choices.length > 0 ? (
+  <View style={{ marginTop: 14 }}>
+    <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+      Temperatura
+    </Text>
+
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+      {selectedItem.options.temp.choices.map((choice, idx) => {
+  const label = getChoiceLabel(choice);
+  const extra = getChoiceExtra(choice);
+  const active = selectedTemp === label;
+
+  return (
+    <Pressable
+      key={`temp-${label}-${idx}`}
+      onPress={() => setSelectedTemp(label)}
+      style={{
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: active ? COLORS.wine : COLORS.border,
+        backgroundColor: active ? COLORS.wineSoft : "#fff",
+      }}
+    >
+      <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
+        {label} {extra > 0 ? `(+${money(extra)})` : ""}
+      </Text>
+    </Pressable>
+  );
+})}
+    </View>
+  </View>
+) : null}
+
+{selectedItem?.options?.flavors?.enabled &&
+Array.isArray(selectedItem?.options?.flavors?.choices) &&
+selectedItem.options.flavors.choices.length > 0 ? (
+  <View style={{ marginTop: 14 }}>
+    <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+      Sabores
+      {selectedItem?.options?.flavors?.multiple ? " (puedes elegir varios)" : ""}
+    </Text>
+
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+      {selectedItem.options.flavors.choices.map((choice, idx) => {
+  const label = getChoiceLabel(choice);
+  const extra = getChoiceExtra(choice);
+  const active = selectedFlavors.includes(label);
+
+  return (
+    <Pressable
+      key={`flavor-${label}-${idx}`}
+      onPress={() => toggleFlavor(label)}
+      style={{
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: active ? COLORS.wine : COLORS.border,
+        backgroundColor: active ? COLORS.wineSoft : "#fff",
+      }}
+    >
+      <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
+        {label} {extra > 0 ? `(+${money(extra)})` : ""}
+      </Text>
+    </Pressable>
+  );
+})}
+    </View>
+  </View>
+) : null}
+
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 18, gap: 10 }}>
+                <Pressable
+                  onPress={closeOptionsModal}
+                  style={{
+                    paddingHorizontal: 14,
+                    height: 40,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ fontWeight: "900", color: COLORS.ink }}>Cancelar</Text>
+                </Pressable>
+
+                <Pressable
+  onPress={() => {
+    const needsMilk =
+      selectedItem?.options?.milk?.enabled &&
+      Array.isArray(selectedItem?.options?.milk?.choices) &&
+      selectedItem.options.milk.choices.length > 0;
+
+    const needsTemp =
+      selectedItem?.options?.temp?.enabled &&
+      Array.isArray(selectedItem?.options?.temp?.choices) &&
+      selectedItem.options.temp.choices.length > 0;
+
+    if (needsMilk && !selectedMilk) {
+      alert("Selecciona el tipo de leche");
+      return;
+    }
+
+    if (needsTemp && !selectedTemp) {
+      alert("Selecciona la temperatura");
+      return;
+    }
+
+    const finalPrice = calcConfiguredPrice(selectedItem, {
+      milk: selectedMilk,
+      temp: selectedTemp,
+      flavors: selectedFlavors,
+    });
+
+    add({
+      ...selectedItem,
+      basePrice: Number(selectedItem.price || 0),
+      price: finalPrice,
+      selectedOptions: {
+        milk: selectedMilk,
+        temp: selectedTemp,
+        flavors: selectedFlavors,
+      },
+    });
+
+    closeOptionsModal();
+  }}
+  style={{
+    paddingHorizontal: 14,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: COLORS.wine,
+    alignItems: "center",
+    justifyContent: "center",
+  }}
+>
+  <Text style={{ fontWeight: "900", color: "#fff" }}>Agregar</Text>
+</Pressable>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </View>
     </Screen>
   );

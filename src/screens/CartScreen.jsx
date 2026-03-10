@@ -46,6 +46,24 @@ function CartItem({ item, onInc, onDec, onRemove }) {
           {money(item.price)}
         </Text>
 
+        {item?.selectedOptions?.milk ? (
+  <Text style={{ marginTop: 4, color: COLORS.muted }}>
+    Leche: {item.selectedOptions.milk}
+  </Text>
+) : null}
+
+{item?.selectedOptions?.temp ? (
+  <Text style={{ marginTop: 2, color: COLORS.muted }}>
+    Temp: {item.selectedOptions.temp}
+  </Text>
+) : null}
+
+{Array.isArray(item?.selectedOptions?.flavors) && item.selectedOptions.flavors.length > 0 ? (
+  <Text style={{ marginTop: 2, color: COLORS.muted }}>
+    Sabores: {item.selectedOptions.flavors.join(", ")}
+  </Text>
+) : null}
+
         <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, gap: 10 }}>
           <Pressable
             onPress={onDec}
@@ -111,9 +129,10 @@ export default function CartScreen({ navigation }) {
 
       // ✅ Backend espera [{ _id, qty }]
       const payloadItems = items.map((it) => ({
-        _id: it.id, // tu CartContext guarda "id"
-        qty: it.qty,
-      }));
+  _id: it.productId,
+  qty: it.qty,
+  selectedOptions: it.selectedOptions,
+}));
 
       // ✅ usa apiFetch -> BASE_URL del client.js (10.0.2.2:3001/api)
       const data = await apiFetch("/payments/sheet", {
