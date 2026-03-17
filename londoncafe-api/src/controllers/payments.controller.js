@@ -12,34 +12,93 @@ const AppMenuItem = require("../models/AppMenuItem");
  * ✅ Devuelve amount en centavos (integer)
  */
 async function calcOrderAmountFromDB(items = []) {
-  const map = new Map(); // id -> qty
-  for (const it of items) {
-    const id = String(it?._id || "").trim();
-    if (!id) continue;
+  const normalizedItems = Array.isArray(items) ? items : [];
 
-    const qty = Math.max(1, Math.min(99, Number(it?.qty) || 1));
-    map.set(id, (map.get(id) || 0) + qty);
-  }
+  const ids = [
+    ...new Set(
+      normalizedItems
+        .map((it) => String(it?._id || "").trim())
+        .filter(Boolean)
+    ),
+  ];
 
-  const ids = Array.from(map.keys());
   if (ids.length === 0) return 0;
 
-   const docs = await AppMenuItem.find({
+  const docs = await AppMenuItem.find({
     _id: { $in: ids },
     active: true,
   }).lean();
 
   const byId = new Map(docs.map((d) => [String(d._id), d]));
 
+  function normalizeChoiceLabel(choice) {
+    if (!choice) return "";
+    if (typeof choice === "string") return choice.trim();
+    return String(choice.label || "").trim();
+  }
+
+  function getExtraFromOptionGroup(group, selectedValue) {
+    if (!group?.enabled) return 0;
+
+    const selectedLabel = normalizeChoiceLabel(selectedValue);
+    if (!selectedLabel) return 0;
+
+    const found = Array.isArray(group.choices)
+      ? group.choices.find((c) => normalizeChoiceLabel(c).toLowerCase() === selectedLabel.toLowerCase())
+      : null;
+
+    if (!found) return 0;
+
+    if (typeof found === "string") return 0;
+
+    return Number(found.extraPrice || 0);
+  }
+
+  function getFlavorsExtra(group, selectedFlavors) {
+    if (!group?.enabled) return 0;
+    if (!Array.isArray(selectedFlavors) || selectedFlavors.length === 0) return 0;
+
+    let total = 0;
+
+    for (const flavor of selectedFlavors) {
+      const selectedLabel = normalizeChoiceLabel(flavor);
+      if (!selectedLabel) continue;
+
+      const found = Array.isArray(group.choices)
+        ? group.choices.find((c) => normalizeChoiceLabel(c).toLowerCase() === selectedLabel.toLowerCase())
+        : null;
+
+      if (!found) continue;
+
+      if (typeof found === "string") continue;
+
+      total += Number(found.extraPrice || 0);
+    }
+
+    return total;
+  }
+
   let total = 0;
-  for (const id of ids) {
+
+  for (const it of normalizedItems) {
+    const id = String(it?._id || "").trim();
+    if (!id) continue;
+
     const doc = byId.get(id);
     if (!doc) throw new Error(`ITEM_NOT_FOUND:${id}`);
 
-    const unit = Number(doc.price) || 0;
-    const qty = map.get(id) || 0;
+    const qty = Math.max(1, Math.min(99, Number(it?.qty) || 1));
+    const basePrice = Number(doc.price) || 0;
 
-    total += unit * qty;
+    const selectedOptions = it?.selectedOptions || {};
+
+    const milkExtra = getExtraFromOptionGroup(doc?.options?.milk, selectedOptions.milk);
+    const tempExtra = getExtraFromOptionGroup(doc?.options?.temp, selectedOptions.temp);
+    const flavorsExtra = getFlavorsExtra(doc?.options?.flavors, selectedOptions.flavors);
+
+    const unitTotal = basePrice + milkExtra + tempExtra + flavorsExtra;
+
+    total += unitTotal * qty;
   }
 
   return Math.round(total * 100);
@@ -83,9 +142,10 @@ exports.createPaymentSheet = async (req, res) => {
     });
 
     return res.json({
-      ok: true,
-      paymentIntentClientSecret: paymentIntent.client_secret,
-    });
+  ok: true,
+  paymentIntentClientSecret: paymentIntent.client_secret,
+  paymentIntentId: paymentIntent.id,
+});
   } catch (e) {
     console.log("❌ createPaymentSheet:", e?.message || e);
     return res.status(500).json({ ok: false, error: "PAYMENT_INTENT_FAILED" });

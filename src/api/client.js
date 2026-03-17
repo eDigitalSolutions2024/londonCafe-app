@@ -2,6 +2,7 @@ const BASE_URL = "http://10.0.2.2:3001/api";
 //const BASE_URL = "https://app.londoncafejrz.com/api";
 const POS_URL  = "https://api.londoncafejrz.com/api";
 
+
 async function parseJsonSafe(res) {
   const text = await res.text();
   try {

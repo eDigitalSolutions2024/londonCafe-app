@@ -111,6 +111,27 @@ function CartItem({ item, onInc, onDec, onRemove }) {
   );
 }
 
+
+function buildOrderPayload(items, subtotal, paymentIntentId) {
+  return {
+    source: "app",
+    paymentIntentId,
+    total: subtotal,
+    currency: "mxn",
+    items: items.map((it) => ({
+      productId: it.productId,
+      title: it.title,
+      imageUrl: it.imageUrl || "",
+      qty: it.qty,
+      unitPrice: Number(it.price || 0),
+      lineTotal: Number(it.price || 0) * Number(it.qty || 0),
+      selectedOptions: it.selectedOptions || {},
+    })),
+  };
+}
+
+
+
 export default function CartScreen({ navigation }) {
   const { items, subtotal, inc, dec, remove, clear } = useCart();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
@@ -134,35 +155,48 @@ export default function CartScreen({ navigation }) {
   selectedOptions: it.selectedOptions,
 }));
 
-      // ✅ usa apiFetch -> BASE_URL del client.js (10.0.2.2:3001/api)
       const data = await apiFetch("/payments/sheet", {
-        method: "POST",
-        body: JSON.stringify({
-          items: payloadItems,
-          // customerEmail: "cliente@correo.com",
-        }),
-      });
+  method: "POST",
+  body: JSON.stringify({
+    items: payloadItems,
+  }),
+});
 
-      if (!data?.ok) {
-        throw new Error(data?.error || "No se pudo iniciar el pago.");
-      }
+if (!data?.ok) {
+  throw new Error(data?.error || "No se pudo iniciar el pago.");
+}
 
-      const clientSecret = data.paymentIntentClientSecret;
-      if (!clientSecret) throw new Error("Stripe: clientSecret vacío.");
+const clientSecret = data.paymentIntentClientSecret;
+const paymentIntentId = data.paymentIntentId;
 
-      const { error: initError } = await initPaymentSheet({
-        merchantDisplayName: "London Café",
-        paymentIntentClientSecret: clientSecret,
-        allowsDelayedPaymentMethods: true,
-      });
+if (!clientSecret) throw new Error("Stripe: clientSecret vacío.");
+if (!paymentIntentId) throw new Error("Stripe: paymentIntentId vacío.");
 
-      if (initError) throw new Error(initError.message);
+const { error: initError } = await initPaymentSheet({
+  merchantDisplayName: "London Café",
+  paymentIntentClientSecret: clientSecret,
+  allowsDelayedPaymentMethods: true,
+});
 
-      const { error: payError } = await presentPaymentSheet();
-      if (payError) throw new Error(payError.message);
+if (initError) throw new Error(initError.message);
 
-      alert("Pago realizado ✅");
-      clear();
+const { error: payError } = await presentPaymentSheet();
+if (payError) throw new Error(payError.message);
+
+// ✅ aquí ya pagó: ahora crear pedido
+const orderPayload = buildOrderPayload(items, subtotal, paymentIntentId);
+
+const orderRes = await apiFetch("/orders/from-app", {
+  method: "POST",
+  body: JSON.stringify(orderPayload),
+});
+
+if (!orderRes?.ok) {
+  throw new Error(orderRes?.error || "El pago pasó, pero no se pudo crear el pedido.");
+}
+
+alert("Pago realizado ✅ Pedido enviado al café.");
+clear();
     } catch (e) {
       alert(e?.message || "Pago cancelado o falló.");
     } finally {

@@ -234,13 +234,28 @@ function ProductRow({ item, onAdd }) {
       />
 
       <View style={{ flex: 1 }}>
-        <Text style={{ fontWeight: "900", color: COLORS.ink }} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={{ marginTop: 4, fontWeight: "900", color: COLORS.wine }}>
-          {money(item.price)}
-        </Text>
-      </View>
+  <Text style={{ fontWeight: "900", color: COLORS.ink }} numberOfLines={2}>
+    {item.title}
+  </Text>
+
+  {item.description ? (
+    <Text
+      numberOfLines={2}
+      style={{
+        marginTop: 4,
+        fontSize: 12,
+        color: COLORS.muted,
+        lineHeight: 16,
+      }}
+    >
+      {item.description}
+    </Text>
+  ) : null}
+
+  <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.wine }}>
+    {money(item.price)}
+  </Text>
+</View>
 
       <Pressable
         onPress={() => onAdd(item)}
@@ -594,6 +609,9 @@ function toggleFlavor(flavor) {
               <Text style={{ marginTop: 8, fontWeight: "700", color: COLORS.wine }}>
                 {selectedItem.title}
               </Text>
+              <Text style={{ marginTop: 4, color: COLORS.muted }}>
+  Base: {money(selectedItem.price)}
+</Text>
 
               <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.wine, fontSize: 16 }}>
   Total: {money(configuredPrice || selectedItem.price)}
