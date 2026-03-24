@@ -12,6 +12,8 @@ async function createOrderFromApp(req, res) {
       total,
       currency,
       items,
+      customerName,
+      generalNotes,
     } = req.body || {};
 
     if (!paymentIntentId) {
@@ -37,23 +39,29 @@ async function createOrderFromApp(req, res) {
     }
 
     const orderPayload = {
-      source: source || "app",
-      paymentIntentId,
-      paymentStatus: paymentIntent.status,
-      total: Number(total || 0),
-      currency: currency || "mxn",
-      status: "pending",
-      createdAt: new Date().toISOString(),
-      items: items.map((it) => ({
-        productId: it.productId,
-        title: it.title,
-        imageUrl: it.imageUrl || "",
-        qty: Number(it.qty || 0),
-        unitPrice: Number(it.unitPrice || 0),
-        lineTotal: Number(it.lineTotal || 0),
-        selectedOptions: it.selectedOptions || {},
-      })),
-    };
+  source: source || "app",
+  paymentIntentId,
+  paymentStatus: paymentIntent.status === "succeeded" ? "paid" : "pending",
+  total: Number(total || 0),
+  currency: currency || "mxn",
+  customerName: customerName || "",
+  generalNotes: generalNotes || "",
+  status: "pending",
+  createdAt: new Date().toISOString(),
+  items: items.map((it) => ({
+    productId: it.productId,
+    title: it.title,
+    imageUrl: it.imageUrl || "",
+    qty: Number(it.qty || 0),
+    unitPrice: Number(it.unitPrice || 0),
+    lineTotal: Number(it.lineTotal || 0),
+    categorySnapshot: it.categorySnapshot || "General",
+    selectedOptions: it.selectedOptions || {},
+  })),
+};
+
+    console.log("[FROM-APP] POS_URL:", POS_URL);
+    console.log("[FROM-APP] orderPayload:", JSON.stringify(orderPayload, null, 2));
 
     const posRes = await fetch(`${POS_URL}/orders/online`, {
       method: "POST",
@@ -63,7 +71,16 @@ async function createOrderFromApp(req, res) {
       body: JSON.stringify(orderPayload),
     });
 
-    const posData = await posRes.json().catch(() => ({}));
+    const posText = await posRes.text();
+    let posData = {};
+    try {
+      posData = posText ? JSON.parse(posText) : {};
+    } catch {
+      posData = { raw: posText };
+    }
+
+    console.log("[FROM-APP] pos status:", posRes.status);
+    console.log("[FROM-APP] pos data:", posData);
 
     if (!posRes.ok) {
       return res.status(502).json({

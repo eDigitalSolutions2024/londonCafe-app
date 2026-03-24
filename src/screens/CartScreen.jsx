@@ -116,15 +116,17 @@ function buildOrderPayload(items, subtotal, paymentIntentId) {
   return {
     source: "app",
     paymentIntentId,
-    total: subtotal,
+    paymentStatus: "paid",
+    total: Number(subtotal || 0),
     currency: "mxn",
     items: items.map((it) => ({
-      productId: it.productId,
+      productId: it.productId || it._id || it.id,
       title: it.title,
       imageUrl: it.imageUrl || "",
-      qty: it.qty,
+      qty: Number(it.qty || 1),
       unitPrice: Number(it.price || 0),
       lineTotal: Number(it.price || 0) * Number(it.qty || 0),
+      categorySnapshot: it.category || it.categorySnapshot || "General",
       selectedOptions: it.selectedOptions || {},
     })),
   };
@@ -137,72 +139,80 @@ export default function CartScreen({ navigation }) {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [paying, setPaying] = useState(false);
 
-  const onContinuar = async () => {
-    if (paying) return;
+ const onContinuar = async () => {
+  if (paying) return;
 
-    try {
-      if (!items.length) {
-        alert("Tu carrito está vacío.");
-        return;
-      }
-
-      setPaying(true);
-
-      // ✅ Backend espera [{ _id, qty }]
-      const payloadItems = items.map((it) => ({
-  _id: it.productId,
-  qty: it.qty,
-  selectedOptions: it.selectedOptions,
-}));
-
-      const data = await apiFetch("/payments/sheet", {
-  method: "POST",
-  body: JSON.stringify({
-    items: payloadItems,
-  }),
-});
-
-if (!data?.ok) {
-  throw new Error(data?.error || "No se pudo iniciar el pago.");
-}
-
-const clientSecret = data.paymentIntentClientSecret;
-const paymentIntentId = data.paymentIntentId;
-
-if (!clientSecret) throw new Error("Stripe: clientSecret vacío.");
-if (!paymentIntentId) throw new Error("Stripe: paymentIntentId vacío.");
-
-const { error: initError } = await initPaymentSheet({
-  merchantDisplayName: "London Café",
-  paymentIntentClientSecret: clientSecret,
-  allowsDelayedPaymentMethods: true,
-});
-
-if (initError) throw new Error(initError.message);
-
-const { error: payError } = await presentPaymentSheet();
-if (payError) throw new Error(payError.message);
-
-// ✅ aquí ya pagó: ahora crear pedido
-const orderPayload = buildOrderPayload(items, subtotal, paymentIntentId);
-
-const orderRes = await apiFetch("/orders/from-app", {
-  method: "POST",
-  body: JSON.stringify(orderPayload),
-});
-
-if (!orderRes?.ok) {
-  throw new Error(orderRes?.error || "El pago pasó, pero no se pudo crear el pedido.");
-}
-
-alert("Pago realizado ✅ Pedido enviado al café.");
-clear();
-    } catch (e) {
-      alert(e?.message || "Pago cancelado o falló.");
-    } finally {
-      setPaying(false);
+  try {
+    if (!items.length) {
+      alert("Tu carrito está vacío.");
+      return;
     }
-  };
+
+    setPaying(true);
+
+    const payloadItems = items.map((it) => ({
+      _id: it.productId || it._id || it.id,
+      qty: Number(it.qty || 1),
+      selectedOptions: it.selectedOptions || {},
+    }));
+
+    const data = await apiFetch("/payments/sheet", {
+      method: "POST",
+      body: JSON.stringify({
+        items: payloadItems,
+      }),
+    });
+
+    if (!data?.ok) {
+      throw new Error(data?.error || "No se pudo iniciar el pago.");
+    }
+
+    const clientSecret = data.paymentIntentClientSecret;
+    const paymentIntentId = data.paymentIntentId;
+
+    if (!clientSecret) throw new Error("Stripe: clientSecret vacío.");
+    if (!paymentIntentId) throw new Error("Stripe: paymentIntentId vacío.");
+
+    const { error: initError } = await initPaymentSheet({
+      merchantDisplayName: "London Café",
+      paymentIntentClientSecret: clientSecret,
+      allowsDelayedPaymentMethods: true,
+    });
+
+    if (initError) throw new Error(initError.message);
+
+    const { error: payError } = await presentPaymentSheet();
+    if (payError) throw new Error(payError.message);
+
+    const orderPayload = buildOrderPayload(items, subtotal, paymentIntentId);
+
+    const orderRes = await apiFetch("/orders/from-app", {
+      method: "POST",
+      body: JSON.stringify(orderPayload),
+    });
+
+    if (!orderRes?.ok) {
+      throw new Error(orderRes?.error || "El pago pasó, pero no se pudo crear el pedido.");
+    }
+
+    alert("Pago realizado ✅ Pedido enviado al café.");
+    clear();
+  } catch (e) {
+    console.log("[CartScreen] ERROR:", e);
+    console.log("[CartScreen] STATUS:", e?.status);
+    console.log("[CartScreen] DATA:", e?.data);
+
+    alert(
+      e?.data?.posData?.error ||
+      e?.data?.posData?.details ||
+      e?.data?.error ||
+      e?.message ||
+      "Pago cancelado o falló."
+    );
+  } finally {
+    setPaying(false);
+  }
+};
 
   return (
     <Screen>
