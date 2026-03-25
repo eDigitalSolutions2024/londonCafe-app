@@ -4,6 +4,7 @@ import Screen from "../components/Screen";
 import { useCart } from "../context/CartContext";
 import { useStripe } from "@stripe/stripe-react-native";
 import { apiFetch } from "../api/client"; // ✅ usa BASE_URL del client.js
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const COLORS = {
   bg: "#FFFFFF",
@@ -112,13 +113,14 @@ function CartItem({ item, onInc, onDec, onRemove }) {
 }
 
 
-function buildOrderPayload(items, subtotal, paymentIntentId) {
+function buildOrderPayload(items, subtotal, paymentIntentId, customerName = "") {
   return {
     source: "app",
     paymentIntentId,
     paymentStatus: "paid",
     total: Number(subtotal || 0),
     currency: "mxn",
+    customerName,
     items: items.map((it) => ({
       productId: it.productId || it._id || it.id,
       title: it.title,
@@ -138,6 +140,31 @@ export default function CartScreen({ navigation }) {
   const { items, subtotal, inc, dec, remove, clear } = useCart();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [paying, setPaying] = useState(false);
+
+
+  async function getLoggedUserName() {
+  try {
+    const raw =
+      (await AsyncStorage.getItem("user")) ||
+      (await AsyncStorage.getItem("me")) ||
+      (await AsyncStorage.getItem("auth_user"));
+
+    if (!raw) return "";
+
+    const parsed = JSON.parse(raw);
+    return (
+      parsed?.name ||
+      parsed?.fullName ||
+      parsed?.user?.name ||
+      parsed?.user?.fullName ||
+      parsed?.username ||
+      ""
+    );
+  } catch {
+    return "";
+  }
+}
+
 
  const onContinuar = async () => {
   if (paying) return;
@@ -184,7 +211,30 @@ export default function CartScreen({ navigation }) {
     const { error: payError } = await presentPaymentSheet();
     if (payError) throw new Error(payError.message);
 
-    const orderPayload = buildOrderPayload(items, subtotal, paymentIntentId);
+    let customerName = "";
+
+try {
+  const me = await apiFetch("/me");
+  customerName =
+    me?.user?.name ||
+    me?.user?.fullName ||
+    me?.user?.username ||
+    "";
+} catch (e) {
+  console.log("[APP] no se pudo obtener /me");
+}
+
+const orderPayload = buildOrderPayload(
+  items,
+  subtotal,
+  paymentIntentId,
+  customerName
+);
+
+console.log("[APP] customerName:", customerName);
+console.log("[APP] orderPayload:", JSON.stringify(orderPayload, null, 2));
+
+
 
     const orderRes = await apiFetch("/orders/from-app", {
       method: "POST",
