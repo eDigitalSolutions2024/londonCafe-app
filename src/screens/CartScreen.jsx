@@ -113,14 +113,23 @@ function CartItem({ item, onInc, onDec, onRemove }) {
 }
 
 
-function buildOrderPayload(items, subtotal, paymentIntentId, customerName = "") {
+function buildOrderPayload(
+  items,
+  subtotal,
+  paymentIntentId,
+  customerName = "",
+  customerPhone = "",
+  customerEmail = ""
+) {
   return {
     source: "app",
     paymentIntentId,
     paymentStatus: "paid",
     total: Number(subtotal || 0),
     currency: "mxn",
-    customerName,
+    customerName: String(customerName || "").trim(),
+    customerPhone: String(customerPhone || "").trim(),
+    customerEmail: String(customerEmail || "").trim(),
     items: items.map((it) => ({
       productId: it.productId || it._id || it.id,
       title: it.title,
@@ -130,6 +139,7 @@ function buildOrderPayload(items, subtotal, paymentIntentId, customerName = "") 
       lineTotal: Number(it.price || 0) * Number(it.qty || 0),
       categorySnapshot: it.category || it.categorySnapshot || "General",
       selectedOptions: it.selectedOptions || {},
+      notes: it.notes || "",
     })),
   };
 }
@@ -162,6 +172,24 @@ export default function CartScreen({ navigation }) {
     );
   } catch {
     return "";
+  }
+}
+
+
+async function getLoggedUserData() {
+  try {
+    const raw =
+      (await AsyncStorage.getItem("user")) ||
+      (await AsyncStorage.getItem("me")) ||
+      (await AsyncStorage.getItem("auth_user"));
+
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+
+    return parsed?.user || parsed || null;
+  } catch {
+    return null;
   }
 }
 
@@ -212,28 +240,63 @@ export default function CartScreen({ navigation }) {
     if (payError) throw new Error(payError.message);
 
     let customerName = "";
+let customerPhone = "";
+let customerEmail = "";
 
 try {
   const me = await apiFetch("/me");
+
   customerName =
     me?.user?.name ||
     me?.user?.fullName ||
     me?.user?.username ||
     "";
+
+  customerPhone =
+    me?.user?.phone ||
+    "";
+
+  customerEmail =
+    me?.user?.email ||
+    "";
 } catch (e) {
   console.log("[APP] no se pudo obtener /me");
+}
+
+if (!customerName || !customerPhone || !customerEmail) {
+  const localUser = await getLoggedUserData();
+
+  customerName =
+    customerName ||
+    localUser?.name ||
+    localUser?.fullName ||
+    localUser?.username ||
+    "";
+
+  customerPhone =
+    customerPhone ||
+    localUser?.phone ||
+    "";
+
+  customerEmail =
+    customerEmail ||
+    localUser?.email ||
+    "";
 }
 
 const orderPayload = buildOrderPayload(
   items,
   subtotal,
   paymentIntentId,
-  customerName
+  customerName,
+  customerPhone,
+  customerEmail
 );
 
 console.log("[APP] customerName:", customerName);
+console.log("[APP] customerPhone:", customerPhone);
+console.log("[APP] customerEmail:", customerEmail);
 console.log("[APP] orderPayload:", JSON.stringify(orderPayload, null, 2));
-
 
 
     const orderRes = await apiFetch("/orders/from-app", {
