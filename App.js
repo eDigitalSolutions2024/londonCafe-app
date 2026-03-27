@@ -32,6 +32,8 @@ import VerifyEmailScreen from "./src/screens/VerifyEmailScreen";
 import RewardsScreen from "./src/screens/RewardsScreen";
 import RedeemQRScreen from "./src/screens/RedeemQRScreen";
 
+import PedidosScreen from "./src/screens/PedidosScreen";
+
 import { colors } from "./src/theme/colors";
 import { AuthProvider, AuthContext } from "./src/context/AuthContext";
 
@@ -58,6 +60,8 @@ function OrderStackNav() {
     <OrderStack.Navigator screenOptions={{ headerShown: false }}>
       <OrderStack.Screen name="Order" component={OrderScreen} />
       <OrderStack.Screen name="Cart" component={CartScreen} />
+        <OrderStack.Screen name="Pedidos" component={PedidosScreen} />
+
     </OrderStack.Navigator>
   );
 }

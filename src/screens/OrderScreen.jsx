@@ -297,11 +297,11 @@ const [selectedFlavors, setSelectedFlavors] = useState([]);
     setError("");
     try {
       const data = await getAppMenu({ active: true });
-        console.log("APP MENU FULL:", JSON.stringify(data, null, 2));
-        console.log(
+        //console.log("APP MENU FULL:", JSON.stringify(data, null, 2));
+       /* console.log(
   "MILK OPTIONS:",
   JSON.stringify(data?.[0]?.options?.milk, null, 2)
-);
+);*/
 
 
       setItems(Array.isArray(data) ? data : []);
@@ -396,66 +396,85 @@ function toggleFlavor(flavor) {
         <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
           {/* Top bar: titulo centrado + carrito */}
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
-            <View style={{ width: 44 }} />
+  <View style={{ flexDirection: "row", gap: 8, width: 96 }}>
+    <Pressable
+      onPress={() => navigation?.navigate?.("Pedidos")}
+      style={({ pressed }) => ({
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        backgroundColor: "#fff",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <Text style={{ fontSize: 16 }}>📦</Text>
+    </Pressable>
+  </View>
 
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.ink }}>
-                Ordena y recoge
-              </Text>
+  <View style={{ flex: 1, alignItems: "center" }}>
+    <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.ink }}>
+      Ordena y recoge
+    </Text>
 
-              <View
-                style={{
-                  marginTop: 6,
-                  height: 3,
-                  width: 76,
-                  borderRadius: 999,
-                  backgroundColor: COLORS.wine,
-                }}
-              />
+    <View
+      style={{
+        marginTop: 6,
+        height: 3,
+        width: 76,
+        borderRadius: 999,
+        backgroundColor: COLORS.wine,
+      }}
+    />
 
-              <Text style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
-                Pide desde la app y recoge sin filas
-              </Text>
-            </View>
+    <Text style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
+      Pide desde la app y recoge sin filas
+    </Text>
+  </View>
 
-            <Pressable
-              onPress={() => navigation?.navigate?.("Cart")}
-              style={({ pressed }) => ({
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                borderWidth: 1,
-                borderColor: COLORS.border,
-                backgroundColor: "#fff",
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Text style={{ fontSize: 18 }}>🛒</Text>
+  <View style={{ width: 96, alignItems: "flex-end" }}>
+    <Pressable
+      onPress={() => navigation?.navigate?.("Cart")}
+      style={({ pressed }) => ({
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        backgroundColor: "#fff",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      <Text style={{ fontSize: 18 }}>🛒</Text>
 
-              {cartCount > 0 ? (
-                <View
-                  style={{
-                    position: "absolute",
-                    top: 6,
-                    right: 6,
-                    minWidth: 18,
-                    height: 18,
-                    borderRadius: 9,
-                    backgroundColor: COLORS.wine,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingHorizontal: 5,
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "900" }}>
-                    {cartCount > 99 ? "99+" : String(cartCount)}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
-          </View>
+      {cartCount > 0 ? (
+        <View
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            backgroundColor: COLORS.wine,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 5,
+          }}
+        >
+          <Text style={{ color: "#fff", fontSize: 11, fontWeight: "900" }}>
+            {cartCount > 99 ? "99+" : String(cartCount)}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
+  </View>
+</View>
 
           {/* ✅ FILA A: Categorías horizontal (full width) */}
           <View style={{ marginTop: 8 }}>

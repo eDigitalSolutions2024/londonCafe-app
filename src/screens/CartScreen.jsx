@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { View, Text, FlatList, Image, Pressable, ActivityIndicator } from "react-native";
 import Screen from "../components/Screen";
 import { useCart } from "../context/CartContext";
+import { AuthContext } from "../context/AuthContext";
 import { useStripe } from "@stripe/stripe-react-native";
 import { apiFetch } from "../api/client"; // ✅ usa BASE_URL del client.js
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -113,6 +114,7 @@ function CartItem({ item, onInc, onDec, onRemove }) {
 }
 
 
+
 function buildOrderPayload(
   items,
   subtotal,
@@ -148,32 +150,12 @@ function buildOrderPayload(
 
 export default function CartScreen({ navigation }) {
   const { items, subtotal, inc, dec, remove, clear } = useCart();
+  const { user } = useContext(AuthContext);
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [paying, setPaying] = useState(false);
 
 
-  async function getLoggedUserName() {
-  try {
-    const raw =
-      (await AsyncStorage.getItem("user")) ||
-      (await AsyncStorage.getItem("me")) ||
-      (await AsyncStorage.getItem("auth_user"));
 
-    if (!raw) return "";
-
-    const parsed = JSON.parse(raw);
-    return (
-      parsed?.name ||
-      parsed?.fullName ||
-      parsed?.user?.name ||
-      parsed?.user?.fullName ||
-      parsed?.username ||
-      ""
-    );
-  } catch {
-    return "";
-  }
-}
 
 
 async function getLoggedUserData() {
@@ -239,50 +221,45 @@ async function getLoggedUserData() {
     const { error: payError } = await presentPaymentSheet();
     if (payError) throw new Error(payError.message);
 
-    let customerName = "";
-let customerPhone = "";
-let customerEmail = "";
+   
+let customerName = user?.name || user?.fullName || user?.username || "";
+let customerPhone = user?.phone || "";
+let customerEmail = user?.email || "";
 
-try {
-  const me = await apiFetch("/me");
-
-  customerName =
-    me?.user?.name ||
-    me?.user?.fullName ||
-    me?.user?.username ||
-    "";
-
-  customerPhone =
-    me?.user?.phone ||
-    "";
-
-  customerEmail =
-    me?.user?.email ||
-    "";
-} catch (e) {
-  console.log("[APP] no se pudo obtener /me");
-}
+const localUser = await getLoggedUserData();
 
 if (!customerName || !customerPhone || !customerEmail) {
-  const localUser = await getLoggedUserData();
-
   customerName =
     customerName ||
     localUser?.name ||
     localUser?.fullName ||
     localUser?.username ||
+    localUser?.user?.name ||
+    localUser?.user?.fullName ||
+    localUser?.user?.username ||
     "";
 
   customerPhone =
     customerPhone ||
     localUser?.phone ||
+    localUser?.user?.phone ||
     "";
 
   customerEmail =
     customerEmail ||
     localUser?.email ||
+    localUser?.user?.email ||
     "";
 }
+
+const finalUserId =
+  user?._id ||
+  user?.id ||
+  localUser?._id ||
+  localUser?.id ||
+  localUser?.user?._id ||
+  localUser?.user?.id ||
+  null;
 
 const orderPayload = buildOrderPayload(
   items,
@@ -293,11 +270,16 @@ const orderPayload = buildOrderPayload(
   customerEmail
 );
 
+orderPayload.userId = finalUserId;
+
+
+/*console.log("[APP] userId:", finalUserId);
+console.log("[APP] orderPayload:", JSON.stringify(orderPayload, null, 2));
 console.log("[APP] customerName:", customerName);
 console.log("[APP] customerPhone:", customerPhone);
 console.log("[APP] customerEmail:", customerEmail);
 console.log("[APP] orderPayload:", JSON.stringify(orderPayload, null, 2));
-
+*/
 
     const orderRes = await apiFetch("/orders/from-app", {
       method: "POST",
@@ -311,10 +293,10 @@ console.log("[APP] orderPayload:", JSON.stringify(orderPayload, null, 2));
     alert("Pago realizado ✅ Pedido enviado al café.");
     clear();
   } catch (e) {
-    console.log("[CartScreen] ERROR:", e);
+   /* console.log("[CartScreen] ERROR:", e);
     console.log("[CartScreen] STATUS:", e?.status);
     console.log("[CartScreen] DATA:", e?.data);
-
+*/
     alert(
       e?.data?.posData?.error ||
       e?.data?.posData?.details ||

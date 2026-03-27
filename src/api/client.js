@@ -1,7 +1,8 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 //const BASE_URL = "http://10.0.2.2:3001/api";
 const BASE_URL = "https://app.londoncafejrz.com/api";
-const POS_URL  = "https://api.londoncafejrz.com/api";
-
+const POS_URL = "https://api.londoncafejrz.com/api";
 
 async function parseJsonSafe(res) {
   const text = await res.text();
@@ -14,7 +15,12 @@ async function parseJsonSafe(res) {
 
 export async function apiFetch(path, options = {}) {
   const url = `${BASE_URL}${path}`;
-  console.log("[apiFetch] URL:", url);
+
+  const token =
+    (await AsyncStorage.getItem("token")) ||
+    (await AsyncStorage.getItem("auth_token")) ||
+    (await AsyncStorage.getItem("jwt")) ||
+    "";
 
   let res;
   try {
@@ -23,18 +29,16 @@ export async function apiFetch(path, options = {}) {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers || {}),
       },
     });
   } catch (fetchErr) {
-    console.log("[apiFetch] NETWORK ERROR:", fetchErr);
     const err = new Error(`NETWORK_ERROR: ${fetchErr?.message || "fetch failed"}`);
     throw err;
   }
 
   const data = await parseJsonSafe(res);
-  console.log("[apiFetch] STATUS:", res.status);
-  console.log("[apiFetch] DATA:", data);
 
   if (!res.ok) {
     const msg =
@@ -51,7 +55,6 @@ export async function apiFetch(path, options = {}) {
   return data;
 }
 
-// ✅ Para consumir tu API en AWS (promos puente)
 export async function posFetch(path, options = {}) {
   const url = `${POS_URL}${path}`;
 
