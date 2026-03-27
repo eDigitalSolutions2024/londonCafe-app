@@ -174,6 +174,65 @@ try {
   }
 }
 
+async function getMyOrders(req, res) {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        ok: false,
+        error: "USER_ID_REQUIRED",
+      });
+    }
+
+    console.log("[GET MY ORDERS] userId:", userId);
+
+    const posRes = await fetch(`${POS_URL}/orders/my/${userId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const posText = await posRes.text();
+    let posData = {};
+
+    try {
+      posData = posText ? JSON.parse(posText) : {};
+    } catch {
+      posData = { raw: posText };
+    }
+
+    console.log("[GET MY ORDERS] pos status:", posRes.status);
+    console.log("[GET MY ORDERS] pos data:", posData);
+
+    if (!posRes.ok) {
+      return res.status(502).json({
+        ok: false,
+        error: "POS_FETCH_ORDERS_FAILED",
+        posStatus: posRes.status,
+        posData,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      orders: Array.isArray(posData?.orders)
+        ? posData.orders
+        : Array.isArray(posData)
+        ? posData
+        : [],
+    });
+  } catch (error) {
+    console.error("getMyOrders error:", error);
+    return res.status(500).json({
+      ok: false,
+      error: error?.message || "INTERNAL_ERROR",
+    });
+  }
+}
+
 module.exports = {
   createOrderFromApp,
+   getMyOrders,
 };
