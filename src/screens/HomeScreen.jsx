@@ -723,7 +723,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
         </View>
 
         {/* Promociones */}
-        <PromosSection limit={5} onViewAll={() => navigation.navigate("Promos")} />
+        <PromosSection limit={5}  />
       </ScrollView>
 
       {/* ✅ MODAL PEEK */}

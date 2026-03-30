@@ -5,6 +5,8 @@ import {
   FlatList,
   ActivityIndicator,
   Pressable,
+  Modal,
+  ScrollView,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import Screen from "../components/Screen";
@@ -31,12 +33,37 @@ function getStatusLabel(status) {
   return status || "Sin estatus";
 }
 
+
+function getStatusConfig(status) {
+  if (status === "pending") {
+    return { label: "Pedido recibido", bg: "#F1F1F1", color: "#555" };
+  }
+  if (status === "sent_to_kitchen") {
+    return { label: "En preparación", bg: "#FFF4E5", color: "#B26A00" };
+  }
+  if (status === "ready") {
+    return { label: "Listo para recoger", bg: "#E3F2FD", color: "#1565C0" };
+  }
+  if (status === "delivered") {
+    return { label: "Entregado", bg: "#E8F5E9", color: "#2E7D32" };
+  }
+  return { label: status || "Sin estatus", bg: "#eee", color: "#333" };
+}
+
+function formatOrderItems(order) {
+  if (Array.isArray(order?.items)) return order.items;
+  if (Array.isArray(order?.products)) return order.products;
+  return [];
+}
+
 export default function PedidosScreen() {
   const navigation = useNavigation();
   const { user } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+const [showOrderModal, setShowOrderModal] = useState(false);
 
   async function loadOrders() {
     const userId = user?._id || user?.id;
@@ -128,23 +155,16 @@ export default function PedidosScreen() {
             data={orders}
             keyExtractor={(item) => String(item._id)}
             renderItem={({ item }) => {
-  const statusConfig = {
-    pending: { label: "Pedido recibido", bg: "#F1F1F1", color: "#555" },
-    sent_to_kitchen: { label: "En preparación", bg: "#FFF4E5", color: "#B26A00" },
-    ready: { label: "Listo para recoger", bg: "#E3F2FD", color: "#1565C0" },
-    delivered: { label: "Entregado", bg: "#E8F5E9", color: "#2E7D32" },
-  };
-
-  const status = statusConfig[item.status] || {
-    label: item.status,
-    bg: "#eee",
-    color: "#333",
-  };
+  const status = getStatusConfig(item.status);
 
   return (
     <Pressable
-      style={{
-        backgroundColor: "#fff",
+  onPress={() => {
+    setSelectedOrder(item);
+    setShowOrderModal(true);
+  }}
+  style={{
+    backgroundColor: "#fff",
         borderRadius: 18,
         padding: 16,
         marginBottom: 14,
@@ -200,6 +220,18 @@ export default function PedidosScreen() {
       >
         {money(item?.totals?.grandTotal || item?.totals?.subtotal || 0)}
       </Text>
+
+      <Text
+  style={{
+    marginTop: 6,
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: "700",
+  }}
+>
+  Toca para ver el detalle
+</Text>
+
     </Pressable>
   );
 }}
@@ -211,6 +243,269 @@ export default function PedidosScreen() {
           />
         )}
       </View>
+
+
+
+      <Modal
+  visible={showOrderModal}
+  transparent
+  animationType="fade"
+  onRequestClose={() => {
+    setShowOrderModal(false);
+    setSelectedOrder(null);
+  }}
+>
+  <View
+    style={{
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      justifyContent: "center",
+      padding: 18,
+    }}
+  >
+    <View
+      style={{
+        maxHeight: "82%",
+        backgroundColor: "#fff",
+        borderRadius: 22,
+        padding: 18,
+      }}
+    >
+      {selectedOrder ? (
+        <>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "900",
+                  color: COLORS.ink,
+                }}
+              >
+                Pedido #{String(selectedOrder._id).slice(-6)}
+              </Text>
+
+              <Text style={{ marginTop: 4, color: COLORS.muted }}>
+                {new Date(selectedOrder.createdAt).toLocaleString()}
+              </Text>
+            </View>
+
+            <Pressable
+              onPress={() => {
+                setShowOrderModal(false);
+                setSelectedOrder(null);
+              }}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: "#F4F4F4",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: "900", color: COLORS.ink }}>
+                ×
+              </Text>
+            </Pressable>
+          </View>
+
+          <View
+            style={{
+              alignSelf: "flex-start",
+              backgroundColor: getStatusConfig(selectedOrder.status).bg,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 999,
+              marginBottom: 14,
+            }}
+          >
+            <Text
+              style={{
+                color: getStatusConfig(selectedOrder.status).color,
+                fontWeight: "800",
+              }}
+            >
+              {getStatusConfig(selectedOrder.status).label}
+            </Text>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: COLORS.border,
+                borderRadius: 16,
+                padding: 14,
+                marginBottom: 14,
+              }}
+            >
+              <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+                Resumen
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <Text style={{ color: COLORS.muted }}>Subtotal</Text>
+                <Text style={{ fontWeight: "800", color: COLORS.ink }}>
+                  {money(selectedOrder?.totals?.subtotal || 0)}
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <Text style={{ color: COLORS.muted }}>Impuestos</Text>
+                <Text style={{ fontWeight: "800", color: COLORS.ink }}>
+                  {money(selectedOrder?.totals?.tax || 0)}
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginTop: 8,
+                  paddingTop: 10,
+                  borderTopWidth: 1,
+                  borderTopColor: COLORS.border,
+                }}
+              >
+                <Text style={{ fontWeight: "900", color: COLORS.ink }}>Total</Text>
+                <Text style={{ fontWeight: "900", color: COLORS.wine, fontSize: 18 }}>
+                  {money(
+                    selectedOrder?.totals?.grandTotal ||
+                      selectedOrder?.totals?.subtotal ||
+                      0
+                  )}
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: COLORS.border,
+                borderRadius: 16,
+                padding: 14,
+              }}
+            >
+              <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 10 }}>
+                Productos
+              </Text>
+
+              {formatOrderItems(selectedOrder).length ? (
+                formatOrderItems(selectedOrder).map((prod, idx) => {
+                  const qty = Number(prod?.qty || prod?.quantity || 1);
+                  const name =
+                    prod?.nameSnapshot ||
+                    prod?.title ||
+                    prod?.name ||
+                    "Producto";
+                  const lineTotal =
+                    prod?.lineTotal ??
+                    (Number(prod?.unitPrice || prod?.price || 0) * qty);
+
+                  return (
+                    <View
+                      key={`${name}-${idx}`}
+                      style={{
+                        paddingVertical: 10,
+                        borderTopWidth: idx === 0 ? 0 : 1,
+                        borderTopColor: COLORS.border,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        <View style={{ flex: 1, paddingRight: 10 }}>
+                          <Text
+                            style={{
+                              fontWeight: "900",
+                              color: COLORS.ink,
+                              fontSize: 15,
+                            }}
+                          >
+                            {qty} × {name}
+                          </Text>
+
+                          {prod?.milkType ? (
+                            <Text style={{ marginTop: 4, color: COLORS.muted, fontSize: 12 }}>
+                              Leche: {prod.milkType}
+                            </Text>
+                          ) : null}
+
+                          {prod?.temp ? (
+                            <Text style={{ marginTop: 2, color: COLORS.muted, fontSize: 12 }}>
+                              Temperatura: {prod.temp}
+                            </Text>
+                          ) : null}
+
+                          {Array.isArray(prod?.flavors) && prod.flavors.length > 0 ? (
+                            <Text style={{ marginTop: 2, color: COLORS.muted, fontSize: 12 }}>
+                              Sabores: {prod.flavors.join(", ")}
+                            </Text>
+                          ) : null}
+
+                          {Array.isArray(prod?.modifiersApplied) &&
+                          prod.modifiersApplied.length > 0 ? (
+                            <Text style={{ marginTop: 2, color: COLORS.muted, fontSize: 12 }}>
+                              Extras:{" "}
+                              {prod.modifiersApplied
+                                .map((m) => m?.name)
+                                .filter(Boolean)
+                                .join(", ")}
+                            </Text>
+                          ) : null}
+
+                          {prod?.notes ? (
+                            <Text style={{ marginTop: 2, color: COLORS.muted, fontSize: 12 }}>
+                              Nota: {prod.notes}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <Text style={{ fontWeight: "900", color: COLORS.wine }}>
+                          {money(lineTotal)}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={{ color: COLORS.muted }}>
+                  No hay detalle de productos disponible.
+                </Text>
+              )}
+            </View>
+          </ScrollView>
+        </>
+      ) : null}
+    </View>
+  </View>
+</Modal>
+
+
     </Screen>
   );
 }
