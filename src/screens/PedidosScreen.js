@@ -1,5 +1,12 @@
 import React, { useContext, useEffect, useState } from "react";
-import { View, Text, FlatList, ActivityIndicator, Pressable } from "react-native";
+import {
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  Pressable,
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import Screen from "../components/Screen";
 import { AuthContext } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
@@ -25,6 +32,7 @@ function getStatusLabel(status) {
 }
 
 export default function PedidosScreen() {
+  const navigation = useNavigation();
   const { user } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -65,6 +73,26 @@ export default function PedidosScreen() {
     <Screen>
       <View style={{ flex: 1, backgroundColor: COLORS.bg, padding: 16 }}>
         <View style={{ marginBottom: 14 }}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={{
+              alignSelf: "flex-start",
+              marginBottom: 14,
+              paddingHorizontal: 14,
+              height: 40,
+              borderRadius: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: 1,
+              borderColor: COLORS.border,
+              backgroundColor: "#fff",
+            }}
+          >
+            <Text style={{ color: COLORS.ink, fontWeight: "900" }}>
+              ← Regresar
+            </Text>
+          </Pressable>
+
           <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.ink }}>
             Pedidos
           </Text>
