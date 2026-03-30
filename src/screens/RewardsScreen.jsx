@@ -7,13 +7,12 @@ import {
   Image,
   ScrollView,
   RefreshControl,
-  Alert,
 } from "react-native";
 
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
-import { apiFetch, posFetch } from "../api/client"; // ✅ apiFetch:3001 | posFetch:4000
+import { apiFetch} from "../api/client"; // ✅ apiFetch:3001 | posFetch:4000
 import AvatarPreview from "../components/AvatarPreview";
 import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
 
@@ -118,53 +117,8 @@ export default function RewardsScreen({ navigation }) {
     }
   }, [lifetimePoints]);
 
-  // ✅ generar QR (en POS backend:4000)
-  const handleRedeem = useCallback(
-    async (rewardType) => {
-      if (!token) return;
-
-      if (rawPoints < VIP_THRESHOLD) {
-        Alert.alert("Puntos insuficientes", "Necesitas 200 puntos para generar este canje.");
-        return;
-      }
-
-      try {
-        setLoading(true);
-
-        const r = await apiFetch("/rewards/redeem", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ rewardType }),
-        });
-
-        if (!r?.ok || !r?.token) {
-          Alert.alert("No se pudo generar el QR", r?.message || "Intenta de nuevo.");
-          return;
-        }
-
-        navigation.navigate("RedeemQR", {
-          token: r.token,
-          rewardType,
-          expiresAt: r.expiresAt,
-        });
-      } catch (e) {
-        console.log("❌ redeem status:", e?.status);
-        console.log("❌ redeem data:", e?.data);
-        console.log("❌ redeem msg:", e?.message);
-
-        Alert.alert(
-          "Error",
-          e?.data?.message || e?.data?.error || e?.message || "No se pudo generar el QR."
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [token, rawPoints, navigation]
-  );
+  // ✅ generar QR (en POS backend:4000)+
+ 
 
   return (
     <Screen>
@@ -176,9 +130,25 @@ export default function RewardsScreen({ navigation }) {
         <View style={styles.headerTop}>
           <Text style={styles.pageTitle}>Recompensas</Text>
 
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.85}>
-            <Text style={styles.backText}>Volver</Text>
-          </TouchableOpacity>
+          <TouchableOpacity
+  onPress={() => navigation.goBack()}
+  activeOpacity={0.85}
+  style={{
+    alignSelf: "flex-start",
+    paddingHorizontal: 14,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: "#fff",
+  }}
+>
+  <Text style={{ color: colors.text, fontWeight: "900" }}>
+    ← Regresar
+  </Text>
+</TouchableOpacity>
         </View>
 
         {/* Card 1: Puntos */}
@@ -245,53 +215,23 @@ export default function RewardsScreen({ navigation }) {
         <View style={styles.card}>
           <Text style={styles.cardLabel}>Beneficios</Text>
 
-          <Text style={styles.bullet}>• Canje de productos gratis</Text>
+          <Text style={styles.bullet}>• Usa tus Buddy Coins como descuento en el café</Text>
           <Text style={styles.bullet}>• Accesorios para avatar</Text>
 
           {isVIP ? (
-            <>
-              <Text style={styles.bullet}>• Mascota especial 🐾</Text>
-              <Text style={styles.bullet}>• Accesorios premium (raros)</Text>
-              <Text style={styles.bullet}>• 1 recompensa VIP mensual</Text>
-              <Text style={styles.bullet}>• Acceso anticipado a promociones</Text>
-            </>
-          ) : (
-            <Text style={styles.locked}>🔒 Desbloquea beneficios VIP al llegar a 200 puntos</Text>
-          )}
+  <>
+    <Text style={styles.bullet}>• Descuentos especiales para miembros VIP</Text>
+    <Text style={styles.bullet}>• Accesorios para avatar</Text>
+    <Text style={styles.bullet}>• Mascota especial 🐾</Text>
+    <Text style={styles.bullet}>• Accesorios premium (raros)</Text>
+    <Text style={styles.bullet}>• Acceso anticipado a promociones</Text>
+  </>
+) : (
+  <Text style={styles.locked}>🔒 Desbloquea beneficios VIP al llegar a 200 puntos</Text>
+)}
         </View>
 
-        {/* Card 4: Canjear */}
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>Canjear</Text>
-
-          <View style={styles.redeemRow}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              style={[styles.redeemBtn, rawPoints < VIP_THRESHOLD && styles.redeemBtnDisabled]}
-              onPress={() => handleRedeem("coffee_free")}
-              disabled={rawPoints < VIP_THRESHOLD || loading}
-            >
-              <Text style={styles.redeemBtnTitle}>Café gratis</Text>
-              <Text style={styles.redeemBtnSub}>200 puntos</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.9}
-              style={[styles.redeemBtn, rawPoints < VIP_THRESHOLD && styles.redeemBtnDisabled]}
-              onPress={() => handleRedeem("bread_free")}
-              disabled={rawPoints < VIP_THRESHOLD || loading}
-            >
-              <Text style={styles.redeemBtnTitle}>Pan gratis</Text>
-              <Text style={styles.redeemBtnSub}>200 puntos</Text>
-            </TouchableOpacity>
-          </View>
-
-          {rawPoints < VIP_THRESHOLD ? (
-            <Text style={styles.locked}>🔒 Te faltan {VIP_THRESHOLD - rawPoints} puntos para poder generar un QR</Text>
-          ) : (
-            <Text style={styles.helper}>Genera el QR y muéstralo en caja para canjear.</Text>
-          )}
-        </View>
+     
 
         <View style={{ height: 16 }} />
       </ScrollView>
@@ -311,21 +251,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 32,
     fontWeight: "900",
-  },
-
-  backBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: "transparent",
-  },
-
-  backText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: "800",
   },
 
   card: {
@@ -436,25 +361,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  redeemRow: { flexDirection: "row", gap: 12 },
-
-  redeemBtn: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 2,
-  },
-
-  redeemBtnDisabled: { opacity: 0.45 },
-
-  redeemBtnTitle: { color: colors.text, fontSize: 15, fontWeight: "900" },
-  redeemBtnSub: { marginTop: 4, color: colors.textMuted, fontSize: 12, fontWeight: "800" },
+ 
 });

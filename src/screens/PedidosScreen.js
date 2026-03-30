@@ -127,47 +127,82 @@ export default function PedidosScreen() {
           <FlatList
             data={orders}
             keyExtractor={(item) => String(item._id)}
-            renderItem={({ item }) => (
-              <View
-                style={{
-                  backgroundColor: "#fff",
-                  borderWidth: 1,
-                  borderColor: COLORS.border,
-                  borderRadius: 16,
-                  padding: 14,
-                  marginBottom: 12,
-                }}
-              >
-                <Text style={{ fontWeight: "900", fontSize: 16, color: COLORS.ink }}>
-                  Pedido #{String(item._id).slice(-6)}
-                </Text>
+            renderItem={({ item }) => {
+  const statusConfig = {
+    pending: { label: "Pedido recibido", bg: "#F1F1F1", color: "#555" },
+    sent_to_kitchen: { label: "En preparación", bg: "#FFF4E5", color: "#B26A00" },
+    ready: { label: "Listo para recoger", bg: "#E3F2FD", color: "#1565C0" },
+    delivered: { label: "Entregado", bg: "#E8F5E9", color: "#2E7D32" },
+  };
 
-                <Text style={{ marginTop: 6, color: COLORS.muted }}>
-                  {new Date(item.createdAt).toLocaleString()}
-                </Text>
+  const status = statusConfig[item.status] || {
+    label: item.status,
+    bg: "#eee",
+    color: "#333",
+  };
 
-                <Text style={{ marginTop: 8, color: COLORS.ink, fontWeight: "700" }}>
-                  Total: {money(item?.totals?.grandTotal || item?.totals?.subtotal || 0)}
-                </Text>
+  return (
+    <Pressable
+      style={{
+        backgroundColor: "#fff",
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 14,
 
-                <View
-                  style={{
-                    marginTop: 10,
-                    alignSelf: "flex-start",
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 999,
-                    backgroundColor: COLORS.wineSoft,
-                    borderWidth: 1,
-                    borderColor: COLORS.wine,
-                  }}
-                >
-                  <Text style={{ color: COLORS.wine, fontWeight: "900" }}>
-                    {getStatusLabel(item.status)}
-                  </Text>
-                </View>
-              </View>
-            )}
+        shadowColor: "#000",
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+        elevation: 3,
+      }}
+    >
+      {/* HEADER */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ fontWeight: "900", fontSize: 16, color: COLORS.ink }}>
+          Pedido #{String(item._id).slice(-6)}
+        </Text>
+
+        {/* STATUS */}
+        <View
+          style={{
+            backgroundColor: status.bg,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            borderRadius: 999,
+          }}
+        >
+          <Text style={{ color: status.color, fontWeight: "700", fontSize: 12 }}>
+            {status.label}
+          </Text>
+        </View>
+      </View>
+
+      {/* FECHA */}
+      <Text style={{ marginTop: 6, color: COLORS.muted, fontSize: 13 }}>
+        {new Date(item.createdAt).toLocaleString()}
+      </Text>
+
+      {/* DIVIDER */}
+      <View
+        style={{
+          height: 1,
+          backgroundColor: COLORS.border,
+          marginVertical: 10,
+        }}
+      />
+
+      {/* TOTAL */}
+      <Text
+        style={{
+          fontSize: 18,
+          fontWeight: "900",
+          color: COLORS.wine,
+        }}
+      >
+        {money(item?.totals?.grandTotal || item?.totals?.subtotal || 0)}
+      </Text>
+    </Pressable>
+  );
+}}
             ListEmptyComponent={
               <Text style={{ color: COLORS.muted }}>
                 Aún no tienes pedidos.
