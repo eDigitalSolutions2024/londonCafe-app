@@ -347,8 +347,12 @@ console.log("[APP] orderPayload:", JSON.stringify(orderPayload, null, 2));
       throw new Error(orderRes?.error || "El pago pasó, pero no se pudo crear el pedido.");
     }
 
-    alert("Pago realizado ✅ Pedido enviado al café.");
+   
     clear();
+
+navigation.navigate("Order", {
+  playOrderBubble: true,
+});
   } catch (e) {
    /* console.log("[CartScreen] ERROR:", e);
     console.log("[CartScreen] STATUS:", e?.status);

@@ -12,7 +12,7 @@ import { AuthContext } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
 
 const COLORS = {
-  bg: "#FFFFFF",
+  bg: "#F7F7F7",
   ink: "#1B1B1B",
   muted: "rgba(27,27,27,0.55)",
   border: "rgba(27,27,27,0.10)",

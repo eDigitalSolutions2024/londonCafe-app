@@ -7,14 +7,19 @@ import {
   Pressable,
   ActivityIndicator,
   StatusBar,
+  Animated,
 } from "react-native";
 import Screen from "../components/Screen";
 import { getAppMenu } from "../api/appMenu";
 
 import { useCart } from "../context/CartContext";
+import { apiFetch } from "../api/client";
+import { useContext } from "react";
+import { AuthContext } from "../context/AuthContext";
+
 
 const COLORS = {
-  bg: "#FFFFFF",
+  bg: "#F7F7F7",
   card: "#FFFFFF",
   ink: "#1B1B1B",
   muted: "rgba(27,27,27,0.55)",
@@ -275,7 +280,7 @@ function ProductRow({ item, onAdd }) {
   );
 }
 
-export default function OrderScreen({ navigation }) {
+export default function OrderScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
@@ -287,10 +292,18 @@ export default function OrderScreen({ navigation }) {
   const [selectedMilk, setSelectedMilk] = useState(null);
 const [selectedTemp, setSelectedTemp] = useState(null);
 const [selectedFlavors, setSelectedFlavors] = useState([]);
+const [activeOrdersCount, setActiveOrdersCount] = useState(0);
+const [badgeScale] = useState(new Animated.Value(1));
 
+const [showOrderBubble, setShowOrderBubble] = useState(false);
+const [bubbleX] = useState(new Animated.Value(0));
+const [bubbleY] = useState(new Animated.Value(0));
+const [bubbleScale] = useState(new Animated.Value(1));
+const [bubbleOpacity] = useState(new Animated.Value(0));
 
   // si ya tienes carrito real, conecta esto a tu store/context
  const { cartCount, add } = useCart();
+ const { user } = useContext(AuthContext);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -314,9 +327,122 @@ const [selectedFlavors, setSelectedFlavors] = useState([]);
     }
   }, []);
 
+
+
+
+  const loadActiveOrdersCount = useCallback(async () => {
+  try {
+    const userId = user?._id || user?.id;
+
+    if (!userId) {
+      setActiveOrdersCount(0);
+      return;
+    }
+
+    const data = await apiFetch(`/orders/my/${userId}`);
+
+    if (!data?.ok) {
+      setActiveOrdersCount(0);
+      return;
+    }
+
+    const orders = Array.isArray(data.orders) ? data.orders : [];
+
+    const count = orders.filter((o) =>
+      ["pending", "sent_to_kitchen", "ready"].includes(o?.status)
+    ).length;
+
+    setActiveOrdersCount(count);
+  } catch (e) {
+    console.log("activeOrders error:", e);
+    setActiveOrdersCount(0);
+  }
+}, [user]);
+
+const playOrderBubbleAnimation = useCallback(() => {
+  setShowOrderBubble(true);
+
+  bubbleX.setValue(0);
+  bubbleY.setValue(0);
+  bubbleScale.setValue(1);
+  bubbleOpacity.setValue(1);
+
+  Animated.parallel([
+    Animated.timing(bubbleX, {
+      toValue: -150,
+      duration: 850,
+      useNativeDriver: true,
+    }),
+    Animated.timing(bubbleY, {
+      toValue: -690,
+      duration: 850,
+      useNativeDriver: true,
+    }),
+    Animated.sequence([
+      Animated.timing(bubbleScale, {
+        toValue: 1.12,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bubbleScale, {
+        toValue: 0.72,
+        duration: 670,
+        useNativeDriver: true,
+      }),
+    ]),
+  ]).start(() => {
+    setShowOrderBubble(false);
+    loadActiveOrdersCount();
+  });
+}, [bubbleOpacity, bubbleScale, bubbleX, bubbleY, loadActiveOrdersCount]);
+
+
   useEffect(() => {
-    load();
-  }, [load]);
+  load();
+  loadActiveOrdersCount();
+}, [load, loadActiveOrdersCount]);
+
+// 🔄 refrescar pedidos al volver
+useEffect(() => {
+  const unsub = navigation.addListener("focus", () => {
+    loadActiveOrdersCount();
+  });
+
+  return unsub;
+}, [navigation, loadActiveOrdersCount]);
+
+
+useEffect(() => {
+  if (route?.params?.playOrderBubble) {
+    const timer = setTimeout(() => {
+      playOrderBubbleAnimation();
+
+      navigation.setParams({
+        playOrderBubble: false,
+      });
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }
+}, [route?.params?.playOrderBubble, playOrderBubbleAnimation, navigation]);
+
+// 🎬 animación del badge
+useEffect(() => {
+  if (activeOrdersCount > 0) {
+    Animated.sequence([
+      Animated.timing(badgeScale, {
+        toValue: 1.25,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+      Animated.timing(badgeScale, {
+        toValue: 1,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }
+}, [activeOrdersCount, badgeScale]);
 
   const categories = useMemo(() => {
     const set = new Set(items.map((x) => normalizeCategory(x.category)));
@@ -397,23 +523,46 @@ function toggleFlavor(flavor) {
           {/* Top bar: titulo centrado + carrito */}
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
   <View style={{ flexDirection: "row", gap: 8, width: 96 }}>
-    <Pressable
-      onPress={() => navigation?.navigate?.("Pedidos")}
-      style={({ pressed }) => ({
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        backgroundColor: "#fff",
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: pressed ? 0.85 : 1,
-      })}
-    >
-      <Text style={{ fontSize: 16 }}>📦</Text>
-    </Pressable>
-  </View>
+  <Pressable
+    onPress={() => navigation?.navigate?.("Pedidos")}
+    style={({ pressed }) => ({
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      backgroundColor: "#fff",
+      alignItems: "center",
+      justifyContent: "center",
+      opacity: pressed ? 0.85 : 1,
+      position: "relative",
+    })}
+  >
+    <Text style={{ fontSize: 16 }}>📦</Text>
+
+    {activeOrdersCount > 0 ? (
+  <Animated.View
+    style={{
+      position: "absolute",
+      top: -4,
+      right: -4,
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: "#B00020",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 4,
+      transform: [{ scale: badgeScale }],
+    }}
+  >
+    <Text style={{ color: "#fff", fontSize: 10, fontWeight: "900" }}>
+      {activeOrdersCount > 99 ? "99+" : activeOrdersCount}
+    </Text>
+  </Animated.View>
+) : null}
+  </Pressable>
+</View>
 
   <View style={{ flex: 1, alignItems: "center" }}>
     <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.ink }}>
@@ -820,6 +969,42 @@ selectedItem.options.flavors.choices.length > 0 ? (
             </View>
           </View>
         ) : null}
+
+
+
+        {showOrderBubble ? (
+  <Animated.View
+    pointerEvents="none"
+    style={{
+      position: "absolute",
+      bottom: 110,
+      left: "50%",
+      marginLeft: -26,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: COLORS.wine,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 5,
+      opacity: bubbleOpacity,
+      transform: [
+        { translateX: bubbleX },
+        { translateY: bubbleY },
+        { scale: bubbleScale },
+      ],
+    }}
+  >
+    <Text style={{ color: "#fff", fontSize: 22, fontWeight: "900" }}>
+      📦
+    </Text>
+  </Animated.View>
+) : null}
+
+
       </View>
     </Screen>
   );
