@@ -17,7 +17,7 @@ import { login as loginApi } from "../api/auth";
 import { AuthContext } from "../context/AuthContext";
 
 // ✅ Logo LondonCafe (ajusta la ruta/extensión si es necesario)
-import LondonCafeLogo from "../assets/markers/londoncafe.jpg";
+import LondonCafeLogo from "../assets/markers/londoncafe1.jpg";
 
 export default function LoginScreen({ route, navigation }) {
   const presetEmail = route?.params?.email || "";

@@ -28,7 +28,7 @@ import PointsStepperBar from "../components/PointsStepperBar";
 import MaskedView from "@react-native-masked-view/masked-view";
 
 import BoothMask from "../assets/markers/London.png";
-import LondonCafeLogo from "../assets/markers/londoncafe.jpg";
+import LondonCafeLogo from "../assets/markers/londoncafe1.jpg";
 // Promociones desde POS
 import PromosSection from "../components/PromoSection";
 

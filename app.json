@@ -1,29 +1,23 @@
 {
   "expo": {
-    "name": "londoncafe-app",
-    "slug": "londoncafe-app",
+    "name": "London Cafe",
+    "slug": "london-cafe",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-
     "ios": {
       "supportsTablet": true,
-      "config": {
-        "googleMapsApiKey": "TU_API_KEY_AQUI"
-      },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa."
       }
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -33,16 +27,25 @@
       "permissions": [
         "android.permission.CAMERA"
       ],
-      "package": "com.anonymous.londoncafeapp",
-      "config": {
-        "googleMaps": {
-          "apiKey": "TU_API_KEY_AQUI"
-        }
-      }
+      "package": "com.londoncafe.app",
+      "versionCode": 1
     },
-
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3175c555-2e1c-4033-83dd-9a40012f5846"
+      }
+    },
+    "plugins": [
+  [
+    "@stripe/stripe-react-native",
+    {
+      "merchantIdentifier": "merchant.com.londoncafe.app",
+      "enableGooglePay": true
     }
+  ]
+]
   }
 }
