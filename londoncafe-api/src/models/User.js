@@ -125,6 +125,19 @@ const userSchema = new mongoose.Schema(
 
     // ✅ Buddy
     buddy: { type: buddySchema, default: () => ({}) },
+
+     // ✅ Push notifications
+    expoPushToken: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    notificationPrefs: {
+      promos: { type: Boolean, default: true },
+      lowEnergy: { type: Boolean, default: true },
+      streak: { type: Boolean, default: true },
+    },
   },
   { timestamps: true }
 );

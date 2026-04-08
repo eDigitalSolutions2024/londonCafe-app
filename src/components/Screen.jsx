@@ -7,11 +7,14 @@ export default function Screen({
   children,
   style,
   safeStyle,
-  edges = ["top"], // ✅ SOLO top, para no duplicar laterales
+  edges = ["top"],
+  withPadding = true,
 }) {
   return (
     <SafeAreaView style={[styles.safe, safeStyle]} edges={edges}>
-      <View style={[styles.container, style]}>{children}</View>
+      <View style={[styles.container, !withPadding && styles.noPadding, style]}>
+        {children}
+      </View>
     </SafeAreaView>
   );
 }
@@ -23,6 +26,9 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 16, // ✅ estándar más estable que 20
+    paddingHorizontal: 16,
+  },
+  noPadding: {
+    paddingHorizontal: 16,
   },
 });

@@ -273,5 +273,56 @@ async function updateAvatar(req, res) {
     return res.status(500).json({ error: "SERVER_ERROR" });
   }
 }
+async function savePushToken(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
-module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak };
+    const { expoPushToken } = req.body || {};
+    if (!expoPushToken) {
+      return res.status(400).json({ error: "MISSING_TOKEN" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      uid,
+      { $set: { expoPushToken } },
+      { new: true }
+    );
+
+    return res.json({
+      ok: true,
+      expoPushToken: user.expoPushToken,
+    });
+  } catch (err) {
+    console.log("savePushToken FULL:", err);
+    return res.status(500).json({ error: "SERVER_ERROR" });
+  }
+}
+
+async function savePushToken(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const { expoPushToken } = req.body || {};
+    if (!expoPushToken) {
+      return res.status(400).json({ error: "MISSING_TOKEN" });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      uid,
+      { $set: { expoPushToken } },
+      { new: true }
+    );
+
+    return res.json({
+      ok: true,
+      expoPushToken: user.expoPushToken,
+    });
+  } catch (err) {
+    console.log("savePushToken FULL:", err);
+    return res.status(500).json({ error: "SERVER_ERROR" });
+  }
+}
+
+module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak, savePushToken, };

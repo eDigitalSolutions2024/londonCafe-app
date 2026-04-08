@@ -12,8 +12,13 @@ import {
   Easing,
   Image,
 } from "react-native";
+import {
+  registerForPushNotificationsAsync,
+  sendLocalNotification,
+  scheduleDailyStreakReminder,
+} from "../utils/notifications";
 
-import { AppState } from "react-native";
+
 import { useFocusEffect } from "@react-navigation/native";
 
 import { colors } from "../theme/colors";
@@ -375,27 +380,76 @@ useEffect(() => {
     }
   }, [token, user]);
 
+    const refreshingHomeRef = useRef(false);
+const firstFocusRef = useRef(true);
+
+const lowEnergyNotifiedRef = useRef(false);
+const pushTokenSentRef = useRef(false);
+
+  const refreshHome = useCallback(async () => {
+    if (!token || refreshingHomeRef.current) return;
+
+    try {
+      refreshingHomeRef.current = true;
+      await Promise.all([fetchPoints(), fetchMe()]);
+    } finally {
+      refreshingHomeRef.current = false;
+    }
+  }, [token, fetchPoints, fetchMe]);
+
+
   useEffect(() => {
-  if (!token) return;
+  if (!token || pushTokenSentRef.current) return;
 
-  const id = setInterval(() => {
-    fetchMe();
-  }, 30000);
+  (async () => {
+    try {
+      const expoPushToken = await registerForPushNotificationsAsync();
+      if (!expoPushToken) return;
 
-  return () => clearInterval(id);
-}, [token, fetchMe]);
+      await apiFetch("/me/push-token", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ expoPushToken }),
+      });
+
+      pushTokenSentRef.current = true;
+    } catch (e) {
+      console.log("❌ push-token:", e?.data || e?.message);
+    }
+  })();
+}, [token]);
 
 
 useEffect(() => {
+  if (!token) return;
+
+  scheduleDailyStreakReminder().catch((e) => {
+    console.log("❌ streak-reminder:", e?.message);
+  });
+}, [token]);
+ /*useEffect(() => {
+  if (!token) return;
+
+  const id = setInterval(() => {
+    refreshHome(); // 👈 importante
+  }, 30000);
+
+  return () => clearInterval(id);
+}, [token, refreshHome]);*/
+
+
+/*useEffect(() => {
   const sub = AppState.addEventListener("change", (state) => {
     if (state === "active") {
-      fetchMe();      // ✅ sincroniza streak al volver a la app
-      fetchPoints();
+      refreshHome();
     }
   });
 
   return () => sub.remove();
-}, [fetchMe, fetchPoints]);
+}, [refreshHome]);*/
 
 
 const playRewardAnimation = useCallback(({ prevEnergy, nextEnergy }) => {
@@ -584,12 +638,16 @@ const prevEnergy = Number.isFinite(Number(buddy?.energy)) ? Number(buddy.energy)
   }, []);
 
   // ✅ cada vez que abres Home, refresca puntos + perfil
-  useFocusEffect(
-    useCallback(() => {
-      fetchPoints();
-      fetchMe();
-    }, [fetchPoints, fetchMe])
-  );
+   
+
+useFocusEffect(
+  useCallback(() => {
+    if (firstFocusRef.current) {
+      firstFocusRef.current = false;
+      refreshHome();
+    }
+  }, [refreshHome])
+);
 
   const displayName = useMemo(() => {
     const n = (me?.name || user?.name || "London Buddy").trim();
@@ -613,18 +671,38 @@ const bread  = Number.isFinite(Number(buddy?.bread)) ? Number(buddy.bread) : 0;
 const mood = moodLabelFromEnergy(energy);
 const moodEmoji = moodEmojiFromEnergy(energy);
 
+
+useEffect(() => {
+  if (!Number.isFinite(Number(energy))) return;
+
+  if (energy < 50 && !lowEnergyNotifiedRef.current) {
+    lowEnergyNotifiedRef.current = true;
+
+    sendLocalNotification({
+      title: "Tu buddy necesita energía ☕",
+      body: "Tu energía bajó de 50%. Entra a darle café o pan.",
+      data: { type: "low-energy" },
+    });
+  }
+
+  if (energy >= 55) {
+    lowEnergyNotifiedRef.current = false;
+  }
+}, [energy]);
+
   return (
-    <Screen>
-      <ScrollView
+    <Screen edges={["top"]} withPadding={false}>
+            <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}
+        automaticallyAdjustKeyboardInsets={false}
+        contentContainerStyle={{ paddingTop: 0 }}
         refreshControl={
           <RefreshControl
             refreshing={loadingPoints || loadingMe}
-            onRefresh={async () => {
-              await fetchPoints();
-              await fetchMe();
-            }}
+            onRefresh={refreshHome}
           />
         }
       >

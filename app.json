@@ -15,8 +15,10 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa."
-      }
+        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.londoncafe.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,9 +26,6 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": [
-        "android.permission.CAMERA"
-      ],
       "package": "com.londoncafe.app",
       "versionCode": 1
     },
@@ -39,13 +38,13 @@
       }
     },
     "plugins": [
-  [
-    "@stripe/stripe-react-native",
-    {
-      "merchantIdentifier": "merchant.com.londoncafe.app",
-      "enableGooglePay": true
-    }
-  ]
-]
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.londoncafe.app",
+          "enableGooglePay": true
+        }
+      ]
+    ]
   }
 }

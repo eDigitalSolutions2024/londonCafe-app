@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Animated,
+  TextInput,
 } from "react-native";
 import Screen from "../components/Screen";
 import { getAppMenu } from "../api/appMenu";
@@ -193,7 +194,7 @@ function ProductTile({ item, onAdd }) {
     fontSize: 13,
   }}
 >
-  {item.title}
+  {(item.title || "").toUpperCase()}
 </Text>
 
 {item.description ? (
@@ -240,7 +241,7 @@ function ProductRow({ item, onAdd }) {
 
       <View style={{ flex: 1 }}>
   <Text style={{ fontWeight: "900", color: COLORS.ink }} numberOfLines={2}>
-    {item.title}
+    {(item.title || "").toUpperCase()}
   </Text>
 
   {item.description ? (
@@ -285,6 +286,7 @@ export default function OrderScreen({ navigation, route }) {
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [cat, setCat] = useState("");
+  const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
     const [selectedItem, setSelectedItem] = useState(null);
   const [showOptions, setShowOptions] = useState(false);
@@ -449,12 +451,31 @@ useEffect(() => {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [items]);
 
-  const filtered = useMemo(() => {
-    return items.filter((x) => {
+ const filtered = useMemo(() => {
+  const q = (search || "").trim().toLowerCase();
+
+  return items
+    .filter((x) => {
       if (cat && normalizeCategory(x.category) !== cat) return false;
-      return true;
-    });
-  }, [items, cat]);
+
+      if (!q) return true;
+
+      const title = String(x.title || "").toLowerCase();
+      const description = String(x.description || "").toLowerCase();
+      const category = String(x.category || "").toLowerCase();
+
+      return (
+        title.includes(q) ||
+        description.includes(q) ||
+        category.includes(q)
+      );
+    })
+    .sort((a, b) =>
+      (a.title || "").localeCompare(b.title || "", "es", {
+        sensitivity: "base",
+      })
+    );
+}, [items, cat, search]);
 
   function onAdd(item) {
   const opts = getEnabledOptions(item);
@@ -630,7 +651,45 @@ function toggleFlavor(flavor) {
             <CategoryPillsHorizontal categories={categories} value={cat} onChange={setCat} />
           </View>
 
+
+          <View style={{ marginTop: 10 }}>
+  <View
+    style={{
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#fff",
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      paddingHorizontal: 12,
+      height: 46,
+    }}
+  >
+    <Text style={{ fontSize: 16, marginRight: 8 }}>🔎</Text>
+
+    <TextInput
+      value={search}
+      onChangeText={setSearch}
+      placeholder="Buscar producto..."
+      placeholderTextColor="rgba(27,27,27,0.45)"
+      style={{
+        flex: 1,
+        color: COLORS.ink,
+        fontSize: 14,
+      }}
+    />
+
+    {search ? (
+      <Pressable onPress={() => setSearch("")}>
+        <Text style={{ fontSize: 16, color: COLORS.muted }}>✕</Text>
+      </Pressable>
+    ) : null}
+  </View>
+</View>
+
           {/* ✅ FILA B: Toggle + Actualizar (a la derecha) */}
+
+          
           <View
             style={{
               marginTop: 10,
