@@ -283,6 +283,12 @@ async function savePushToken(req, res) {
     if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
     const { expoPushToken } = req.body || {};
+
+    console.log("📲 savePushToken called");
+console.log("👤 uid:", uid);
+console.log("📩 expoPushToken recibido:", expoPushToken);
+
+
     if (!expoPushToken) {
       return res.status(400).json({ error: "MISSING_TOKEN" });
     }
@@ -293,6 +299,8 @@ async function savePushToken(req, res) {
       { new: true }
     );
 
+
+console.log("✅ expoPushToken guardado en BD");
     return res.json({
       ok: true,
       expoPushToken: user.expoPushToken,
