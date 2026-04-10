@@ -403,10 +403,20 @@ const pushTokenSentRef = useRef(false);
 
   (async () => {
     try {
-      const expoPushToken = await registerForPushNotificationsAsync();
-      if (!expoPushToken) return;
+      console.log("🚀 intentando registrar push");
 
-      await apiFetch("/me/push-token", {
+      const expoPushToken = await registerForPushNotificationsAsync();
+
+      console.log("📲 expoPushToken app:", expoPushToken);
+
+      if (!expoPushToken) {
+        console.log("❌ NO se generó expoPushToken");
+        return;
+      }
+
+      console.log("🌐 enviando a backend...");
+
+      const res = await apiFetch("/me/push-token", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -415,9 +425,12 @@ const pushTokenSentRef = useRef(false);
         body: JSON.stringify({ expoPushToken }),
       });
 
+      console.log("✅ respuesta backend:", res);
+
       pushTokenSentRef.current = true;
+
     } catch (e) {
-      console.log("❌ push-token:", e?.data || e?.message);
+      console.log("❌ ERROR push-token:", e?.data || e?.message);
     }
   })();
 }, [token]);

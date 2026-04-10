@@ -1,5 +1,4 @@
 // src/utils/push.js
-const fetch = require("node-fetch");
 
 async function sendExpoPushNotification(expoPushToken, title, body, data = {}) {
   if (!expoPushToken) throw new Error("Missing expoPushToken");
@@ -23,6 +22,13 @@ async function sendExpoPushNotification(expoPushToken, title, body, data = {}) {
   });
 
   const result = await response.json();
+
+  console.log("📩 Expo push response:", JSON.stringify(result, null, 2));
+
+  if (!response.ok) {
+    throw new Error(result?.errors?.[0]?.message || "EXPO_PUSH_FAILED");
+  }
+
   return result;
 }
 

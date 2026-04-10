@@ -399,4 +399,53 @@ async function sendLowEnergyPush(req, res) {
   }
 }
 
-module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak, savePushToken,testPush, sendLowEnergyPush,};
+async function sendStreakReminderPush(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    if (!user.expoPushToken) {
+      return res.status(400).json({ error: "NO_PUSH_TOKEN" });
+    }
+
+    const todayKey = dayKeyLocal(new Date());
+    const claimedToday = user?.buddy?.lastClaimDay === todayKey;
+    const streakCount = Number(user?.buddy?.streakCount || 0);
+
+    if (claimedToday) {
+      return res.status(400).json({
+        ok: false,
+        error: "ALREADY_CLAIMED_TODAY",
+        message: "Hoy ya reclamó su recompensa diaria.",
+      });
+    }
+
+    const result = await sendExpoPushNotification(
+      user.expoPushToken,
+      "No pierdas tu racha 🔥",
+      streakCount > 0
+        ? `Llevas ${streakCount} días de racha. Entra a reclamar tu recompensa de hoy.`
+        : "Entra a reclamar tu recompensa diaria y comienza una nueva racha.",
+      {
+        type: "streak-reminder",
+        streakCount,
+      }
+    );
+
+    return res.json({
+      ok: true,
+      streakCount,
+      result,
+    });
+  } catch (err) {
+    console.log("sendStreakReminderPush FULL:", err);
+    return res.status(500).json({
+      error: "SERVER_ERROR",
+      message: err?.message,
+    });
+  }
+}
+module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak, savePushToken,testPush, sendLowEnergyPush,sendStreakReminderPush,};

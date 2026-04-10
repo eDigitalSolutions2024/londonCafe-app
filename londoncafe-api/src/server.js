@@ -63,7 +63,7 @@ app.use("/api/sales", salesRoutes);
 app.use("/api/dev", require("./routes/dev"));
 app.use("/api/rewards", rewardsRoutes);
 app.use("/api/buddy", buddyRoutes);
-
+app.use("/api", require("./routes/internalPush.routes"));
 // ✅ Payments normal: /api/payments/sheet
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/giftcards", giftcardsRouter);
