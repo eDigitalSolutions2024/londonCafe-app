@@ -354,4 +354,65 @@ async function testPush(req, res) {
   }
 }
 
-module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak, savePushToken,testPush, };
+
+async function sendLowEnergyPush(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    // aplica desgaste real antes de revisar energía
+    const now = new Date();
+    applyEnergyDecay(user, now);
+
+    const energy = Number(user?.buddy?.energy || 0);
+
+    if (!user.expoPushToken) {
+      return res.status(400).json({ error: "NO_PUSH_TOKEN" });
+    }
+
+    if (!user.buddy) {
+      return res.status(400).json({ error: "NO_BUDDY" });
+    }
+
+    // si quieres que SOLO mande cuando esté baja:
+    if (energy >= 50) {
+      return res.status(400).json({
+        ok: false,
+        error: "ENERGY_NOT_LOW",
+        energy,
+        message: "La energía aún no está por debajo de 50.",
+      });
+    }
+
+    const result = await sendExpoPushNotification(
+      user.expoPushToken,
+      "Tu buddy necesita energía ☕",
+      `La energía de tu buddy está en ${energy}%. Entra a darle café o pan.`,
+      {
+        type: "low-energy",
+        energy,
+      }
+    );
+
+    // opcional: guardar por si applyEnergyDecay cambió energía
+    user.markModified("buddy");
+    await user.save();
+
+    return res.json({
+      ok: true,
+      energy,
+      result,
+    });
+  } catch (err) {
+    console.log("sendLowEnergyPush FULL:", err);
+    return res.status(500).json({
+      error: "SERVER_ERROR",
+      message: err?.message,
+    });
+  }
+}
+
+module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak, savePushToken,testPush, sendLowEnergyPush,};
