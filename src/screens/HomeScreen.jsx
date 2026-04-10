@@ -672,7 +672,7 @@ const mood = moodLabelFromEnergy(energy);
 const moodEmoji = moodEmojiFromEnergy(energy);
 
 
-useEffect(() => {
+/*useEffect(() => {
   if (!Number.isFinite(Number(energy))) return;
 
   if (energy < 50 && !lowEnergyNotifiedRef.current) {
@@ -688,8 +688,16 @@ useEffect(() => {
   if (energy >= 55) {
     lowEnergyNotifiedRef.current = false;
   }
-}, [energy]);
+}, [energy]);*/
 
+
+useEffect(() => {
+  sendLocalNotification({
+    title: "Prueba local ✅",
+    body: "Si ves esto, las notificaciones locales sí funcionan.",
+    data: { type: "test-local" },
+  });
+}, []);
   return (
     <Screen edges={["top"]} withPadding={false}>
             <ScrollView

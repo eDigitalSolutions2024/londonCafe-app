@@ -1,37 +1,55 @@
-import React, { useMemo, useRef, useCallback } from "react";
-import { View, StyleSheet, Platform, Pressable, Text, Linking, Image } from "react-native";
-import MapView, { Marker } from "react-native-maps";
-import { useFocusEffect } from "@react-navigation/native";
+import React, { useEffect, useRef } from "react";
+import {
+  View,
+  StyleSheet,
+  Platform,
+  Pressable,
+  Text,
+  Linking,
+  Animated,
+} from "react-native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { DeviceMotion } from "expo-sensors";
 import { colors } from "../theme/colors";
-import boothMarker from "../assets/markers/londoncafe.png";
+import locationBg from "../assets/MapsLondon.jpeg";
 
 const LAT = 31.70075;
 const LNG = -106.38848;
 
 export default function LocationScreen() {
-  const mapRef = useRef(null);
+  const tabBarHeight = useBottomTabBarHeight();
 
-  const region = useMemo(
-    () => ({
-      latitude: LAT,
-      longitude: LNG,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }),
-    []
-  );
+  const translateX = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
 
-  useFocusEffect(
-    useCallback(() => {
-      const t = setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.animateToRegion(region, 600);
-        }
-      }, 100);
+  useEffect(() => {
+    DeviceMotion.setUpdateInterval(80);
 
-      return () => clearTimeout(t);
-    }, [region])
-  );
+    const sub = DeviceMotion.addListener((motion) => {
+      const x = motion?.rotation?.beta ?? 0;  // inclinación adelante/atrás
+      const y = motion?.rotation?.gamma ?? 0; // inclinación izquierda/derecha
+
+      // limita el movimiento para que no se vea exagerado
+      const moveX = Math.max(-18, Math.min(18, y * 18));
+      const moveY = Math.max(-25, Math.min(25, x * 18));
+
+      Animated.spring(translateX, {
+        toValue: -moveX,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 6,
+      }).start();
+
+      Animated.spring(translateY, {
+        toValue: -moveY,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 6,
+      }).start();
+    });
+
+    return () => sub?.remove();
+  }, [translateX, translateY]);
 
   const openMaps = () => {
     const label = "LondonCafe";
@@ -51,32 +69,31 @@ export default function LocationScreen() {
 
   return (
     <View style={styles.wrap}>
-      {/*
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFill}
-        initialRegion={region}
-        showsUserLocation
-        showsMyLocationButton
-        toolbarEnabled={false}
-      >
-        <Marker
-          coordinate={{ latitude: LAT, longitude: LNG }}
-          title="LondonCafe"
-          description="Café de especialidad"
-          //anchor={{ x: 0.5, y: 1 }} // ✅ “punta” abajo centrada
+      <View style={styles.bg}>
+        <Animated.Image
+          source={locationBg}
+          resizeMode="cover"
+          style={[
+            styles.bgImage,
+            {
+              transform: [
+                { translateX },
+                { translateY },
+                { scale: 1.18 }, // la hacemos más grande para que haya “margen” al moverla
+              ],
+            },
+          ]}
+        />
+
+        <View style={styles.overlay} />
+
+        <Pressable
+          onPress={openMaps}
+          style={[styles.fab, { bottom: tabBarHeight + 16 }]}
         >
-          <Image
-            source={boothMarker}
-            style={styles.markerImg}
-            resizeMode="none"
-          />
-        </Marker>
-      </MapView>
-*/}
-      <Pressable onPress={openMaps} style={styles.fab}>
-        <Text style={styles.fabText}>Abrir en Maps</Text>
-      </Pressable>
+          <Text style={styles.fabText}>Abrir en Maps</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -86,24 +103,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-
-  // ✅ Ajusta tamaño del pin aquí
-  markerImg: {
-    width: 46,
-    height: 46,
+  bg: {
+    flex: 1,
+    overflow: "hidden",
   },
-
+  bgImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.18)",
+  },
   fab: {
     position: "absolute",
     left: 16,
     right: 16,
-    bottom: 18,
     backgroundColor: colors.primary,
     paddingVertical: 14,
     borderRadius: 999,
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
+    zIndex: 10,
+    elevation: 5,
   },
   fabText: {
     color: "#fff",
