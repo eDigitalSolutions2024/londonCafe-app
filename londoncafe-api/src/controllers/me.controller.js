@@ -12,6 +12,8 @@ const {
   addDaysToKey,// ✅
 } = require("../utils/buddy");
 
+const { sendExpoPushNotification } = require("../utils/push");
+
 const RECOVERY_COST = 25;
 
 /** helper: saca uid del token */
@@ -325,4 +327,31 @@ async function savePushToken(req, res) {
   }
 }
 
-module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak, savePushToken, };
+
+async function testPush(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    if (!user.expoPushToken) {
+      return res.status(400).json({ error: "NO_PUSH_TOKEN" });
+    }
+
+    const result = await sendExpoPushNotification(
+      user.expoPushToken,
+      "London Cafe 🔔",
+      "Esta es una prueba de notificación push",
+      { type: "test-push" }
+    );
+
+    return res.json({ ok: true, result });
+  } catch (err) {
+    console.log("testPush FULL:", err);
+    return res.status(500).json({ error: "SERVER_ERROR", message: err?.message });
+  }
+}
+
+module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak, savePushToken,testPush, };

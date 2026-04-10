@@ -7,14 +7,16 @@ import {
   Text,
   Linking,
   Animated,
+  Dimensions,
 } from "react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { DeviceMotion } from "expo-sensors";
 import { colors } from "../theme/colors";
-import locationBg from "../assets/MapsLondon.jpeg";
 
 const LAT = 31.70075;
 const LNG = -106.38848;
+
+const { width, height } = Dimensions.get("window");
 
 export default function LocationScreen() {
   const tabBarHeight = useBottomTabBarHeight();
@@ -23,28 +25,32 @@ export default function LocationScreen() {
   const translateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    DeviceMotion.setUpdateInterval(80);
+    DeviceMotion.setUpdateInterval(120);
 
     const sub = DeviceMotion.addListener((motion) => {
-      const x = motion?.rotation?.beta ?? 0;  // inclinación adelante/atrás
-      const y = motion?.rotation?.gamma ?? 0; // inclinación izquierda/derecha
+      const beta = motion?.rotation?.beta;
+      const gamma = motion?.rotation?.gamma;
 
-      // limita el movimiento para que no se vea exagerado
-      const moveX = Math.max(-18, Math.min(18, y * 18));
-      const moveY = Math.max(-25, Math.min(25, x * 18));
+      // si no vienen números válidos, no hacemos nada
+      if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
 
-      Animated.spring(translateX, {
+      // movimiento mucho más suave y controlado
+      const rawX = gamma * 10;
+      const rawY = beta * 6;
+
+      const moveX = Math.max(-22, Math.min(22, rawX));
+      const moveY = Math.max(-12, Math.min(12, rawY));
+
+      Animated.timing(translateX, {
         toValue: -moveX,
+        duration: 120,
         useNativeDriver: true,
-        speed: 20,
-        bounciness: 6,
       }).start();
 
-      Animated.spring(translateY, {
+      Animated.timing(translateY, {
         toValue: -moveY,
+        duration: 120,
         useNativeDriver: true,
-        speed: 20,
-        bounciness: 6,
       }).start();
     });
 
@@ -71,16 +77,12 @@ export default function LocationScreen() {
     <View style={styles.wrap}>
       <View style={styles.bg}>
         <Animated.Image
-          source={locationBg}
+          source={require("../assets/MapsLondon.jpeg")}
           resizeMode="cover"
           style={[
             styles.bgImage,
             {
-              transform: [
-                { translateX },
-                { translateY },
-                { scale: 1.18 }, // la hacemos más grande para que haya “margen” al moverla
-              ],
+              transform: [{ translateX }, { translateY }],
             },
           ]}
         />
@@ -106,11 +108,14 @@ const styles = StyleSheet.create({
   bg: {
     flex: 1,
     overflow: "hidden",
+    backgroundColor: "#000",
   },
   bgImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: "100%",
-    height: "100%",
+    position: "absolute",
+    top: -30,
+    left: -30,
+    width: width + 140,
+    height: height + 60,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,

@@ -21,10 +21,7 @@
       "bundleIdentifier": "com.londoncafe.app"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+      "icon": "./assets/favicon.png",
       "edgeToEdgeEnabled": true,
       "package": "com.londoncafe.app",
       "versionCode": 1
