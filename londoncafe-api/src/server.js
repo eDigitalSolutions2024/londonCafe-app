@@ -71,7 +71,7 @@ app.use("/api/giftcards", giftcardsRouter);
 app.use("/api/orders", orderRoutes);
 // start
 
-require("../cron/pushJobs");
+require("./cron/pushJobs");
 
 
 const PORT = process.env.PORT || 3001;
