@@ -12,8 +12,16 @@ Notifications.setNotificationHandler({
   }),
 });
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function registerForPushNotificationsAsync() {
   try {
+    console.log("📱 Device.isDevice:", Device.isDevice);
+    console.log("📦 Constants.expoConfig?.extra:", Constants?.expoConfig?.extra);
+    console.log("📦 Constants.easConfig:", Constants?.easConfig);
+
     if (!Device.isDevice) {
       console.log("❌ Push: no es dispositivo físico");
       return null;
@@ -53,42 +61,27 @@ export async function registerForPushNotificationsAsync() {
       return null;
     }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-    console.log("✅ Expo push token generado:", tokenData?.data);
+    let lastError = null;
 
-    return tokenData.data;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`📡 Intento token push #${attempt}`);
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+        console.log("✅ Expo push token generado:", tokenData?.data);
+        return tokenData?.data ?? null;
+      } catch (err) {
+        lastError = err;
+        console.log(`❌ intento #${attempt}:`, err?.message || err);
+        if (attempt < 3) {
+          await wait(2500 * attempt);
+        }
+      }
+    }
+
+    console.log("❌ registerForPushNotificationsAsync error final:", lastError?.message || lastError);
+    return null;
   } catch (e) {
     console.log("❌ registerForPushNotificationsAsync error:", e?.message || e);
     return null;
   }
-}
-
-export async function sendLocalNotification({ title, body, data = {} }) {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title,
-      body,
-      data,
-    },
-    trigger: null,
-  });
-}
-
-export async function scheduleDailyStreakReminder() {
-  await Notifications.cancelScheduledNotificationAsync("daily-streak-reminder").catch(() => {});
-
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "No pierdas tu racha 🔥",
-      body: "Entra hoy y reclama tu recompensa diaria.",
-      data: { type: "streak-reminder" },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: 19,
-      minute: 0,
-    },
-  });
-
-  return id;
 }

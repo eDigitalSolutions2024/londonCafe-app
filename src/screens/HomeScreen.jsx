@@ -14,8 +14,8 @@ import {
 } from "react-native";
 import {
   registerForPushNotificationsAsync,
-  sendLocalNotification,
-  scheduleDailyStreakReminder,
+  //sendLocalNotification,
+//  scheduleDailyStreakReminder,
 } from "../utils/notifications";
 
 
@@ -399,7 +399,7 @@ const lowEnergyNotifiedRef = useRef(false);
 
 
   useEffect(() => {
-  
+  if (!token) return;
 
   (async () => {
     try {
@@ -408,13 +408,12 @@ const lowEnergyNotifiedRef = useRef(false);
       const expoPushToken = await registerForPushNotificationsAsync();
 
       console.log("📲 expoPushToken app:", expoPushToken);
+      console.log("📲 typeof expoPushToken:", typeof expoPushToken);
 
       if (!expoPushToken) {
         console.log("❌ NO se generó expoPushToken");
         return;
       }
-
-      console.log("🌐 enviando a backend...");
 
       const res = await apiFetch("/me/push-token", {
         method: "POST",
@@ -426,9 +425,6 @@ const lowEnergyNotifiedRef = useRef(false);
       });
 
       console.log("✅ respuesta backend:", res);
-
-     
-
     } catch (e) {
       console.log("❌ ERROR push-token:", e?.data || e?.message);
     }
@@ -436,13 +432,15 @@ const lowEnergyNotifiedRef = useRef(false);
 }, [token]);
 
 
-useEffect(() => {
+/*useEffect(() => {
   if (!token) return;
 
   scheduleDailyStreakReminder().catch((e) => {
     console.log("❌ streak-reminder:", e?.message);
   });
 }, [token]);
+*/
+
  /*useEffect(() => {
   if (!token) return;
 
@@ -704,13 +702,16 @@ const moodEmoji = moodEmojiFromEnergy(energy);
 }, [energy]);*/
 
 
-useEffect(() => {
+/*useEffect(() => {
   sendLocalNotification({
     title: "Prueba local ✅",
     body: "Si ves esto, las notificaciones locales sí funcionan.",
     data: { type: "test-local" },
   });
-}, []);
+}, []);*/
+
+
+
   return (
     <Screen edges={["top"]} withPadding={false}>
             <ScrollView

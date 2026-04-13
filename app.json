@@ -24,6 +24,7 @@
       "icon": "./assets/favicon.png",
       "edgeToEdgeEnabled": true,
       "package": "com.londoncafe.app",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 1
     },
     "web": {

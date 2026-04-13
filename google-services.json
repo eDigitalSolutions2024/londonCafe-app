@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "952315116188",
+    "project_id": "londoncafe",
+    "storage_bucket": "londoncafe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:952315116188:android:fcf42c491f4f1211990b59",
+        "android_client_info": {
+          "package_name": "com.londoncafe.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBNs-whfY9JN6Wp8QKUuJ-_Lvd9Oyjjlh0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -70,6 +70,10 @@ app.use("/api/giftcards", giftcardsRouter);
 
 app.use("/api/orders", orderRoutes);
 // start
+
+require("./cron/pushJobs");
+
+
 const PORT = process.env.PORT || 3001;
 
 connectDB(process.env.MONGO_URI)
