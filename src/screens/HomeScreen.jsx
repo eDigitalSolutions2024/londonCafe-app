@@ -384,7 +384,7 @@ useEffect(() => {
 const firstFocusRef = useRef(true);
 
 const lowEnergyNotifiedRef = useRef(false);
-const pushTokenSentRef = useRef(false);
+
 
   const refreshHome = useCallback(async () => {
     if (!token || refreshingHomeRef.current) return;
@@ -399,7 +399,7 @@ const pushTokenSentRef = useRef(false);
 
 
   useEffect(() => {
-  if (!token || pushTokenSentRef.current) return;
+  
 
   (async () => {
     try {
@@ -427,7 +427,7 @@ const pushTokenSentRef = useRef(false);
 
       console.log("✅ respuesta backend:", res);
 
-      pushTokenSentRef.current = true;
+     
 
     } catch (e) {
       console.log("❌ ERROR push-token:", e?.data || e?.message);
