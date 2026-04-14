@@ -5,6 +5,7 @@ import { useCart } from "../context/CartContext";
 import { AuthContext } from "../context/AuthContext";
 import { useStripe } from "@stripe/stripe-react-native";
 import { apiFetch } from "../api/client"; // ✅ usa BASE_URL del client.js
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const COLORS = {
@@ -210,7 +211,7 @@ export default function CartScreen({ navigation }) {
   const { user } = useContext(AuthContext);
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [paying, setPaying] = useState(false);
-
+const tabBarHeight = useBottomTabBarHeight();
 
 
 
@@ -372,7 +373,14 @@ navigation.navigate("Order", {
 
   return (
     <Screen>
-      <View style={{ flex: 1, backgroundColor: COLORS.bg, padding: 16 }}>
+      <View
+  style={{
+    flex: 1,
+    backgroundColor: COLORS.bg,
+    padding: 16,
+    paddingBottom: tabBarHeight + 16,
+  }}
+>
         <View style={{ marginBottom: 16 }}>
   <View
     style={{
@@ -439,7 +447,7 @@ navigation.navigate("Order", {
               onRemove={() => remove(item.id)}
             />
           )}
-          contentContainerStyle={{ paddingBottom: 18 }}
+          contentContainerStyle={{ paddingBottom: 40 }}
 showsVerticalScrollIndicator={false}
           ListEmptyComponent={
   <View

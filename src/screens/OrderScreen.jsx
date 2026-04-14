@@ -9,6 +9,7 @@ import {
   StatusBar,
   Animated,
   TextInput,
+  ScrollView,
 } from "react-native";
 import Screen from "../components/Screen";
 import { getAppMenu } from "../api/appMenu";
@@ -806,228 +807,244 @@ function toggleFlavor(flavor) {
           />
         )}
 
-                {showOptions && selectedItem ? (
-          <View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(0,0,0,0.45)",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 20,
-            }}
-          >
-            <View
-              style={{
-                width: "100%",
-                maxWidth: 420,
-                backgroundColor: "#fff",
-                borderRadius: 20,
-                padding: 18,
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: "900", color: COLORS.ink }}>
-                Configurar producto
-              </Text>
-
-              <Text style={{ marginTop: 8, fontWeight: "700", color: COLORS.wine }}>
-                {selectedItem.title}
-              </Text>
-              <Text style={{ marginTop: 4, color: COLORS.muted }}>
-  Base: {money(selectedItem.price)}
-</Text>
-
-              <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.wine, fontSize: 16 }}>
-  Total: {money(configuredPrice || selectedItem.price)}
-</Text>
-
-              {selectedItem?.options?.milk?.enabled &&
-Array.isArray(selectedItem?.options?.milk?.choices) &&
-selectedItem.options.milk.choices.length > 0 ? (
-  <View style={{ marginTop: 14 }}>
-    <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
-      Tipo de leche
-    </Text>
-
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-      {selectedItem.options.milk.choices.map((choice, idx) => {
-  const label = getChoiceLabel(choice);
-  const extra = getChoiceExtra(choice);
-  const active = selectedMilk === label;
-
-  return (
-    <Pressable
-      key={`milk-${label}-${idx}`}
-      onPress={() => setSelectedMilk(label)}
-      style={{
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: active ? COLORS.wine : COLORS.border,
-        backgroundColor: active ? COLORS.wineSoft : "#fff",
-      }}
-    >
-      <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
-        {label} {extra > 0 ? `(+${money(extra)})` : ""}
-      </Text>
-    </Pressable>
-  );
-})}
-    </View>
-  </View>
-) : null}
-
-{selectedItem?.options?.temp?.enabled &&
-Array.isArray(selectedItem?.options?.temp?.choices) &&
-selectedItem.options.temp.choices.length > 0 ? (
-  <View style={{ marginTop: 14 }}>
-    <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
-      Temperatura
-    </Text>
-
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-      {selectedItem.options.temp.choices.map((choice, idx) => {
-  const label = getChoiceLabel(choice);
-  const extra = getChoiceExtra(choice);
-  const active = selectedTemp === label;
-
-  return (
-    <Pressable
-      key={`temp-${label}-${idx}`}
-      onPress={() => setSelectedTemp(label)}
-      style={{
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: active ? COLORS.wine : COLORS.border,
-        backgroundColor: active ? COLORS.wineSoft : "#fff",
-      }}
-    >
-      <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
-        {label} {extra > 0 ? `(+${money(extra)})` : ""}
-      </Text>
-    </Pressable>
-  );
-})}
-    </View>
-  </View>
-) : null}
-
-{selectedItem?.options?.flavors?.enabled &&
-Array.isArray(selectedItem?.options?.flavors?.choices) &&
-selectedItem.options.flavors.choices.length > 0 ? (
-  <View style={{ marginTop: 14 }}>
-    <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
-      Sabores
-      {selectedItem?.options?.flavors?.multiple ? " (puedes elegir varios)" : ""}
-    </Text>
-
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-      {selectedItem.options.flavors.choices.map((choice, idx) => {
-  const label = getChoiceLabel(choice);
-  const extra = getChoiceExtra(choice);
-  const active = selectedFlavors.includes(label);
-
-  return (
-    <Pressable
-      key={`flavor-${label}-${idx}`}
-      onPress={() => toggleFlavor(label)}
-      style={{
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: active ? COLORS.wine : COLORS.border,
-        backgroundColor: active ? COLORS.wineSoft : "#fff",
-      }}
-    >
-      <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
-        {label} {extra > 0 ? `(+${money(extra)})` : ""}
-      </Text>
-    </Pressable>
-  );
-})}
-    </View>
-  </View>
-) : null}
-
-              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 18, gap: 10 }}>
-                <Pressable
-                  onPress={closeOptionsModal}
-                  style={{
-                    paddingHorizontal: 14,
-                    height: 40,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: COLORS.border,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text style={{ fontWeight: "900", color: COLORS.ink }}>Cancelar</Text>
-                </Pressable>
-
-                <Pressable
-  onPress={() => {
-    const needsMilk =
-      selectedItem?.options?.milk?.enabled &&
-      Array.isArray(selectedItem?.options?.milk?.choices) &&
-      selectedItem.options.milk.choices.length > 0;
-
-    const needsTemp =
-      selectedItem?.options?.temp?.enabled &&
-      Array.isArray(selectedItem?.options?.temp?.choices) &&
-      selectedItem.options.temp.choices.length > 0;
-
-    if (needsMilk && !selectedMilk) {
-      alert("Selecciona el tipo de leche");
-      return;
-    }
-
-    if (needsTemp && !selectedTemp) {
-      alert("Selecciona la temperatura");
-      return;
-    }
-
-    const finalPrice = calcConfiguredPrice(selectedItem, {
-      milk: selectedMilk,
-      temp: selectedTemp,
-      flavors: selectedFlavors,
-    });
-
-    add({
-      ...selectedItem,
-      basePrice: Number(selectedItem.price || 0),
-      price: finalPrice,
-      selectedOptions: {
-        milk: selectedMilk,
-        temp: selectedTemp,
-        flavors: selectedFlavors,
-      },
-    });
-
-    closeOptionsModal();
+               {showOptions && selectedItem ? (
+  <View
+     style={{
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.06)",
+    paddingHorizontal: 12,
+    paddingTop: 28,
+    paddingBottom: 95, // 👈 deja espacio para la barra inferior
+    justifyContent: "flex-start",
   }}
-  style={{
-    paddingHorizontal: 14,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: COLORS.wine,
-    alignItems: "center",
-    justifyContent: "center",
-  }}
->
-  <Text style={{ fontWeight: "900", color: "#fff" }}>Agregar</Text>
-</Pressable>
-              </View>
+  >
+    <View
+      style={{
+        width: "100%",
+        maxWidth: 420,
+        alignSelf: "center",
+        maxHeight: "98%",
+        backgroundColor: "#fff",
+        borderRadius: 20,
+        overflow: "hidden",
+      }}
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={true}
+        contentContainerStyle={{ padding: 18, paddingBottom: 24 }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: "900", color: COLORS.ink }}>
+          Configurar producto
+        </Text>
+
+        <Text style={{ marginTop: 8, fontWeight: "700", color: COLORS.wine }}>
+          {selectedItem.title}
+        </Text>
+
+        <Text style={{ marginTop: 4, color: COLORS.muted }}>
+          Base: {money(selectedItem.price)}
+        </Text>
+
+        <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.wine, fontSize: 16 }}>
+          Total: {money(configuredPrice || selectedItem.price)}
+        </Text>
+
+        {selectedItem?.options?.milk?.enabled &&
+        Array.isArray(selectedItem?.options?.milk?.choices) &&
+        selectedItem.options.milk.choices.length > 0 ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+              Tipo de leche
+            </Text>
+
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {selectedItem.options.milk.choices.map((choice, idx) => {
+                const label = getChoiceLabel(choice);
+                const extra = getChoiceExtra(choice);
+                const active = selectedMilk === label;
+
+                return (
+                  <Pressable
+                    key={`milk-${label}-${idx}`}
+                    onPress={() => setSelectedMilk(label)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: active ? COLORS.wine : COLORS.border,
+                      backgroundColor: active ? COLORS.wineSoft : "#fff",
+                    }}
+                  >
+                    <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
+                      {label} {extra > 0 ? `(+${money(extra)})` : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         ) : null}
+
+        {selectedItem?.options?.temp?.enabled &&
+        Array.isArray(selectedItem?.options?.temp?.choices) &&
+        selectedItem.options.temp.choices.length > 0 ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+              Temperatura
+            </Text>
+
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {selectedItem.options.temp.choices.map((choice, idx) => {
+                const label = getChoiceLabel(choice);
+                const extra = getChoiceExtra(choice);
+                const active = selectedTemp === label;
+
+                return (
+                  <Pressable
+                    key={`temp-${label}-${idx}`}
+                    onPress={() => setSelectedTemp(label)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: active ? COLORS.wine : COLORS.border,
+                      backgroundColor: active ? COLORS.wineSoft : "#fff",
+                    }}
+                  >
+                    <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
+                      {label} {extra > 0 ? `(+${money(extra)})` : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
+
+        {selectedItem?.options?.flavors?.enabled &&
+        Array.isArray(selectedItem?.options?.flavors?.choices) &&
+        selectedItem.options.flavors.choices.length > 0 ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+              Sabores
+              {selectedItem?.options?.flavors?.multiple ? " (puedes elegir varios)" : ""}
+            </Text>
+
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {selectedItem.options.flavors.choices.map((choice, idx) => {
+                const label = getChoiceLabel(choice);
+                const extra = getChoiceExtra(choice);
+                const active = selectedFlavors.includes(label);
+
+                return (
+                  <Pressable
+                    key={`flavor-${label}-${idx}`}
+                    onPress={() => toggleFlavor(label)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: active ? COLORS.wine : COLORS.border,
+                      backgroundColor: active ? COLORS.wineSoft : "#fff",
+                    }}
+                  >
+                    <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
+                      {label} {extra > 0 ? `(+${money(extra)})` : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
+
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "flex-end",
+            marginTop: 18,
+            gap: 10,
+          }}
+        >
+          <Pressable
+            onPress={closeOptionsModal}
+            style={{
+              paddingHorizontal: 14,
+              height: 40,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: COLORS.border,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontWeight: "900", color: COLORS.ink }}>Cancelar</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              const needsMilk =
+                selectedItem?.options?.milk?.enabled &&
+                Array.isArray(selectedItem?.options?.milk?.choices) &&
+                selectedItem.options.milk.choices.length > 0;
+
+              const needsTemp =
+                selectedItem?.options?.temp?.enabled &&
+                Array.isArray(selectedItem?.options?.temp?.choices) &&
+                selectedItem.options.temp.choices.length > 0;
+
+              if (needsMilk && !selectedMilk) {
+                alert("Selecciona el tipo de leche");
+                return;
+              }
+
+              if (needsTemp && !selectedTemp) {
+                alert("Selecciona la temperatura");
+                return;
+              }
+
+              const finalPrice = calcConfiguredPrice(selectedItem, {
+                milk: selectedMilk,
+                temp: selectedTemp,
+                flavors: selectedFlavors,
+              });
+
+              add({
+                ...selectedItem,
+                basePrice: Number(selectedItem.price || 0),
+                price: finalPrice,
+                selectedOptions: {
+                  milk: selectedMilk,
+                  temp: selectedTemp,
+                  flavors: selectedFlavors,
+                },
+              });
+
+              closeOptionsModal();
+            }}
+            style={{
+              paddingHorizontal: 14,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: COLORS.wine,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontWeight: "900", color: "#fff" }}>Agregar</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </View>
+  </View>
+) : null}
 
 
 

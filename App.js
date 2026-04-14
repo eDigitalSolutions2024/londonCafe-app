@@ -128,7 +128,7 @@ function RootNav() {
 
 export default function App() {
   // ✅ Pon tu publishable key aquí (env o hardcode temporal)
-  const STRIPE_PK = "pk_test_51T45YB1UV0f6g0GRDA4CKq2VNodaG4dWSxJS6NXYSYgTv0OxIALOoOyJS31Kl1iB7W2yITskuSoHqGWuHMJnEgsA00XbvXkms1";
+  const STRIPE_PK = process.env.EXPO_PUBLIC_STRIPE_PK;
 
   return (
     <StripeProvider

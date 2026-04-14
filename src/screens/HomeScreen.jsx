@@ -715,19 +715,22 @@ const moodEmoji = moodEmojiFromEnergy(energy);
   return (
     <Screen edges={["top"]} withPadding={false}>
             <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="never"
-        automaticallyAdjustContentInsets={false}
-        automaticallyAdjustKeyboardInsets={false}
-        contentContainerStyle={{ paddingTop: 0 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={loadingPoints || loadingMe}
-            onRefresh={refreshHome}
-          />
-        }
-      >
+  style={styles.container}
+  showsVerticalScrollIndicator={false}
+  contentInsetAdjustmentBehavior="never"
+  automaticallyAdjustContentInsets={false}
+  automaticallyAdjustKeyboardInsets={false}
+  contentContainerStyle={{
+    paddingTop: 0,
+    paddingBottom: 80, // espacio para que no lo tape la tab bar
+  }}
+  refreshControl={
+    <RefreshControl
+      refreshing={loadingPoints || loadingMe}
+      onRefresh={refreshHome}
+    />
+  }
+>
         {/* Hero */}
         <View style={styles.hero}>
           <View style={styles.heroHeader}>
