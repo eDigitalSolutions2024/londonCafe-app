@@ -128,8 +128,11 @@ function RootNav() {
 
 export default function App() {
   // ✅ Pon tu publishable key aquí (env o hardcode temporal)
-  const STRIPE_PK = process.env.STRIPE_PUBLISHABLE_KEY;
+  const STRIPE_PK = process.env.EXPO_PUBLIC_STRIPE_PK;
 
+if (!STRIPE_PK) {
+  throw new Error("EXPO_PUBLIC_STRIPE_PK no está definida");
+}
   return (
     <StripeProvider
       publishableKey={STRIPE_PK}

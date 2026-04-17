@@ -4,10 +4,12 @@ import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
 import AvatarPreview from "../components/AvatarPreview";
 import { apiFetch } from "../api/client";
-import Screen from "../components/Screen"; // ✅ NUEVO
+import Screen from "../components/Screen"; 
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";  // ✅ NUEVO
 
 export default function AccountSettingsScreen({ navigation }) {
   const { token } = useContext(AuthContext);
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -112,7 +114,10 @@ export default function AccountSettingsScreen({ navigation }) {
     <Screen style={styles.screen} edges={["top", "left", "right"]}>
       <ScrollView
         style={styles.wrap}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+    styles.content,
+    { paddingBottom: tabBarHeight + 28 },
+  ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
@@ -218,7 +223,7 @@ export default function AccountSettingsScreen({ navigation }) {
         </Pressable>
 
         {/* espacio al final para que no se encime con tab bar */}
-        <View style={{ height: 18 }} />
+       
       </ScrollView>
     </Screen>
   );

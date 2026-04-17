@@ -20,6 +20,7 @@ import {
 import { AuthContext } from "../context/AuthContext";
 import { fetchMyGiftCards, purchaseGiftCard, redeemGiftCard } from "../api/giftcards";
 import { colors } from "../theme/colors";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import AvatarPreview from "../components/AvatarPreview"; // ✅ ajusta si tu path cambia
 
 const moneyPresets = [50, 100, 200, 300, 500];
@@ -188,6 +189,7 @@ function GiftPreview({ amount, toEmail, message, fromUser }) {
 
   const fromName = fromUser?.name || fromUser?.username || "London Buddy";
   const fromAt = fromUser?.username ? `@${fromUser.username}` : "";
+ 
 
   return (
     <View
@@ -424,6 +426,7 @@ function GiftPillCard({ item, variant = "received", onPress }) {
 
 export default function GiftsScreen() {
   const { token, user } = useContext(AuthContext);
+const tabBarHeight = useBottomTabBarHeight();
 
   const scrollRef = useRef(null);
   const redeemYRef = useRef(0);
@@ -544,7 +547,11 @@ export default function GiftsScreen() {
     <ScrollView
       ref={scrollRef}
       style={{ flex: 1, backgroundColor: UI.bg }}
-      contentContainerStyle={{ padding: 16, paddingTop: 40, paddingBottom: 40 }}
+      contentContainerStyle={{
+  padding: 16,
+  paddingTop: 40,
+  paddingBottom: tabBarHeight + 28,
+}}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       keyboardShouldPersistTaps="handled"
     >
