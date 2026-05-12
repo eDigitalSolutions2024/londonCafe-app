@@ -785,7 +785,7 @@ function toggleFlavor(flavor) {
             key={isGrid ? "grid" : "list"}
             data={filtered}
             keyExtractor={(it) => String(it._id)}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
             numColumns={isGrid ? 2 : 1}
             columnWrapperStyle={isGrid ? { gap: 12 } : undefined}
             renderItem={({ item }) =>

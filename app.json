@@ -6,26 +6,28 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa.",
-        "ITSAppUsesNonExemptEncryption": false
-      },
-      "bundleIdentifier": "com.londoncafe.app"
-    },
+  "supportsTablet": true,
+  "infoPlist": {
+    "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa.",
+    "ITSAppUsesNonExemptEncryption": false,
+    "NSCameraUsageDescription": "Usamos la cámara únicamente si una función integrada del dispositivo o componente de la app la requiere."
+  },
+  "bundleIdentifier": "com.londoncafe.app"
+},
     "android": {
       "icon": "./assets/favicon.png",
       "edgeToEdgeEnabled": true,
       "package": "com.londoncafe.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 2
+      "versionCode": 19,
+      "blockedPermissions": ["android.permission.ACTIVITY_RECOGNITION"]
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import {
   View,
   StyleSheet,
@@ -10,7 +10,6 @@ import {
   Dimensions,
 } from "react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { DeviceMotion } from "expo-sensors";
 import { colors } from "../theme/colors";
 
 const LAT = 31.70075;
@@ -20,42 +19,6 @@ const { width, height } = Dimensions.get("window");
 
 export default function LocationScreen() {
   const tabBarHeight = useBottomTabBarHeight();
-
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    DeviceMotion.setUpdateInterval(120);
-
-    const sub = DeviceMotion.addListener((motion) => {
-      const beta = motion?.rotation?.beta;
-      const gamma = motion?.rotation?.gamma;
-
-      // si no vienen números válidos, no hacemos nada
-      if (!Number.isFinite(beta) || !Number.isFinite(gamma)) return;
-
-      // movimiento mucho más suave y controlado
-      const rawX = gamma * 10;
-      const rawY = beta * 6;
-
-      const moveX = Math.max(-22, Math.min(22, rawX));
-      const moveY = Math.max(-12, Math.min(12, rawY));
-
-      Animated.timing(translateX, {
-        toValue: -moveX,
-        duration: 120,
-        useNativeDriver: true,
-      }).start();
-
-      Animated.timing(translateY, {
-        toValue: -moveY,
-        duration: 120,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    return () => sub?.remove();
-  }, [translateX, translateY]);
 
   const openMaps = () => {
     const label = "LondonCafe";
@@ -79,12 +42,7 @@ export default function LocationScreen() {
         <Animated.Image
           source={require("../assets/MapsLondon.jpeg")}
           resizeMode="cover"
-          style={[
-            styles.bgImage,
-            {
-              transform: [{ translateX }, { translateY }],
-            },
-          ]}
+          style={styles.bgImage}
         />
 
         <View style={styles.overlay} />
