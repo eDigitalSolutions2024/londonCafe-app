@@ -336,7 +336,7 @@ function normalizeStreakAutoReset(user, now = new Date()) {
     const alreadyArmed = !!user.buddy.streakBrokenDay;
     const alreadyUsed = user.buddy.streakRecoveryUsed === true;
 
-    if (hadStreak && !alreadyArmed && !alreadyUsed) {
+    if (hadStreak && !alreadyArmed ) {
       user.buddy.streakPrevCount = Number(user.buddy.streakCount || 0);
       user.buddy.streakBrokenDay = today;
       user.buddy.streakRecoveryUsed = false;

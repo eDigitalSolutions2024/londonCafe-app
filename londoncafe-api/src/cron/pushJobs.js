@@ -14,22 +14,65 @@ cron.schedule("*/10 * * * *", async () => {
 
     const energy = Number(user?.buddy?.energy || 0);
 
-    if (energy < 50 && !user?.buddy?.lowEnergyNotified) {
-      await sendExpoPushNotification(
-        user.expoPushToken,
-        "Tu buddy necesita energía ☕",
-        `Tu energía está en ${energy}%. Entra a darle café o pan.`,
-        { type: "low-energy" }
-      );
+   const alerts = user?.buddy?.energyAlerts || {
+  fifty: false,
+  twentyFive: false,
+  ten: false,
+};
 
-      user.buddy.lowEnergyNotified = true;
-      await user.save();
-    }
 
-    if (energy >= 55) {
-      user.buddy.lowEnergyNotified = false;
-      await user.save();
-    }
+// 🔔 50%
+if (energy <= 50 && !alerts.fifty) {
+
+  alerts.fifty = true;
+
+  await sendExpoPushNotification(
+    user.expoPushToken,
+    "Tu buddy necesita energía ☕",
+    `Tu energía está en ${Math.round(energy)}%. Entra a darle café o pan.`,
+    { type: "low-energy-50" }
+  );
+}
+
+
+// 🔔 25%
+if (energy <= 25 && !alerts.twentyFive) {
+
+  alerts.twentyFive = true;
+
+  await sendExpoPushNotification(
+    user.expoPushToken,
+    "Tu buddy está cansado 😢",
+    `La energía bajó a ${Math.round(energy)}%.`,
+    { type: "low-energy-25" }
+  );
+}
+
+
+// 🔔 10%
+if (energy <= 10 && !alerts.ten) {
+
+  alerts.ten = true;
+
+  await sendExpoPushNotification(
+    user.expoPushToken,
+    "¡Tu buddy está agotado! 💀",
+    `La energía está críticamente baja (${Math.round(energy)}%).`,
+    { type: "low-energy-10" }
+  );
+}
+
+
+// ✅ reset automático
+if (energy > 55) alerts.fifty = false;
+if (energy > 30) alerts.twentyFive = false;
+if (energy > 15) alerts.ten = false;
+
+user.buddy.energyAlerts = alerts;
+
+await user.save();
+
+    
   }
 });
 
