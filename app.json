@@ -2,7 +2,7 @@
   "expo": {
     "name": "London Cafe",
     "slug": "london-cafe",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -26,7 +26,7 @@
       "edgeToEdgeEnabled": true,
       "package": "com.londoncafe.app",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 19,
+      
       "blockedPermissions": ["android.permission.ACTIVITY_RECOGNITION"]
     },
     "web": {
