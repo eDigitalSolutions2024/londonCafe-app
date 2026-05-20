@@ -33,6 +33,21 @@ const buddySchema = new mongoose.Schema(
     coffee: { type: Number, default: 1, min: 0 },
     bread: { type: Number, default: 1, min: 0 },
 
+      energyAlerts: {
+      fifty: {
+        type: Boolean,
+        default: false,
+      },
+      twentyFive: {
+        type: Boolean,
+        default: false,
+      },
+      ten: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
     lastEnergyAt: { type: Date, default: Date.now },
     lastRefillAt: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },
