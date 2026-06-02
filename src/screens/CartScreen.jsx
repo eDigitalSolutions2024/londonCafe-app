@@ -1,5 +1,5 @@
 import React, { useContext, useState } from "react";
-import { View, Text, FlatList, Image, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, Image, Pressable, ActivityIndicator, Alert } from "react-native";
 import Screen from "../components/Screen";
 import { useCart } from "../context/CartContext";
 import { AuthContext } from "../context/AuthContext";
@@ -40,7 +40,7 @@ function CartItem({ item, onInc, onDec, onRemove }) {
       }}
     >
       <Image
-        source={{ uri: item.imageUrl || "https://via.placeholder.com/120" }}
+        source={item.imageUrl ? { uri: item.imageUrl } : require("../assets/promo_placeholder.png")}
         style={{
           width: 72,
           height: 72,
@@ -208,7 +208,7 @@ function buildOrderPayload(
 
 export default function CartScreen({ navigation }) {
   const { items, subtotal, inc, dec, remove, clear } = useCart();
-  const { user } = useContext(AuthContext);
+  const { user, token } = useContext(AuthContext);
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [paying, setPaying] = useState(false);
 const tabBarHeight = useBottomTabBarHeight();
@@ -236,6 +236,25 @@ async function getLoggedUserData() {
 
  const onContinuar = async () => {
   if (paying) return;
+
+  if (!token) {
+    Alert.alert(
+      "Inicia sesión para pagar",
+      "Crea una cuenta gratuita para desbloquear esta función.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Iniciar sesión",
+          onPress: () => navigation.navigate("AuthModal"),
+        },
+        {
+          text: "Crear cuenta",
+          onPress: () => navigation.navigate("AuthModal", { screen: "Register" }),
+        },
+      ]
+    );
+    return;
+  }
 
   try {
     if (!items.length) {

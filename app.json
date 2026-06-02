@@ -17,7 +17,7 @@
   "infoPlist": {
     "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa.",
     "ITSAppUsesNonExemptEncryption": false,
-    "NSCameraUsageDescription": "Usamos la cámara únicamente si una función integrada del dispositivo o componente de la app la requiere."
+    "NSCameraUsageDescription": "Usamos la cámara para escanear tarjetas de pago al realizar compras en la app."
   },
   "bundleIdentifier": "com.londoncafe.app"
 },

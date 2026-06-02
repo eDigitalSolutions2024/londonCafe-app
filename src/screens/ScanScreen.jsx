@@ -5,30 +5,29 @@ import QRCode from "react-native-qrcode-svg";
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
+import GuestPrompt from "../components/GuestPrompt";
 
 export default function ScanScreen() {
   const { user, token } = useContext(AuthContext);
   const [qrToken, setQrToken] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
+    if (!token) { setQrToken(""); return; }
     const userId = user?._id || user?.id || null;
-
-    if (!token) {
-      setQrToken("");
-      setErrorMsg("Sesión inválida. Inicia sesión de nuevo.");
-      return;
-    }
-
-    if (!userId) {
-      setQrToken("");
-      setErrorMsg("No se encontró el usuario para generar el QR.");
-      return;
-    }
-
+    if (!userId) { setQrToken(""); return; }
     setQrToken(`lc_user:${userId}`);
-    setErrorMsg("");
   }, [user, token]);
+
+  if (!token) {
+    return (
+      <Screen>
+        <GuestPrompt
+          title="Mi QR"
+          message="Inicia sesión para generar tu código QR de fidelidad."
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -42,14 +41,13 @@ export default function ScanScreen() {
               <View style={styles.qrBox}>
                 <QRCode value={qrToken} size={220} />
               </View>
-
               <Text style={styles.hint}>
                 Este QR es único para tu cuenta y no expira.
               </Text>
             </View>
           ) : (
             <View style={styles.center}>
-              <Text style={styles.err}>{errorMsg || "Sin QR disponible"}</Text>
+              <Text style={styles.err}>Sin QR disponible</Text>
             </View>
           )}
         </View>

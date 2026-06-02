@@ -403,19 +403,10 @@ const lowEnergyNotifiedRef = useRef(false);
 
   (async () => {
     try {
-      console.log("🚀 intentando registrar push");
-
       const expoPushToken = await registerForPushNotificationsAsync();
+      if (!expoPushToken) return;
 
-      console.log("📲 expoPushToken app:", expoPushToken);
-      console.log("📲 typeof expoPushToken:", typeof expoPushToken);
-
-      if (!expoPushToken) {
-        console.log("❌ NO se generó expoPushToken");
-        return;
-      }
-
-      const res = await apiFetch("/me/push-token", {
+      await apiFetch("/me/push-token", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -423,10 +414,8 @@ const lowEnergyNotifiedRef = useRef(false);
         },
         body: JSON.stringify({ expoPushToken }),
       });
-
-      console.log("✅ respuesta backend:", res);
-    } catch (e) {
-      console.log("❌ ERROR push-token:", e?.data || e?.message);
+    } catch {
+      // silent — push registration is best-effort
     }
   })();
 }, [token]);
@@ -642,11 +631,6 @@ const prevEnergy = Number.isFinite(Number(buddy?.energy)) ? Number(buddy.energy)
 }, [token, claimingDaily]);
 
 
-  useEffect(() => {
-    apiFetch("/health")
-      .then((d) => console.log("✅ HEALTH OK:", d))
-      .catch((e) => console.log("❌ HEALTH ERROR:", e?.data || e.message));
-  }, []);
 
   // ✅ cada vez que abres Home, refresca puntos + perfil
    
@@ -711,6 +695,85 @@ const moodEmoji = moodEmojiFromEnergy(energy);
 }, []);*/
 
 
+
+  if (!token) {
+    return (
+      <Screen edges={["top"]} withPadding={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 80 }}
+        >
+          {/* Welcome section */}
+          <View style={styles.guestWrap}>
+            <View style={styles.guestLogoWrap}>
+              <Image source={LondonCafeLogo} style={styles.guestLogo} resizeMode="cover" />
+            </View>
+
+            <Text style={styles.guestTitle}>Bienvenido a London Cafe</Text>
+            <Text style={styles.guestMessage}>
+              Inicia sesión para acumular puntos, mantener tu racha diaria y canjear recompensas.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.guestPrimaryBtn}
+              onPress={() => navigation.navigate("AuthModal")}
+              activeOpacity={0.9}
+              accessibilityRole="button"
+            >
+              <Text style={styles.guestPrimaryBtnText}>Iniciar sesión</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.guestSecondaryBtn}
+              onPress={() => navigation.navigate("AuthModal", { screen: "Register" })}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+            >
+              <Text style={styles.guestSecondaryBtnText}>Crear cuenta gratuita</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Ordena")}
+              activeOpacity={0.8}
+              style={styles.guestContinueBtn}
+              accessibilityRole="button"
+            >
+              <Text style={styles.guestContinueBtnText}>Continuar como invitado</Text>
+            </TouchableOpacity>
+
+            <View style={styles.guestBenefits}>
+              {[
+                { icon: "☕", text: "Acumula puntos por cada compra" },
+                { icon: "🎁", text: "Canjea recompensas exclusivas" },
+                { icon: "🔥", text: "Mantén tu racha diaria" },
+                { icon: "📍", text: "Encuentra nuestras sucursales fácilmente" },
+              ].map((b, i) => (
+                <View key={i} style={styles.guestBenefitRow}>
+                  <Text style={styles.guestBenefitIcon}>{b.icon}</Text>
+                  <Text style={styles.guestBenefitText}>{b.text}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Promotions visible to guests */}
+          <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "900",
+                color: colors.text,
+                marginBottom: 6,
+              }}
+            >
+              Promociones
+            </Text>
+            <PromosSection limit={5} />
+          </View>
+        </ScrollView>
+      </Screen>
+    );
+  }
 
   return (
     <Screen edges={["top"]} withPadding={false}>
@@ -934,6 +997,99 @@ const moodEmoji = moodEmojiFromEnergy(energy);
 }
 
 const styles = StyleSheet.create({
+  /* Guest welcome section */
+  guestWrap: {
+    alignItems: "center",
+    paddingHorizontal: 32,
+    paddingTop: 48,
+    paddingBottom: 32,
+    backgroundColor: colors.background,
+  },
+  guestLogoWrap: {
+    width: 110,
+    height: 110,
+    borderRadius: 28,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  guestLogo: { width: "100%", height: "100%" },
+  guestTitle: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: colors.text,
+    textAlign: "center",
+    marginBottom: 10,
+    letterSpacing: -0.3,
+  },
+  guestMessage: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textMuted,
+    textAlign: "center",
+    lineHeight: 21,
+    marginBottom: 28,
+    maxWidth: 300,
+  },
+  guestPrimaryBtn: {
+    width: "100%",
+    height: 52,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  guestPrimaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "900" },
+  guestSecondaryBtn: {
+    width: "100%",
+    height: 52,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  guestSecondaryBtnText: { color: colors.primary, fontSize: 16, fontWeight: "900" },
+  guestContinueBtn: { paddingVertical: 12, alignItems: "center", marginBottom: 28 },
+  guestContinueBtnText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
+  guestBenefits: {
+    width: "100%",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: "#fff",
+    padding: 16,
+    gap: 14,
+  },
+  guestBenefitRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  guestBenefitIcon: { fontSize: 20, width: 28, textAlign: "center" },
+  guestBenefitText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+    lineHeight: 18,
+  },
+
   /* Screen / layout base */
   container: { flex: 1, backgroundColor: colors.background },
 

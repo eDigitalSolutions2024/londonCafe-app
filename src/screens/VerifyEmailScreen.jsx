@@ -25,7 +25,7 @@ export default function VerifyEmailScreen({ route, navigation }) {
   async function onResend() {
     try {
       await resendVerification({ email });
-      Alert.alert("Enviado", "Se generó un nuevo código (modo dev: revisa consola del backend).");
+      Alert.alert("Enviado", "Revisa tu correo, te hemos enviado un nuevo código de verificación.");
     } catch (e) {
       Alert.alert("Error", e?.data?.error || e.message);
     }

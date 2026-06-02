@@ -1,5 +1,12 @@
 // src/controllers/me.controller.js
 const User = require("../models/User");
+const EmailVerification = require("../models/EmailVerification");
+const PointsHistory = require("../models/PointsHistory");
+const PointClaim = require("../models/PointClaims");
+const Redemption = require("../models/Redemption");
+const Receipt = require("../models/Receipt");
+const Sale = require("../models/Sale");
+const GiftCard = require("../models/GiftCard");
 
 // 👇 agrega esto (ajusta la ruta según dónde lo pusiste)
 const {
@@ -448,4 +455,54 @@ async function sendStreakReminderPush(req, res) {
     });
   }
 }
-module.exports = { getMe, updateMe, updateAvatar, claimReward, recoverStreak, savePushToken,testPush, sendLowEnergyPush,sendStreakReminderPush,};
+async function deleteMe(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    // Run all collection cleanup in parallel before deleting the user document.
+    // Financial records (Receipt, Sale, GiftCard) are anonymised rather than deleted
+    // so accounting history is preserved without retaining any PII.
+    await Promise.all([
+      // Hard deletes — records that have no value without the user
+      EmailVerification.deleteMany({ userId: uid }),
+      PointsHistory.deleteMany({ userId: uid }),
+      Redemption.deleteMany({ userId: uid }),
+
+      // Anonymise — financial/audit records where userId is just a foreign key
+      Receipt.updateMany({ uid }, { $set: { uid: null } }),
+      Sale.updateMany({ userId: uid }, { $set: { userId: null } }),
+      PointClaim.updateMany({ redeemedBy: uid }, { $set: { redeemedBy: null } }),
+
+      // Anonymise gift cards — the gift itself may still be relevant to the other party
+      GiftCard.updateMany({ fromUser: uid }, { $set: { fromUser: null } }),
+      GiftCard.updateMany({ toUser: uid }, { $set: { toUser: null } }),
+      GiftCard.updateMany({ redeemedBy: uid }, { $set: { redeemedBy: null } }),
+    ]);
+
+    // Delete the user document last so a partial failure above can be retried
+    // without losing the ability to identify the user.
+    await User.findByIdAndDelete(uid);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("deleteMe error:", err);
+    return res.status(500).json({ error: "SERVER_ERROR", message: err?.message });
+  }
+}
+
+module.exports = {
+  getMe,
+  updateMe,
+  updateAvatar,
+  claimReward,
+  recoverStreak,
+  savePushToken,
+  testPush,
+  sendLowEnergyPush,
+  sendStreakReminderPush,
+  deleteMe,
+};

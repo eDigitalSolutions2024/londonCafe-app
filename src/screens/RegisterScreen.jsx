@@ -90,50 +90,29 @@ export default function RegisterScreen({ navigation }) {
   async function onSubmit() {
     try {
       if (!name.trim()) return Alert.alert("Falta nombre", "Escribe tu nombre.");
-      if (!gender) return Alert.alert("Falta género", "Selecciona tu género.");
       if (!email.trim()) return Alert.alert("Falta email", "Escribe tu email.");
-      if (!phone.trim()) return Alert.alert("Falta teléfono", "Escribe tu teléfono.");
-
-      const phoneNorm = normalizePhone(phone);
-      if (phoneNorm.replace("+", "").length < 10) {
-        return Alert.alert(
-          "Teléfono inválido",
-          "Escribe un teléfono válido (mínimo 10 dígitos)."
-        );
-      }
-
-      if (!birthDate.trim()) {
-        return Alert.alert("Falta cumpleaños", "Escribe tu fecha de nacimiento.");
-      }
-      if (!isValidBirthDate(birthDate)) {
-        return Alert.alert(
-          "Fecha inválida",
-          "Usa formato DD/MM/AAAA y que sea una fecha real."
-        );
-      }
-
       if (!password.trim()) {
         return Alert.alert("Falta contraseña", "Escribe tu contraseña.");
       }
 
       setLoading(true);
-      console.log("REGISTER SEND:", {
-  name,
-  email,
-  password,
-  gender,
-  phone: phoneNorm,
-  birthDate: birthDateToISO(birthDate),
-});
 
-      const res = await register({
-        name,
-        email,
-        password,
-        gender,
-        phone: phoneNorm,
-        birthDate: birthDateToISO(birthDate), // ✅ ISO para backend/Mongo
-      });
+      const payload = { name: name.trim(), email: email.trim(), password };
+
+      if (gender) payload.gender = gender;
+
+      if (phone.trim()) {
+        const phoneNorm = normalizePhone(phone);
+        if (phoneNorm.replace("+", "").length >= 10) {
+          payload.phone = phoneNorm;
+        }
+      }
+
+      if (birthDate.trim() && isValidBirthDate(birthDate)) {
+        payload.birthDate = birthDateToISO(birthDate);
+      }
+
+      const res = await register(payload);
 
       navigation.navigate("VerifyEmail", { email: res?.email || email });
     } catch (e) {
@@ -202,13 +181,12 @@ export default function RegisterScreen({ navigation }) {
 
             {/* ✅ Género */}
             <View style={styles.field}>
-              <Text style={styles.label}>Género</Text>
+              <Text style={styles.label}>Género (opcional)</Text>
               <View style={styles.pillsRow}>
                 <GenderPill value="male" label="Hombre" />
                 <GenderPill value="female" label="Mujer" />
                 <GenderPill value="other" label="Otro" />
               </View>
-              {!gender ? <Text style={styles.helper}>Selecciona una opción</Text> : null}
             </View>
 
             <View style={styles.field}>
@@ -228,7 +206,7 @@ export default function RegisterScreen({ navigation }) {
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Teléfono</Text>
+              <Text style={styles.label}>Teléfono (opcional)</Text>
               <TextInput
                 value={phone}
                 onChangeText={(v) => setPhone(normalizePhone(v))}
@@ -243,7 +221,7 @@ export default function RegisterScreen({ navigation }) {
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Fecha de nacimiento</Text>
+              <Text style={styles.label}>Fecha de nacimiento (opcional)</Text>
               <TextInput
                 value={birthDate}
                 onChangeText={(v) => setBirthDate(formatBirthDate(v))}

@@ -1,4 +1,5 @@
 import React, { useContext } from "react";
+import { View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -38,9 +39,21 @@ import { colors } from "./src/theme/colors";
 import { AuthProvider, AuthContext } from "./src/context/AuthContext";
 
 const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+const RootStack = createNativeStackNavigator();
+const AuthNav = createNativeStackNavigator();
 const HomeStack = createNativeStackNavigator();
 const OrderStack = createNativeStackNavigator();
+
+// Modal auth stack — Login / Register / VerifyEmail
+function AuthStack() {
+  return (
+    <AuthNav.Navigator screenOptions={{ headerShown: false }}>
+      <AuthNav.Screen name="Login" component={LoginScreen} />
+      <AuthNav.Screen name="Register" component={RegisterScreen} />
+      <AuthNav.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+    </AuthNav.Navigator>
+  );
+}
 
 function HomeStackNav() {
   return (
@@ -60,8 +73,7 @@ function OrderStackNav() {
     <OrderStack.Navigator screenOptions={{ headerShown: false }}>
       <OrderStack.Screen name="Order" component={OrderScreen} />
       <OrderStack.Screen name="Cart" component={CartScreen} />
-        <OrderStack.Screen name="Pedidos" component={PedidosScreen} />
-
+      <OrderStack.Screen name="Pedidos" component={PedidosScreen} />
     </OrderStack.Navigator>
   );
 }
@@ -110,31 +122,49 @@ function MainTabs() {
   );
 }
 
-function AuthStack() {
+// Root: always renders tabs; auth is a modal on top
+function RootNav() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-      <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
-    </Stack.Navigator>
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      <RootStack.Screen name="Main" component={MainTabs} />
+      <RootStack.Screen
+        name="AuthModal"
+        component={AuthStack}
+        options={{ presentation: "modal" }}
+      />
+    </RootStack.Navigator>
   );
 }
 
-function RootNav() {
-  const { token, loading } = useContext(AuthContext);
-  if (loading) return null;
-  return token ? <MainTabs /> : <AuthStack />;
+// Handles loading splash before mounting NavigationContainer
+function AppContent() {
+  const { loading } = useContext(AuthContext);
+
+  if (loading) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, backgroundColor: colors.background }} />
+      </SafeAreaProvider>
+    );
+  }
+
+  return (
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <RootNav />
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
 }
 
 export default function App() {
-  // ✅ Pon tu publishable key aquí (env o hardcode temporal)
+  console.log("STRIPE KEY:", process.env.EXPO_PUBLIC_STRIPE_PK);
   const STRIPE_PK = process.env.EXPO_PUBLIC_STRIPE_PK;
 
-if (!STRIPE_PK) {
-  throw new Error("Stripe publishable key missing");
-}
+  if (!STRIPE_PK) {
+    throw new Error("Stripe publishable key missing. Set EXPO_PUBLIC_STRIPE_PK.");
+  }
 
-console.log("STRIPE_PK:", STRIPE_PK);
   return (
     <StripeProvider
       publishableKey={STRIPE_PK}
@@ -142,11 +172,7 @@ console.log("STRIPE_PK:", STRIPE_PK);
     >
       <AuthProvider>
         <CartProvider>
-          <SafeAreaProvider>
-            <NavigationContainer>
-              <RootNav />
-            </NavigationContainer>
-          </SafeAreaProvider>
+          <AppContent />
         </CartProvider>
       </AuthProvider>
     </StripeProvider>

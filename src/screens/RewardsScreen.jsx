@@ -12,9 +12,10 @@ import {
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
-import { apiFetch} from "../api/client"; // ✅ apiFetch:3001 | posFetch:4000
+import { apiFetch } from "../api/client";
 import AvatarPreview from "../components/AvatarPreview";
 import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
+import { GuestLockCard } from "../components/GuestPrompt";
 
 export default function RewardsScreen({ navigation }) {
   const { token, user } = useContext(AuthContext);
@@ -75,19 +76,6 @@ export default function RewardsScreen({ navigation }) {
     return unsub;
   }, [navigation, fetchAll]);
 
-  // ✅ DEBUG: comprobar si POS trae rewards.routes (4000)
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await apiFetch("/rewards/ping");
-        console.log("✅ rewards ping:", r);
-      } catch (e) {
-        console.log("❌ rewards ping status:", e?.status);
-        console.log("❌ rewards ping data:", e?.data);
-        console.log("❌ rewards ping msg:", e?.message);
-      }
-    })();
-  }, []);
 
   const displayName = useMemo(() => {
     const n = (me?.name || user?.name || "London Buddy").trim();
@@ -119,6 +107,72 @@ export default function RewardsScreen({ navigation }) {
 
   // ✅ generar QR (en POS backend:4000)+
  
+
+  if (!token) {
+    return (
+      <Screen>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+          <View style={styles.headerTop}>
+            <Text style={styles.pageTitle}>Recompensas</Text>
+          </View>
+
+          {/* What are BuddyCoins */}
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Buddy Coins</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "700", lineHeight: 19, marginBottom: 12 }}>
+              Acumula puntos por cada compra y canjéalos en London Cafe. Llega a 200 para subir al nivel VIP.
+            </Text>
+
+            {/* Sample progress bar */}
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: "0%" }]} />
+            </View>
+            <Text style={styles.helper}>Crea una cuenta para comenzar a acumular</Text>
+          </View>
+
+          {/* Benefits catalog */}
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>Beneficios</Text>
+
+            {[
+              "Usa tus Buddy Coins como descuento en el café",
+              "Accesorios exclusivos para tu avatar",
+              "Mantén una racha diaria y gana bonos",
+            ].map((b, i) => (
+              <Text key={i} style={styles.bullet}>• {b}</Text>
+            ))}
+
+            <View
+              style={{
+                marginTop: 14,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: "#FDE68A",
+                backgroundColor: "#FFFBEB",
+                padding: 12,
+              }}
+            >
+              <Text style={{ color: "#92400E", fontWeight: "900", fontSize: 13, marginBottom: 4 }}>
+                ⚡ Nivel VIP — 200 puntos
+              </Text>
+              {[
+                "Descuentos especiales para miembros VIP",
+                "Accesorios premium (raros)",
+                "Mascota especial 🐾",
+                "Acceso anticipado a promociones",
+              ].map((b, i) => (
+                <Text key={i} style={{ color: "#92400E", fontSize: 12, fontWeight: "700", marginBottom: 3 }}>
+                  • {b}
+                </Text>
+              ))}
+            </View>
+          </View>
+
+          <GuestLockCard />
+        </ScrollView>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

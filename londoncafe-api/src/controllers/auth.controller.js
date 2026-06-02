@@ -117,44 +117,37 @@ async function register(req, res) {
       return res.status(400).json({ error: "WEAK_PASSWORD" });
     }
 
-    // ✅ Validación phone (mínimo 10 dígitos, opcional +)
+    // ✅ Phone — optional
     const phoneStr = String(phone || "").trim();
-    if (!phoneStr) {
-      return res.status(400).json({ error: "MISSING_PHONE" });
-    }
-    if (!/^\+?[0-9]{10,16}$/.test(phoneStr)) {
-      return res.status(400).json({ error: "INVALID_PHONE" });
+    let validPhone = null;
+    if (phoneStr) {
+      if (!/^\+?[0-9]{10,16}$/.test(phoneStr)) {
+        return res.status(400).json({ error: "INVALID_PHONE" });
+      }
+      const phoneExists = await User.findOne({ phone: phoneStr });
+      if (phoneExists) return res.status(409).json({ error: "PHONE_ALREADY_EXISTS" });
+      validPhone = phoneStr;
     }
 
-    // ✅ Validación birthDate (esperamos ISO YYYY-MM-DD)
+    // ✅ birthDate — optional
+    let bd = null;
     const birthStr = String(birthDate || "").trim();
-    if (!birthStr) {
-      return res.status(400).json({ error: "MISSING_BIRTHDATE" });
-    }
-    const bd = new Date(birthStr);
-    if (Number.isNaN(bd.getTime())) {
-      return res.status(400).json({ error: "INVALID_BIRTHDATE" });
-    }
-    // no futuro
-    const today = new Date();
-    if (bd > today) {
-      return res.status(400).json({ error: "INVALID_BIRTHDATE" });
-    }
-    // mínimo 13 años (igual que frontend)
-    const min = new Date();
-    min.setFullYear(min.getFullYear() - 13);
-    if (bd > min) {
-      return res.status(400).json({ error: "UNDERAGE" });
+    if (birthStr) {
+      bd = new Date(birthStr);
+      if (Number.isNaN(bd.getTime())) {
+        return res.status(400).json({ error: "INVALID_BIRTHDATE" });
+      }
+      const today = new Date();
+      if (bd > today) return res.status(400).json({ error: "INVALID_BIRTHDATE" });
+      const minAge = new Date();
+      minAge.setFullYear(minAge.getFullYear() - 13);
+      if (bd > minAge) return res.status(400).json({ error: "UNDERAGE" });
     }
 
     // ✅ Duplicados: email
     const emailLower = String(email).toLowerCase();
     const exists = await User.findOne({ email: emailLower });
     if (exists) return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
-
-    // ✅ Duplicados: phone (si lo hiciste unique+sparse en schema, esto también lo atrapará)
-    const phoneExists = await User.findOne({ phone: phoneStr });
-    if (phoneExists) return res.status(409).json({ error: "PHONE_ALREADY_EXISTS" });
 
     const allowed = ["male", "female", "other"];
     const safeGender = allowed.includes(String(gender)) ? String(gender) : "other";
@@ -183,10 +176,8 @@ async function register(req, res) {
       isEmailVerified: false,
       gender: safeGender,
       avatarConfig,
-
-      // ✅ NUEVO
-      phone: phoneStr,
-      birthDate: bd,
+      ...(validPhone ? { phone: validPhone } : {}),
+      ...(bd ? { birthDate: bd } : {}),
     });
 
     // OTP

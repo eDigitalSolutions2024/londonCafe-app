@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>London Cafe — Screenshot 1 — App Store 6.9"</title>
+<!--
+  Canvas: 1320 × 2868 px  (iPhone 16 Pro Max — App Store required)
+  Open in browser → zoom to fit → export / screenshot at full size.
+  For production: use a headless tool (puppeteer, playwright) to export
+  at exactly 1320×2868 with deviceScaleFactor=1.
+-->
+<style>
+/* ─── Reset ─────────────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+/* ─── Canvas ─────────────────────────────────────────────── */
+.canvas {
+  width: 1320px;
+  height: 2868px;
+  position: relative;
+  overflow: hidden;
+  background: #FAF7F4;
+  font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Burgundy background block ──────────────────────────── */
+.bg-burgundy {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1100px;
+  background: #7B1E3A;
+}
+
+/* Soft rounded bottom edge */
+.bg-burgundy::after {
+  content: '';
+  position: absolute;
+  bottom: -60px; left: -5%; right: -5%;
+  height: 120px;
+  background: #7B1E3A;
+  border-radius: 0 0 60% 60%;
+}
+
+/* ─── Header text area ───────────────────────────────────── */
+.header {
+  position: absolute;
+  top: 80px; left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  z-index: 2;
+}
+
+.lc-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 44px;
+}
+
+.lc-logo-ring {
+  width: 90px; height: 90px;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 2.5px solid rgba(255,255,255,0.30);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.30);
+}
+
+.lc-logo-ring img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lc-name {
+  font-size: 46px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.90);
+  letter-spacing: -1px;
+}
+
+.headline {
+  font-size: 100px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.04;
+  letter-spacing: -4px;
+  margin-bottom: 30px;
+}
+
+.subtitle {
+  font-size: 36px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.72);
+  letter-spacing: 0.5px;
+}
+
+/* ─── Device wrapper ─────────────────────────────────────── */
+.device-wrap {
+  position: absolute;
+  top: 530px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 1730px;
+  z-index: 3;
+  filter: drop-shadow(0px 70px 160px rgba(0,0,0,0.60))
+          drop-shadow(0px 20px 40px rgba(0,0,0,0.30));
+}
+
+/* Outer titanium frame */
+.device-frame {
+  width: 100%;
+  height: 100%;
+  border-radius: 82px;
+  background: linear-gradient(160deg, #B0AFAB 0%, #9B9994 30%, #A8A8A4 60%, #888882 100%);
+  padding: 13px;
+  position: relative;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.20),
+    inset 0 1px 0 rgba(255,255,255,0.35);
+}
+
+/* Volume buttons (left side) */
+.device-frame::before {
+  content: '';
+  position: absolute;
+  left: -7px; top: 248px;
+  width: 7px;
+  height: 68px;
+  background: linear-gradient(90deg, #888882, #9B9994);
+  border-radius: 4px 0 0 4px;
+  box-shadow: 0 100px 0 #9B9994, 0 200px 0 #9B9994;
+}
+
+/* Power button (right side) */
+.device-frame::after {
+  content: '';
+  position: absolute;
+  right: -7px; top: 310px;
+  width: 7px;
+  height: 120px;
+  background: linear-gradient(90deg, #9B9994, #888882);
+  border-radius: 0 4px 4px 0;
+}
+
+/* Inner bezel */
+.device-bezel {
+  width: 100%;
+  height: 100%;
+  border-radius: 71px;
+  background: #111;
+  padding: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+
+/* Glass screen */
+.device-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 60px;
+  background: #FAF7F4;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Dynamic Island */
+.dynamic-island {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 195px; height: 37px;
+  background: #000;
+  border-radius: 22px;
+  z-index: 20;
+}
+
+/* Status bar */
+.status-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 66px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 44px 10px;
+  z-index: 10;
+}
+
+.status-time {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1C1C1E;
+  letter-spacing: -0.5px;
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.signal-bars {
+  display: flex; align-items: flex-end; gap: 3px;
+}
+.signal-bars span {
+  display: block;
+  width: 5px;
+  background: #1C1C1E;
+  border-radius: 2px;
+}
+
+.wifi-icon {
+  width: 22px; height: 16px;
+  position: relative;
+}
+.wifi-icon::before,
+.wifi-icon::after {
+  content: '';
+  position: absolute;
+  border: 3px solid #1C1C1E;
+  border-radius: 50%;
+  border-color: #1C1C1E transparent transparent;
+}
+.wifi-icon::before {
+  width: 22px; height: 22px;
+  top: -3px; left: 0;
+}
+.wifi-icon::after {
+  width: 13px; height: 13px;
+  top: 1px; left: 4.5px;
+}
+
+.battery {
+  width: 28px; height: 15px;
+  border: 2px solid #1C1C1E;
+  border-radius: 3px;
+  position: relative;
+}
+.battery::before {
+  content: '';
+  position: absolute;
+  right: -6px; top: 50%;
+  transform: translateY(-50%);
+  width: 4px; height: 7px;
+  background: #1C1C1E;
+  border-radius: 0 2px 2px 0;
+}
+.battery::after {
+  content: '';
+  position: absolute;
+  left: 2px; top: 2px; bottom: 2px;
+  width: 75%;
+  background: #1C1C1E;
+  border-radius: 1px;
+}
+
+/* ─── App scroll content ─────────────────────────────────── */
+.app-scroll {
+  position: absolute;
+  top: 66px; left: 0; right: 0;
+  bottom: 112px; /* tab bar height */
+  overflow: hidden;
+}
+
+.app-content {
+  padding: 14px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Top bar */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.brand-left {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex: 1;
+  min-width: 0;
+}
+
+.logo-bubble {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: 2px solid #F2DADF;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #F2DADF;
+}
+
+.logo-bubble img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+
+.welcome-block .wlabel {
+  font-size: 18px;
+  font-weight: 700;
+  color: #6E6E73;
+  line-height: 1.2;
+}
+
+.welcome-block .wname {
+  font-size: 20px;
+  font-weight: 900;
+  color: #1C1C1E;
+  line-height: 1.2;
+}
+
+.logout-btn {
+  border: 1px solid #F2DADF;
+  border-radius: 999px;
+  padding: 7px 18px;
+  font-size: 17px;
+  font-weight: 900;
+  color: #6E6E73;
+  background: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ─── Avatar / Buddy widget ──────────────────────────────── */
+.buddy-card {
+  background: #fff;
+  border-radius: 22px;
+  border: 1px solid #F2DADF;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+}
+
+.buddy-avatar {
+  width: 92px; height: 92px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F2DADF 0%, #E8CFAE 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 50px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 2px solid #F2DADF;
+}
+
+.buddy-avatar img {
+  width: 80px; height: 80px;
+  object-fit: contain;
+}
+
+.buddy-info { flex: 1; min-width: 0; }
+
+.buddy-name {
+  font-size: 20px;
+  font-weight: 900;
+  color: #1C1C1E;
+  margin-bottom: 5px;
+}
+
+.mood-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.mood-emoji { font-size: 18px; }
+.mood-label { font-size: 16px; color: #6E6E73; font-weight: 700; }
+
+.energy-wrap {
+  height: 10px;
+  background: #F2DADF;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.energy-fill {
+  height: 100%;
+  width: 82%;
+  background: linear-gradient(90deg, #7B1E3A 0%, #A0274C 100%);
+  border-radius: 999px;
+}
+
+.energy-label {
+  font-size: 14px;
+  color: #6E6E73;
+  font-weight: 700;
+}
+
+.feed-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.feed-btn {
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: #FAF7F4;
+  border: 1px solid #F2DADF;
+  font-size: 17px;
+  font-weight: 800;
+  color: #1C1C1E;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ─── Streak card (Booth) ────────────────────────────────── */
+.streak-card {
+  background: #7B1E3A;
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,0.10);
+  padding: 18px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.streak-left { flex: 1; min-width: 0; }
+
+.streak-day {
+  font-size: 28px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 5px;
+}
+
+.streak-sub {
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.88);
+  margin-bottom: 13px;
+}
+
+.claim-btn {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255,255,255,0.96);
+  border-radius: 999px;
+  padding: 9px 20px;
+  font-size: 16px;
+  font-weight: 900;
+  color: #7B1E3A;
+  margin-bottom: 12px;
+}
+
+.streak-hint {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.72);
+  line-height: 1.45;
+}
+
+/* Phone booth */
+.booth-right {
+  flex-shrink: 0;
+  width: 110px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.booth-container {
+  width: 88px;
+  height: 148px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* White fill from bottom (50% for day 14/28) */
+.booth-fill {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 50%;
+  background: rgba(255,255,255,0.90);
+  border-radius: 0 0 4px 4px;
+}
+
+.booth-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+
+.booth-svg svg {
+  width: 100%; height: 100%;
+}
+
+/* ─── BuddyCoins stepper bar ─────────────────────────────── */
+.coins-card {
+  background: #fff;
+  border-radius: 22px;
+  border: 1px solid #F2DADF;
+  padding: 18px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+}
+
+.coins-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.coins-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.buddy-logo {
+  width: 32px; height: 32px;
+  object-fit: contain;
+  opacity: 0.85;
+}
+
+.coins-label {
+  font-size: 17px;
+  font-weight: 900;
+  color: #6E6E73;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.coins-number {
+  font-size: 30px;
+  font-weight: 900;
+  color: #1C1C1E;
+  letter-spacing: -0.5px;
+}
+
+.coins-max {
+  font-size: 20px;
+  color: #6E6E73;
+  font-weight: 700;
+}
+
+/* Track */
+.coins-track-wrap {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.coins-track {
+  height: 12px;
+  background: #F2DADF;
+  border-radius: 999px;
+  position: relative;
+  overflow: visible;
+}
+
+.coins-fill {
+  position: absolute;
+  top: 0; left: 0;
+  width: 71%; /* 142/200 */
+  height: 100%;
+  background: linear-gradient(90deg, #7B1E3A 0%, #A0274C 100%);
+  border-radius: 999px;
+}
+
+/* Steps markers */
+.step-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #F2DADF;
+  z-index: 1;
+}
+
+.step-dot.filled {
+  border-color: #7B1E3A;
+  background: #7B1E3A;
+}
+
+/* Thumb at current position */
+.coins-thumb {
+  position: absolute;
+  top: 50%;
+  left: 71%;
+  transform: translate(-50%, -50%);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #7B1E3A;
+  box-shadow: 0 2px 8px rgba(123,30,58,0.25);
+  z-index: 2;
+}
+
+.coins-steps-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px;
+  margin-top: 8px;
+}
+
+.step-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #6E6E73;
+}
+
+.step-label.active {
+  color: #7B1E3A;
+  font-weight: 900;
+}
+
+.coins-helper {
+  margin-top: 10px;
+  font-size: 15px;
+  color: #6E6E73;
+  font-weight: 700;
+}
+
+/* VIP chip */
+.vip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #FDE68A;
+  border-radius: 999px;
+  padding: 4px 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #92400E;
+}
+
+/* ─── Promotions preview ─────────────────────────────────── */
+.promos-section { }
+
+.promos-label {
+  font-size: 20px;
+  font-weight: 900;
+  color: #1C1C1E;
+  margin-bottom: 12px;
+}
+
+.promo-card {
+  background: #fff;
+  border-radius: 18px;
+  border: 1px solid #F2DADF;
+  padding: 16px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.promo-thumb {
+  width: 72px; height: 72px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #F2DADF, #E8CFAE);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+}
+
+.promo-body {}
+
+.promo-badge {
+  display: inline-block;
+  background: #7B1E3A;
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
+}
+
+.promo-title {
+  font-size: 18px;
+  font-weight: 900;
+  color: #1C1C1E;
+  margin-bottom: 3px;
+}
+
+.promo-sub {
+  font-size: 14px;
+  color: #6E6E73;
+  font-weight: 600;
+}
+
+/* ─── Tab bar ────────────────────────────────────────────── */
+.tab-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 112px;
+  background: #111118;
+  border-top: 1px solid #222230;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-around;
+  padding-top: 14px;
+}
+
+.tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.tab-icon { font-size: 24px; }
+
+.tab-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tab-active .tab-label { color: #E8CFAE; }
+.tab-inactive .tab-icon { opacity: 0.45; }
+.tab-inactive .tab-label { color: #6E6E73; opacity: 0.7; }
+
+/* Phone booth tab icon — custom SVG */
+.tab-booth-icon {
+  width: 24px; height: 24px;
+  opacity: 1;
+}
+
+.tab-booth-icon-inactive {
+  opacity: 0.45;
+}
+
+/* ─── Bottom area (below device) ─────────────────────────── */
+.bottom-area {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 90px;
+  gap: 36px;
+}
+
+.free-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 2px solid #F2DADF;
+  border-radius: 999px;
+  padding: 18px 52px;
+  box-shadow: 0 6px 24px rgba(123,30,58,0.12);
+}
+
+.free-badge-icon {
+  font-size: 32px;
+}
+
+.free-badge-text {
+  font-size: 38px;
+  font-weight: 900;
+  color: #7B1E3A;
+  letter-spacing: -0.5px;
+}
+
+.dot-nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.dot {
+  height: 14px;
+  background: #F2DADF;
+  border-radius: 999px;
+  width: 14px;
+}
+
+.dot.active {
+  width: 36px;
+  background: #7B1E3A;
+}
+
+</style>
+</head>
+<body style="background:#222; width:1320px;">
+<div class="canvas">
+
+  <!-- ① Burgundy background -->
+  <div class="bg-burgundy"></div>
+
+  <!-- ② Header text -->
+  <div class="header">
+    <div class="lc-wordmark">
+      <div class="lc-logo-ring">
+        <img src="src/assets/markers/londoncafe1.jpg" alt="London Cafe">
+      </div>
+      <span class="lc-name">London Cafe</span>
+    </div>
+    <div class="headline">Acumula puntos<br>con cada visita.</div>
+    <div class="subtitle">BuddyCoins &nbsp;·&nbsp; Nivel VIP &nbsp;·&nbsp; Racha diaria</div>
+  </div>
+
+  <!-- ③ Device -->
+  <div class="device-wrap">
+    <div class="device-frame">
+      <div class="device-bezel">
+        <div class="device-screen">
+
+          <!-- Dynamic Island -->
+          <div class="dynamic-island"></div>
+
+          <!-- Status bar -->
+          <div class="status-bar">
+            <div class="status-time">9:41</div>
+            <div class="status-icons">
+              <!-- Signal -->
+              <div class="signal-bars">
+                <span style="height:6px"></span>
+                <span style="height:9px"></span>
+                <span style="height:12px"></span>
+                <span style="height:15px"></span>
+              </div>
+              <!-- WiFi (unicode approx) -->
+              <span style="font-size:20px;color:#1C1C1E;line-height:1;">𝌕</span>
+              <!-- Battery -->
+              <div class="battery"></div>
+            </div>
+          </div>
+
+          <!-- App scroll area -->
+          <div class="app-scroll">
+            <div class="app-content">
+
+              <!-- Top bar -->
+              <div class="top-bar">
+                <div class="brand-left">
+                  <div class="logo-bubble">
+                    <img src="src/assets/markers/londoncafe1.jpg" alt="LC">
+                  </div>
+                  <div class="welcome-block">
+                    <div class="wlabel">Bienvenida</div>
+                    <div class="wname">Sofía M. (@sofia_jrz)</div>
+                  </div>
+                </div>
+                <div class="logout-btn">Salir</div>
+              </div>
+
+              <!-- Buddy / Avatar widget -->
+              <div class="buddy-card">
+                <div class="buddy-avatar">
+                  <img src="src/assets/icons/LondonBuddy.png" alt="London Buddy">
+                </div>
+                <div class="buddy-info">
+                  <div class="buddy-name">London Buddy</div>
+                  <div class="mood-row">
+                    <span class="mood-emoji">😄</span>
+                    <span class="mood-label">Feliz · 82%</span>
+                  </div>
+                  <div class="energy-wrap">
+                    <div class="energy-fill"></div>
+                  </div>
+                  <div class="energy-label">Energía: 82 / 100</div>
+                </div>
+                <div class="feed-btns">
+                  <div class="feed-btn">☕ ×2</div>
+                  <div class="feed-btn">🍞 ×1</div>
+                </div>
+              </div>
+
+              <!-- Streak / Booth card -->
+              <div class="streak-card">
+                <div class="streak-left">
+                  <div class="streak-day">🔥 Día 14/28</div>
+                  <div class="streak-sub">¡Reclama tu recompensa!</div>
+                  <div class="claim-btn">Reclamar</div>
+                  <div class="streak-hint">Completa la cabina en 28 días 💥<br>Día 28 = Bonus especial</div>
+                </div>
+
+                <!-- Phone booth with 50% fill -->
+                <div class="booth-right">
+                  <div class="booth-container">
+                    <div class="booth-fill"></div>
+                    <div class="booth-svg">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+                        <!-- Outline version: stroke white, fill transparent so fill div shows through -->
+                        <g fill="rgba(255,255,255,0.20)" stroke="rgba(255,255,255,0.65)" stroke-width="0.4">
+                          <path fill-rule="evenodd" clip-rule="evenodd" d="M7.825 4.698c1 0 2 .1 3 .1c.43 0 .87 0 1.32-.07l3.679-.16a.35.35 0 0 0 .36-.32a.34.34 0 0 0-.32-.36c-.45-.07-1.39-.18-2.26-.24c-.62-.05-1.21-.06-1.55-.06c-.58.06-1.15.09-1.72.15c-.899.09-1.759.23-2.589.36a.3.3 0 0 0-.28.32a.3.3 0 0 0 .36.28m-.83 6.139l1.38.07c-.11 1.36-.17 2.16-.18 3v.1c-.3 0-.76.07-1.2.11c-.9.05-.83.55 0 .71h1.19v.77c0 .48 0 1 .08 1.73v.23h-1.27c-.81.23-.92.47 0 .71l1.36.12l.08 1.179c.14.51.42.48.81 0v-1.13q.258.05.52.07h2c.67 0 1.33-.06 2-.11l.67-.1c0 .41.06.83.08 1.25c.32.57.58.42.81 0c0-.45 0-.9.06-1.34l.999-.05v-.83h-.95v-.7c0-.62-.05-1.24-.08-1.86h1c.91 0 .79-.76 0-.81h-1.06c0-.36-.09-1.999-.13-2.939l1.19-.07c.86-.15.92-.61 0-.83h-1.22c-.89 0-1.77-.18-2.65-.26h-1.21c-1.24.08-2.509.24-3.769.31h-.51c-.75-.01-.71.71 0 .67m6.75 6.54c-.91 0-1.83 0-2.75.07c-.73 0-.95.07-1.67.1v-2.68h.72c.71 0 1.43.06 2.14.06h2.07v1.17c0 .39.07.88.11 1.31zm-2.41-6.44c.88 0 1.76.08 2.64.12h.54l-.26 2.82l-4.18-.09a2.2 2.2 0 0 0-.44.05h-.37c-.06-.8-.15-1.6-.22-2.95c.95.05 1.38.03 2.3.05z"/>
+                          <path d="M19.374 7.298a4.6 4.6 0 0 0 .28-1.57c.046-.703.03-1.41-.05-2.11a3.6 3.6 0 0 0-1.79-2.1a12.7 12.7 0 0 0-3.5-1.32a8 8 0 0 0-2.15-.19c-.703.023-1.403.113-2.09.27a12.2 12.2 0 0 0-2.999 1a7.85 7.85 0 0 0-2.47 2a.3.3 0 0 0 0 .37c-.08.39-.15.79-.2 1.18a9 9 0 0 0-.08 1.37q-.022.444.07.88a.94.94 0 0 0 .24.45c.196.182.445.294.71.32c-.06 1.44-.19 2.88-.27 4.32c-.08.429-.08.839-.08 1.239v2c0 .64 0 1.36.09 2.05s.1 1.4.18 2.049c0 .37.1.74.16 1.11a1.36 1.36 0 0 0-.66.39a.5.5 0 0 0-.1.29q.016.21.06.42v1.65a.5.5 0 0 0 0 .12a.34.34 0 0 0 .37.31h4.38c.69 0 1.35 0 2 .05c.93 0 3.85.17 5.619.15a5.6 5.6 0 0 0 1.65-.18a1.4 1.4 0 0 0 .63-.91a2.9 2.9 0 0 0 0-1.28a7 7 0 0 0-.12-.93a.84.84 0 0 0-.39-.55a1.2 1.2 0 0 0-.54-.13c-.09-2.11.17-5.15.17-5.21c.07-1 .1-1.999.13-3.049v-2.62c0-.46 0-.92-.08-1.38a1.22 1.22 0 0 0 .83-.46m-1.06 15.098a.9.9 0 0 1-.06.34v.08h-.34c-.52 0-1.32.07-2.2.09h-6.18c-.659 0-1.369.05-1.999.1l-2.1.09v-1.38a3 3 0 0 1 0-.3a1.4 1.4 0 0 1 .56-.13h3.7c1.75 0 3.51 0 5.25.06l2.579-.09l.61-.07q.062.365.2.71q.03.25-.02.5M5.995 7.897c.38 0 .75-.06 1-.06h9.629c.25 0 .83.06 1.37 0v.86c0 .29-.78 7.608-.27 11.388h-.25l-10.229.43h-1.06c-.25-2.11.01-9.509-.19-12.618m12.539-2.89c0 .46 0 .94-.08 1.31s-.08.37-1.85.33h-1.61c-.79 0-1.57 0-2.35.08c-7.648.37-7.348.39-7.438.28a.46.46 0 0 1-.11-.3a5 5 0 0 1 0-.52a11 11 0 0 1 0-1.27c0-.42.11-.85.19-1.27a.44.44 0 0 0 0-.2a7 7 0 0 1 2.1-1.53c.913-.395 1.874-.67 2.859-.82q.962-.175 1.94-.18a7.7 7.7 0 0 1 1.88.24c1.113.28 2.18.718 3.169 1.3a2.54 2.54 0 0 1 1.26 1.42q.064.564.04 1.13"/>
+                        </g>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- BuddyCoins stepper bar -->
+              <div class="coins-card">
+                <div class="coins-header">
+                  <div class="coins-left">
+                    <img class="buddy-logo" src="src/assets/icons/LondonBuddy.png" alt="">
+                    <span class="coins-label">Buddy Coins</span>
+                  </div>
+                  <div>
+                    <span class="coins-number">142</span>
+                    <span class="coins-max"> / 200</span>
+                  </div>
+                </div>
+
+                <div class="coins-track-wrap">
+                  <div class="coins-track">
+                    <div class="coins-fill"></div>
+                    <!-- Step dots -->
+                    <div class="step-dot filled" style="left:25%"></div>
+                    <div class="step-dot filled" style="left:50%"></div>
+                    <div class="step-dot filled" style="left:75%"></div>
+                    <div class="step-dot" style="left:100%"></div>
+                    <!-- Thumb -->
+                    <div class="coins-thumb"></div>
+                  </div>
+                </div>
+
+                <div class="coins-steps-labels">
+                  <span class="step-label active">50</span>
+                  <span class="step-label active">100</span>
+                  <span class="step-label active">150</span>
+                  <span class="step-label">200</span>
+                </div>
+
+                <div class="coins-helper">Te faltan 58 puntos para subir a VIP ⚡</div>
+                <div class="vip-chip">⚡ VIP en 200 coins</div>
+              </div>
+
+              <!-- Promotions (partial) -->
+              <div class="promos-section">
+                <div class="promos-label">Promociones</div>
+                <div class="promo-card">
+                  <div class="promo-thumb">☕</div>
+                  <div class="promo-body">
+                    <div class="promo-badge">HOY</div>
+                    <div class="promo-title">2x1 en café americano</div>
+                    <div class="promo-sub">Válido hasta las 12:00 pm</div>
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- /app-content -->
+          </div><!-- /app-scroll -->
+
+          <!-- Tab bar -->
+          <div class="tab-bar">
+            <!-- Inicio — active -->
+            <div class="tab-item tab-active">
+              <svg class="tab-booth-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g fill="#E8CFAE">
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M7.825 4.698c1 0 2 .1 3 .1c.43 0 .87 0 1.32-.07l3.679-.16a.35.35 0 0 0 .36-.32a.34.34 0 0 0-.32-.36c-.45-.07-1.39-.18-2.26-.24c-.62-.05-1.21-.06-1.55-.06c-.58.06-1.15.09-1.72.15c-.899.09-1.759.23-2.589.36a.3.3 0 0 0-.28.32a.3.3 0 0 0 .36.28m-.83 6.139l1.38.07c-.11 1.36-.17 2.16-.18 3v.1c-.3 0-.76.07-1.2.11c-.9.05-.83.55 0 .71h1.19v.77c0 .48 0 1 .08 1.73v.23h-1.27c-.81.23-.92.47 0 .71l1.36.12l.08 1.179c.14.51.42.48.81 0v-1.13q.258.05.52.07h2c.67 0 1.33-.06 2-.11l.67-.1c0 .41.06.83.08 1.25c.32.57.58.42.81 0c0-.45 0-.9.06-1.34l.999-.05v-.83h-.95v-.7c0-.62-.05-1.24-.08-1.86h1c.91 0 .79-.76 0-.81h-1.06c0-.36-.09-1.999-.13-2.939l1.19-.07c.86-.15.92-.61 0-.83h-1.22c-.89 0-1.77-.18-2.65-.26h-1.21c-1.24.08-2.509.24-3.769.31h-.51c-.75-.01-.71.71 0 .67m6.75 6.54c-.91 0-1.83 0-2.75.07c-.73 0-.95.07-1.67.1v-2.68h.72c.71 0 1.43.06 2.14.06h2.07v1.17c0 .39.07.88.11 1.31zm-2.41-6.44c.88 0 1.76.08 2.64.12h.54l-.26 2.82l-4.18-.09a2.2 2.2 0 0 0-.44.05h-.37c-.06-.8-.15-1.6-.22-2.95c.95.05 1.38.03 2.3.05z"/>
+                  <path d="M19.374 7.298a4.6 4.6 0 0 0 .28-1.57c.046-.703.03-1.41-.05-2.11a3.6 3.6 0 0 0-1.79-2.1a12.7 12.7 0 0 0-3.5-1.32a8 8 0 0 0-2.15-.19c-.703.023-1.403.113-2.09.27a12.2 12.2 0 0 0-2.999 1a7.85 7.85 0 0 0-2.47 2a.3.3 0 0 0 0 .37c-.08.39-.15.79-.2 1.18a9 9 0 0 0-.08 1.37q-.022.444.07.88a.94.94 0 0 0 .24.45c.196.182.445.294.71.32c-.06 1.44-.19 2.88-.27 4.32c-.08.429-.08.839-.08 1.239v2c0 .64 0 1.36.09 2.05s.1 1.4.18 2.049c0 .37.1.74.16 1.11a1.36 1.36 0 0 0-.66.39a.5.5 0 0 0-.1.29q.016.21.06.42v1.65a.5.5 0 0 0 0 .12a.34.34 0 0 0 .37.31h4.38c.69 0 1.35 0 2 .05c.93 0 3.85.17 5.619.15a5.6 5.6 0 0 0 1.65-.18a1.4 1.4 0 0 0 .63-.91a2.9 2.9 0 0 0 0-1.28a7 7 0 0 0-.12-.93a.84.84 0 0 0-.39-.55a1.2 1.2 0 0 0-.54-.13c-.09-2.11.17-5.15.17-5.21c.07-1 .1-1.999.13-3.049v-2.62c0-.46 0-.92-.08-1.38a1.22 1.22 0 0 0 .83-.46m-1.06 15.098a.9.9 0 0 1-.06.34v.08h-.34c-.52 0-1.32.07-2.2.09h-6.18c-.659 0-1.369.05-1.999.1l-2.1.09v-1.38a3 3 0 0 1 0-.3a1.4 1.4 0 0 1 .56-.13h3.7c1.75 0 3.51 0 5.25.06l2.579-.09l.61-.07q.062.365.2.71q.03.25-.02.5M5.995 7.897c.38 0 .75-.06 1-.06h9.629c.25 0 .83.06 1.37 0v.86c0 .29-.78 7.608-.27 11.388h-.25l-10.229.43h-1.06c-.25-2.11.01-9.509-.19-12.618m12.539-2.89c0 .46 0 .94-.08 1.31s-.08.37-1.85.33h-1.61c-.79 0-1.57 0-2.35.08c-7.648.37-7.348.39-7.438.28a.46.46 0 0 1-.11-.3a5 5 0 0 1 0-.52a11 11 0 0 1 0-1.27c0-.42.11-.85.19-1.27a.44.44 0 0 0 0-.2a7 7 0 0 1 2.1-1.53c.913-.395 1.874-.67 2.859-.82q.962-.175 1.94-.18a7.7 7.7 0 0 1 1.88.24c1.113.28 2.18.718 3.169 1.3a2.54 2.54 0 0 1 1.26 1.42q.064.564.04 1.13"/>
+                </g>
+              </svg>
+              <span class="tab-label" style="color:#E8CFAE;font-size:13px;font-weight:700;">Inicio</span>
+            </div>
+
+            <!-- Ordena -->
+            <div class="tab-item tab-inactive">
+              <span class="tab-icon" style="font-size:24px;opacity:.45;">🛒</span>
+              <span class="tab-label">Ordena</span>
+            </div>
+
+            <!-- Escanear -->
+            <div class="tab-item tab-inactive">
+              <span class="tab-icon" style="font-size:24px;opacity:.45;">⬛</span>
+              <span class="tab-label">Escanear</span>
+            </div>
+
+            <!-- Regalos -->
+            <div class="tab-item tab-inactive">
+              <span class="tab-icon" style="font-size:24px;opacity:.45;">🎁</span>
+              <span class="tab-label">Regalos</span>
+            </div>
+
+            <!-- Ubicación -->
+            <div class="tab-item tab-inactive">
+              <span class="tab-icon" style="font-size:24px;opacity:.45;">📍</span>
+              <span class="tab-label">Ubicación</span>
+            </div>
+          </div><!-- /tab-bar -->
+
+        </div><!-- /device-screen -->
+      </div><!-- /device-bezel -->
+    </div><!-- /device-frame -->
+  </div><!-- /device-wrap -->
+
+  <!-- ④ Bottom area -->
+  <div class="bottom-area">
+    <div class="free-badge">
+      <span class="free-badge-icon">☕</span>
+      <span class="free-badge-text">Descarga gratuita</span>
+    </div>
+    <div class="dot-nav">
+      <div class="dot active"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+  </div>
+
+</div><!-- /canvas -->
+</body>
+</html>

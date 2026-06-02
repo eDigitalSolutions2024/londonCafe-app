@@ -155,7 +155,7 @@ function ProductTile({ item, onAdd }) {
     >
       <View style={{ position: "relative" }}>
         <Image
-          source={{ uri: item.imageUrl || "https://via.placeholder.com/300" }}
+          source={item.imageUrl ? { uri: item.imageUrl } : require("../assets/promo_placeholder.png")}
           style={{
             width: "100%",
             height: 120,
@@ -236,7 +236,7 @@ function ProductRow({ item, onAdd }) {
       }}
     >
       <Image
-        source={{ uri: item.imageUrl || "https://via.placeholder.com/120" }}
+        source={item.imageUrl ? { uri: item.imageUrl } : require("../assets/promo_placeholder.png")}
         style={{ width: 70, height: 70, borderRadius: 14, backgroundColor: "#eee" }}
       />
 

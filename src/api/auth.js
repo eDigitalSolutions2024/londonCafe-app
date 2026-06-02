@@ -36,3 +36,12 @@ export function me(token) {
     },
   });
 }
+
+export function deleteAccount(token) {
+  return apiFetch("/me", {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}

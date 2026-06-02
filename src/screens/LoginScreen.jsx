@@ -32,7 +32,8 @@ export default function LoginScreen({ route, navigation }) {
       setLoading(true);
       const res = await loginApi({ email, password });
       await signIn(res.token, res.user);
-      // ya te manda a tabs por el App.js
+      // dismiss the auth modal and return to whatever tab was active
+      navigation.getParent()?.goBack();
     } catch (e) {
       const errCode = e?.data?.error;
       if (errCode === "EMAIL_NOT_VERIFIED") {
@@ -63,8 +64,8 @@ export default function LoginScreen({ route, navigation }) {
               <Image source={LondonCafeLogo} style={styles.logo} resizeMode="contain" />
             </View>
 
-            <Text style={styles.title}>Bienvenido</Text>
-            <Text style={styles.subtitle}>Inicia sesión para continuar</Text>
+            <Text style={styles.title}>Bienvenido a London Cafe</Text>
+            <Text style={styles.subtitle}>Inicia sesión para acceder a tus recompensas</Text>
           </View>
 
           {/* Card */}
@@ -125,6 +126,17 @@ export default function LoginScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
 
+          {/* Continuar sin cuenta */}
+          <TouchableOpacity
+            onPress={() => navigation.getParent()?.goBack()}
+            activeOpacity={0.8}
+            style={{ paddingVertical: 12, alignItems: "center" }}
+          >
+            <Text style={[styles.footerNote, { textDecorationLine: "underline" }]}>
+              Continuar sin cuenta
+            </Text>
+          </TouchableOpacity>
+
           {/* Footer */}
           <Text style={styles.footerNote}>
             Al continuar aceptas las políticas de LondonCafe.
@@ -151,25 +163,25 @@ const styles = StyleSheet.create({
   },
 
   logoWrap: {
-    width: 92,
-    height: 92,
-    borderRadius: 26,
+    width: 108,
+    height: 108,
+    borderRadius: 28,
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 12,
-    // sombra suave
+    marginBottom: 14,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
+    elevation: 4,
+    overflow: "hidden",
   },
   logo: {
-    width: 78,
-    height: 78,
+    width: 108,
+    height: 108,
   },
 
   title: {

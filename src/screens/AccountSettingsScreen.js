@@ -4,24 +4,23 @@ import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
 import AvatarPreview from "../components/AvatarPreview";
 import { apiFetch } from "../api/client";
-import Screen from "../components/Screen"; 
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";  // ✅ NUEVO
+import { deleteAccount } from "../api/auth";
+import Screen from "../components/Screen";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import GuestPrompt from "../components/GuestPrompt";
 
 export default function AccountSettingsScreen({ navigation }) {
-  const { token } = useContext(AuthContext);
+  const { token, signOut } = useContext(AuthContext);
   const tabBarHeight = useBottomTabBarHeight();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // perfil
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-
-  // seguridad (pendiente backend)
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
 
   // avatar
   const [avatarConfig, setAvatarConfig] = useState({
@@ -36,6 +35,7 @@ export default function AccountSettingsScreen({ navigation }) {
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   const loadMe = useCallback(async () => {
+    if (!token) { setLoading(false); return; }
     try {
       setLoading(true);
       const r = await apiFetch("/me", { headers: authHeaders });
@@ -84,16 +84,7 @@ export default function AccountSettingsScreen({ navigation }) {
         body: JSON.stringify({ avatarConfig }),
       });
 
-      // 3) Password (todavía no hay endpoint)
-      if ((currentPassword && !newPassword) || (!currentPassword && newPassword)) {
-        Alert.alert("Aviso", "Para cambiar contraseña, llena ambos campos.");
-      } else if (currentPassword && newPassword) {
-        Alert.alert("Pendiente", "Aún falta crear el endpoint para cambiar contraseña en el backend.");
-      }
-
       Alert.alert("Listo", "Cambios guardados ✅");
-      setCurrentPassword("");
-      setNewPassword("");
       await loadMe();
     } catch (e) {
       console.log("❌ save:", e?.data || e?.message);
@@ -109,6 +100,56 @@ export default function AccountSettingsScreen({ navigation }) {
       setSaving(false);
     }
   };
+
+  // Step 2 of 2: performs the actual deletion after the user confirms.
+  // Split from onDeleteAccount so the error path never signs the user out
+  // without having actually deleted their data on the server.
+  const confirmDelete = async () => {
+    setDeleting(true);
+
+    try {
+      // 1. Hit DELETE /api/me — backend deletes user + related collections
+      await deleteAccount(token);
+    } catch (e) {
+      // Server failed: keep the session alive so the user can retry
+      setDeleting(false);
+      const msg =
+        e?.data?.error === "USER_NOT_FOUND"
+          ? "Esta cuenta ya no existe en el servidor."
+          : "No se pudo eliminar la cuenta. Intenta de nuevo o contacta a soporte.";
+      Alert.alert("Error al eliminar", msg);
+      return;
+    }
+
+    // 2. Server confirmed deletion — invalidate the local session.
+    //    setDeleting(false) is intentionally omitted here: the component
+    //    re-renders as GuestPrompt after signOut() clears the token, so
+    //    updating that state would write to an effectively dead render.
+    await signOut();
+    navigation.popToTop();
+  };
+
+  const onDeleteAccount = () => {
+    Alert.alert(
+      "Eliminar cuenta",
+      "Esta acción es permanente y no se puede deshacer. Todos tus datos, puntos y recompensas serán eliminados.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Sí, eliminar", style: "destructive", onPress: confirmDelete },
+      ]
+    );
+  };
+
+  if (!token) {
+    return (
+      <Screen style={styles.screen} edges={["top", "left", "right"]}>
+        <GuestPrompt
+          title="Configuración"
+          message="Inicia sesión para gestionar tu cuenta y avatar."
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen style={styles.screen} edges={["top", "left", "right"]}>
@@ -189,31 +230,6 @@ export default function AccountSettingsScreen({ navigation }) {
           </Pressable>
         </View>
 
-        {/* Card: Seguridad */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Seguridad</Text>
-
-          <Text style={styles.label}>Contraseña actual</Text>
-          <TextInput
-            value={currentPassword}
-            onChangeText={setCurrentPassword}
-            placeholder="••••••••"
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
-            style={styles.input}
-          />
-
-          <Text style={styles.label}>Nueva contraseña</Text>
-          <TextInput
-            value={newPassword}
-            onChangeText={setNewPassword}
-            placeholder="••••••••"
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
-            style={styles.input}
-          />
-        </View>
-
         <Pressable
           onPress={onSave}
           style={[styles.primaryBtn, (saving || loading) && { opacity: 0.7 }]}
@@ -222,8 +238,16 @@ export default function AccountSettingsScreen({ navigation }) {
           <Text style={styles.primaryBtnText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
         </Pressable>
 
-        {/* espacio al final para que no se encime con tab bar */}
-       
+        <Pressable
+          onPress={onDeleteAccount}
+          style={[styles.deleteBtn, deleting && { opacity: 0.6 }]}
+          disabled={deleting}
+        >
+          <Text style={styles.deleteBtnText}>
+            {deleting ? "Eliminando..." : "Eliminar cuenta"}
+          </Text>
+        </Pressable>
+
       </ScrollView>
     </Screen>
   );
@@ -318,4 +342,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   primaryBtnText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+
+  deleteBtn: {
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#EF4444",
+    backgroundColor: "#FFF",
+    alignItems: "center",
+  },
+  deleteBtnText: {
+    color: "#EF4444",
+    fontWeight: "900",
+    fontSize: 14,
+  },
 });

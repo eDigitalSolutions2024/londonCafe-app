@@ -12,6 +12,7 @@ import { useNavigation } from "@react-navigation/native";
 import Screen from "../components/Screen";
 import { AuthContext } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
+import GuestPrompt from "../components/GuestPrompt";
 
 const COLORS = {
   bg: "#F7F7F7",
@@ -58,7 +59,7 @@ function formatOrderItems(order) {
 
 export default function PedidosScreen() {
   const navigation = useNavigation();
-  const { user } = useContext(AuthContext);
+  const { user, token } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
@@ -95,6 +96,17 @@ const [showOrderModal, setShowOrderModal] = useState(false);
   useEffect(() => {
     loadOrders();
   }, [user?._id, user?.id]);
+
+  if (!token) {
+    return (
+      <Screen>
+        <GuestPrompt
+          title="Pedidos"
+          message="Inicia sesión para ver el historial de tus pedidos."
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

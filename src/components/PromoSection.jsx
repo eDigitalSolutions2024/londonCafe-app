@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from "react-native";
 import { colors } from "../theme/colors";
 import { posFetch } from "../api/client";
+import PromoPlaceholder from "../assets/promo_placeholder.png";
 
 function formatWhen(iso) {
   try {
@@ -122,9 +123,7 @@ export default function PromosSection({
             activeOpacity={0.9}
           >
             <Image
-              source={{
-                uri: img || "https://picsum.photos/1200/600?blur=2",
-              }}
+              source={img ? { uri: img } : PromoPlaceholder}
               style={styles.promoImageV}
             />
 

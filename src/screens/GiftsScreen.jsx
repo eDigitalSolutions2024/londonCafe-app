@@ -21,7 +21,8 @@ import { AuthContext } from "../context/AuthContext";
 import { fetchMyGiftCards, purchaseGiftCard, redeemGiftCard } from "../api/giftcards";
 import { colors } from "../theme/colors";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import AvatarPreview from "../components/AvatarPreview"; // ✅ ajusta si tu path cambia
+import AvatarPreview from "../components/AvatarPreview";
+import { GuestLockCard } from "../components/GuestPrompt";
 
 const moneyPresets = [50, 100, 200, 300, 500];
 
@@ -542,6 +543,89 @@ const tabBarHeight = useBottomTabBarHeight();
       Alert.alert("Error", e?.message || "Error");
     }
   }, [token, redeemCode, received, load]);
+
+  if (!token) {
+    return (
+      <ScrollView
+        style={{ flex: 1, backgroundColor: UI.bg }}
+        contentContainerStyle={{ padding: 16, paddingTop: 40, paddingBottom: 60 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={{ color: UI.text, fontSize: 22, fontWeight: "900", marginBottom: 14 }}>
+          Regalos 🎁
+        </Text>
+
+        {/* Sample gift card */}
+        <View
+          style={{
+            borderRadius: 18,
+            padding: 18,
+            backgroundColor: UI.primary,
+            marginBottom: 14,
+          }}
+        >
+          <Text style={{ color: "rgba(255,255,255,0.85)", fontWeight: "900", fontSize: 12 }}>
+            Tarjeta de regalo · London Cafe
+          </Text>
+          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 34, marginTop: 10 }}>
+            $50 – $500
+          </Text>
+          <Text style={{ color: "rgba(255,255,255,0.85)", fontWeight: "700", fontSize: 13, marginTop: 6, lineHeight: 19 }}>
+            Envía una tarjeta de regalo a tus amigos o familia y ellos podrán canjearla en London Cafe.
+          </Text>
+
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 14 }}>
+            {[50, 100, 200, 300, 500].map((m) => (
+              <View
+                key={m}
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
+                  borderRadius: 999,
+                  backgroundColor: "rgba(255,255,255,0.18)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.3)",
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>${m}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* How it works */}
+        <View
+          style={{
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: UI.border,
+            backgroundColor: "#fff",
+            padding: 16,
+            marginBottom: 14,
+            gap: 12,
+          }}
+        >
+          <Text style={{ color: UI.text, fontSize: 15, fontWeight: "900" }}>
+            ¿Cómo funciona?
+          </Text>
+          {[
+            { icon: "✉️", text: "Elige el monto y el email del destinatario." },
+            { icon: "🎁", text: "El destinatario recibe un código único." },
+            { icon: "☕", text: "Se canjea en tu próxima visita a London Cafe." },
+          ].map((step, i) => (
+            <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+              <Text style={{ fontSize: 18 }}>{step.icon}</Text>
+              <Text style={{ flex: 1, color: UI.muted, fontWeight: "700", fontSize: 13, lineHeight: 18 }}>
+                {step.text}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <GuestLockCard />
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
