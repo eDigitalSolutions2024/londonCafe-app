@@ -381,7 +381,6 @@ useEffect(() => {
   }, [token, user]);
 
     const refreshingHomeRef = useRef(false);
-const firstFocusRef = useRef(true);
 
 const lowEnergyNotifiedRef = useRef(false);
 
@@ -637,10 +636,7 @@ const prevEnergy = Number.isFinite(Number(buddy?.energy)) ? Number(buddy.energy)
 
 useFocusEffect(
   useCallback(() => {
-    if (firstFocusRef.current) {
-      firstFocusRef.current = false;
-      refreshHome();
-    }
+    refreshHome();
   }, [refreshHome])
 );
 
@@ -835,7 +831,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
                 onAvatarPressOut={() => setShowAvatarPeek(false)}
                 energyFlash={energyFlash}
               />
-            ) : (
+            ) : loadingMe ? (
               <View
                 style={{
                   padding: 14,
@@ -849,7 +845,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
                   Cargando avatar...
                 </Text>
               </View>
-            )}
+            ) : null}
 
 
 
