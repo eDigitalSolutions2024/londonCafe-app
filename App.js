@@ -1,6 +1,6 @@
 import React, { useContext } from "react";
 import { View } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, CommonActions } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -115,7 +115,29 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Inicio" component={HomeStackNav} />
+      <Tab.Screen
+        name="Inicio"
+        component={HomeStackNav}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            const tabState = navigation.getState().routes.find((r) => r.name === "Inicio")?.state;
+            // Si hay pantallas apiladas (Rewards, WalletHistory, etc.) sobre
+            // Home, cada tap en "Inicio" debe regresar a la pantalla
+            // principal -- no quedarse donde el usuario dejó ese stack la
+            // última vez, que es el comportamiento por defecto de React
+            // Navigation al cambiar de tab y volver.
+            if (tabState && tabState.index > 0) {
+              navigation.dispatch({
+                ...CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: "Home" }],
+                }),
+                target: tabState.key,
+              });
+            }
+          },
+        })}
+      />
       <Tab.Screen name="Ordena" component={OrderStackNav} />
       <Tab.Screen name="Escanear" component={ScanScreen} />
       <Tab.Screen name="Regalos" component={GiftsScreen} />
