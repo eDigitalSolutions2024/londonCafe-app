@@ -35,6 +35,14 @@ function computeBadge(promo) {
   return "PROMO";
 }
 
+// Cada tipo de badge tiene su propio color -- "HOY" debe leerse urgente,
+// "NUEVO" como algo que vale la pena descubrir, "PROMO" como la marca.
+const BADGE_STYLES = {
+  HOY: { backgroundColor: "#E64A19", color: "#fff" },
+  NUEVO: { backgroundColor: "#2E7D32", color: "#fff" },
+  PROMO: { backgroundColor: colors.primary, color: "#fff" },
+};
+
 export default function PromosSection({
   onViewAll,
   limit = 3,
@@ -67,27 +75,6 @@ export default function PromosSection({
 
   return (
     <View style={styles.promosSection}>
-      <View style={styles.sectionHeader}>
-  <View style={styles.sectionLeft}>
-    {/*<View style={styles.sectionPill}>
-      <Text style={styles.sectionIcon}>🔥</Text>
-      <Text style={styles.sectionTitle}>Promociones</Text>
-    </View>*/}
-
-    {/* si quieres, esto puede ser badge en vez de texto 
-    <View style={styles.sectionMiniRow}>
-      <View style={styles.sectionDot} />
-      <Text style={styles.sectionHint}>Novedades</Text>
-    </View>*/}
-  </View>
-
-  {/* opcional: si luego quieres volver a poner "ver todas" aquí */}
-  {/* <TouchableOpacity style={styles.seeAllBtn} onPress={onViewAll}>
-    <Text style={styles.seeAllText}>Ver todas</Text>
-  </TouchableOpacity> */}
-</View>
-{/* <View style={styles.sectionUnderline} />*/}
-
       {loading && (
         <View style={styles.loadingRow}>
           <ActivityIndicator />
@@ -129,7 +116,17 @@ export default function PromosSection({
 
             <View style={styles.promoOverlayV}>
               <View style={styles.promoMetaRow}>
-                <Text style={styles.promoBadge}>{badge}</Text>
+                <Text
+                  style={[
+                    styles.promoBadge,
+                    {
+                      backgroundColor: (BADGE_STYLES[badge] || BADGE_STYLES.PROMO).backgroundColor,
+                      color: (BADGE_STYLES[badge] || BADGE_STYLES.PROMO).color,
+                    },
+                  ]}
+                >
+                  {badge}
+                </Text>
                 <Text style={styles.promoTag}>
                   {tag ? tag : (p?.createdAt ? formatWhen(p.createdAt) : "")}
                 </Text>
@@ -150,69 +147,7 @@ export default function PromosSection({
 }
 
 const styles = StyleSheet.create({
-  promosSection: { paddingHorizontal: 20, paddingBottom: 24 },
-
-  // ===== Header (nuevo estilo) =====
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-
-  sectionLeft: { gap: 6 },
-
-  sectionPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: "rgba(128,16,35,0.08)", // rojito suave
-    borderWidth: 1,
-    borderColor: "rgba(128,16,35,0.18)",
-    alignSelf: "flex-start",
-  },
-
-  sectionIcon: { fontSize: 13 },
-
-  sectionTitle: {
-    color: colors.primary, // rojo London
-    fontSize: 13,
-    fontWeight: "900",
-    letterSpacing: 0.2,
-  },
-
-  sectionMiniRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginLeft: 6,
-  },
-
-  sectionDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 99,
-    backgroundColor: colors.primary,
-    opacity: 0.9,
-  },
-
-  sectionHint: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontWeight: "700",
-  },
-
-  sectionUnderline: {
-    height: 3,
-    width: 74,
-    borderRadius: 99,
-    backgroundColor: colors.primary,
-    opacity: 0.9,
-    marginBottom: 10,
-  },
+  promosSection: { paddingHorizontal: 20, paddingBottom: 24, marginTop: 10 },
 
   // ===== Loading / Error / Empty =====
   loadingRow: {
@@ -254,18 +189,18 @@ const styles = StyleSheet.create({
 
   // ===== Promo Card =====
   promoCardV: {
-    height: 220,
-    borderRadius: 18,
+    height: 240,
+    borderRadius: 20,
     overflow: "hidden",
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: colors.card,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5,
   },
 
   promoImageV: { width: "100%", height: "100%" },
@@ -275,10 +210,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 80,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    height: 104,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "rgba(0,0,0,0.52)",
     borderTopWidth: 1,                    // opcional (se ve pro)
     borderTopColor: "rgba(255,255,255,0.10)",
   },
@@ -287,32 +222,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 8,
   },
 
   promoBadge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.95)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.25)",
-    color: "#111",
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.4,
+    overflow: "hidden",
   },
 
   promoTag: { color: "#fff", fontWeight: "900", fontSize: 12 },
 
   promoTitle: {
     color: "#fff",
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "900",
-    marginBottom: 2,
+    marginBottom: 3,
   },
 
-  promoSubtitle: { color: "rgba(255,255,255,0.88)", fontSize: 12 },
+  promoSubtitle: { color: "rgba(255,255,255,0.92)", fontSize: 12.5, lineHeight: 17 },
 });
 
 

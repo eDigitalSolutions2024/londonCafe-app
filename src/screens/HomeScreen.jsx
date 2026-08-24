@@ -74,7 +74,7 @@ function BoothStreakBar({
   const shown = claimedToday ? day : Math.max(0, day - 1);
   const pct = shown / totalDays; // 0..1
 
-  const BOOTH_H = 160; // debe ser igual a styles.boothBox.height
+  const BOOTH_H = 128; // debe ser igual a styles.boothBox.height
 
   // ✅ animación del llenado
  const fillAnim = useRef(new Animated.Value(pct * BOOTH_H)).current;
@@ -1152,8 +1152,8 @@ const styles = StyleSheet.create({
   /* ✅ Streak Card (cabina + botón + texto) */
   duoCard: {
     marginTop: 10,
-    borderRadius: 18,
-    padding: 12,
+    borderRadius: 16,
+    padding: 10,
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: colors.primary,
@@ -1177,22 +1177,22 @@ const styles = StyleSheet.create({
   },
 
   duoTitle: {
-    fontSize: 22,
+    fontSize: 17,
     fontWeight: "900",
     color: "#ffffff",
     marginBottom: 2,
   },
 
   duoSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
     color: "rgba(255,255,255,0.95)",
-    marginBottom: 8,
+    marginBottom: 6,
   },
 
   duoBtnCompact: {
-    height: 34,
-    paddingHorizontal: 12,
+    height: 28,
+    paddingHorizontal: 10,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.95)",
     alignItems: "center",
@@ -1202,7 +1202,7 @@ const styles = StyleSheet.create({
   duoBtnDisabled: { opacity: 0.6 },
 
   duoBtnTextCompact: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "900",
     color: colors.primary,
   },
@@ -1213,18 +1213,18 @@ const styles = StyleSheet.create({
   },
 
   boothBox: {
-    width: 120,
-    height: 160,
+    width: 96,
+    height: 128,
     overflow: "hidden",
   },
   boothImg: {
-    width: 120,
-    height: 160,
+    width: 96,
+    height: 128,
   },
 
   boothHint: {
-    marginTop: 8,
-    fontSize: 10,
+    marginTop: 6,
+    fontSize: 9,
     fontWeight: "800",
     color: "rgba(255,255,255,0.85)",
   },

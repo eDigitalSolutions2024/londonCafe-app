@@ -251,9 +251,10 @@ export default function RewardsScreen({ navigation }) {
           <TouchableOpacity
             onPress={() => navigation.navigate("WalletHistory")}
             activeOpacity={0.7}
-            style={{ marginTop: 10 }}
+            style={styles.historyRow}
           >
-            <Text style={styles.historyLink}>Ver historial de movimientos →</Text>
+            <Text style={styles.historyRowText}>Ver historial de movimientos</Text>
+            <Text style={styles.historyChevron}>›</Text>
           </TouchableOpacity>
         </View>
 
@@ -403,7 +404,18 @@ const styles = StyleSheet.create({
 
   lifetimeText: { marginTop: 8, fontSize: 13, color: colors.textMuted, fontWeight: "700" },
 
-  historyLink: { color: colors.primary, fontSize: 13, fontWeight: "900" },
+  historyRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.primarySoft,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  historyRowText: { color: colors.primary, fontSize: 13, fontWeight: "900" },
+  historyChevron: { color: colors.primary, fontSize: 20, fontWeight: "900" },
 
   levelRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 6 },
 

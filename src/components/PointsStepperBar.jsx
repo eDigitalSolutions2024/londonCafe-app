@@ -15,8 +15,8 @@ export default function PointsStepperBar({
   subtitle = "Buddy Coins",
 
   iconSource = LondonBuddyLogo,
-  iconSize =60,
-  pillIconSize = 24,
+  iconSize = 44,
+  pillIconSize = 20,
 
   onPress,
   disabledPress = false,
@@ -102,6 +102,7 @@ export default function PointsStepperBar({
               resizeMode="contain"
             />
           ) : null}
+          {onPress && !disabledPress ? <Text style={styles.pillChevron}>›</Text> : null}
         </View>
       </View>
 
@@ -129,6 +130,13 @@ export default function PointsStepperBar({
           })}
         </View>
       </View>
+
+      {onPress && !disabledPress ? (
+        <View style={styles.tapHintRow}>
+          <Text style={styles.tapHintText}>Toca para ver tu wallet completo</Text>
+          <Text style={styles.tapHintChevron}>›</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -136,11 +144,11 @@ export default function PointsStepperBar({
 const styles = StyleSheet.create({
   // ✅ un poquito más grande que la racha
   card: {
-    marginTop: 14,
+    marginTop: 10,
     ...appStyles.card,
 
-    paddingVertical: 14, // antes 12
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
 
     // “premium” sin cambiar appStyles
     borderWidth: 1,
@@ -160,25 +168,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 6,
     gap: 10,
   },
 
-  bigRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
+  bigRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
 
   // ✅ número más hero
   bigNumber: {
     color: colors.text,
-    fontSize: 30, // antes 26
+    fontSize: 24,
     fontWeight: "900",
-    lineHeight: 34,
+    lineHeight: 28,
     letterSpacing: 0.2,
   },
 
   // ✅ moneda dentro de “ring” suave
   coinRing: {
-    width: 50,
-    height: 50,
+    width: 38,
+    height: 38,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
@@ -215,8 +223,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(128,16,35,0.35)",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
@@ -224,39 +232,50 @@ const styles = StyleSheet.create({
   },
   pillText: { color: colors.primary, fontWeight: "900", fontSize: 11, letterSpacing: 0.2 },
   pillIcon: { backgroundColor: "transparent" },
+  pillChevron: { color: colors.primary, fontWeight: "900", fontSize: 15, marginLeft: -2 },
+
+  tapHintRow: {
+    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 2,
+  },
+  tapHintText: { color: colors.textMuted, fontSize: 11, fontWeight: "700" },
+  tapHintChevron: { color: colors.textMuted, fontSize: 13, fontWeight: "900" },
 
   // ✅ barra más “pro”
-  barWrap: { position: "relative", height: 50, justifyContent: "center" },
+  barWrap: { position: "relative", height: 38, justifyContent: "center" },
 
   track: {
     position: "absolute",
     left: 6,
     right: 6,
-    height: 9, // antes 6
+    height: 7,
     borderRadius: 999,
     backgroundColor: "rgba(128,16,35,0.14)",
   },
   fill: {
     position: "absolute",
     left: 6,
-    height: 9,
+    height: 7,
     borderRadius: 999,
     backgroundColor: colors.primary,
   },
 
   pinWrap: { position: "absolute", top: -1, transform: [{ translateX: -7 }], alignItems: "center" },
-  pin: { width: 2, height: 16, backgroundColor: colors.primary, borderRadius: 999, opacity: 0.9 },
+  pin: { width: 2, height: 13, backgroundColor: colors.primary, borderRadius: 999, opacity: 0.9 },
   pinDot: {
     marginTop: 2,
-    width: 12,
-    height: 12,
+    width: 10,
+    height: 10,
     borderRadius: 999,
     backgroundColor: colors.primary,
     borderWidth: 2,
     borderColor: "#fff",
   },
 
-  stepsRow: { position: "absolute", left: 6, right: 6, top: 24, height: 24 },
+  stepsRow: { position: "absolute", left: 6, right: 6, top: 18, height: 20 },
   stepItem: { position: "absolute", transform: [{ translateX: -7 }], alignItems: "center" },
   stepDot: {
     width: 9,
