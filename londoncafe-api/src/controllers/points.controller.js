@@ -171,4 +171,70 @@ async function posCheckout(req, res) {
   }
 }
 
-module.exports = { getMyPoints, getMyQr, posScanQr, posCheckout };
+// Mismo POS_URL/POS_API_KEY que ya usa order.controller.js para hablar con
+// apps/api -- server-a-servidor, la app nunca ve esta llave (decisión #2,
+// apps/api/src/modules/wallet/ARCHITECTURE.md §6).
+const POS_URL = process.env.POS_URL || "https://api.londoncafejrz.com/api";
+
+/**
+ * GET /api/points/wallet  (APP)
+ * Proxy de solo lectura hacia GET /api/wallet/:userId de apps/api (Wallet
+ * V2, ADR-001). Sin wallet todavía (usuario no migrado y sin ningún Earn
+ * todavía) no es un error: significa saldo $0 en Wallet V2.
+ */
+async function getMyWallet(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const posRes = await fetch(`${POS_URL}/wallet/${uid}`, {
+      headers: { "x-api-key": process.env.POS_API_KEY || "" },
+    });
+
+    if (posRes.status === 404) {
+      return res.json({ ok: true, migrated: false, wallet: null });
+    }
+
+    const data = await posRes.json().catch(() => ({}));
+    if (!posRes.ok) {
+      console.log("getMyWallet POS error:", posRes.status, data);
+      return res.status(502).json({ ok: false, error: "WALLET_UPSTREAM_ERROR" });
+    }
+
+    return res.json({ ok: true, migrated: true, wallet: data.wallet });
+  } catch (err) {
+    console.log("getMyWallet error:", err?.message);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+}
+
+/**
+ * GET /api/points/wallet/transactions?limit=  (APP)
+ * Proxy de solo lectura hacia GET /api/wallet/:userId/transactions de
+ * apps/api. Historial real del Ledger de Wallet V2 -- más detallado que
+ * pointsHistory (legado).
+ */
+async function getMyWalletTransactions(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const posRes = await fetch(`${POS_URL}/wallet/${uid}/transactions?limit=${limit}`, {
+      headers: { "x-api-key": process.env.POS_API_KEY || "" },
+    });
+
+    const data = await posRes.json().catch(() => ({}));
+    if (!posRes.ok) {
+      console.log("getMyWalletTransactions POS error:", posRes.status, data);
+      return res.status(502).json({ ok: false, error: "WALLET_UPSTREAM_ERROR" });
+    }
+
+    return res.json({ ok: true, transactions: data.transactions || [] });
+  } catch (err) {
+    console.log("getMyWalletTransactions error:", err?.message);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+}
+
+module.exports = { getMyPoints, getMyQr, posScanQr, posCheckout, getMyWallet, getMyWalletTransactions };

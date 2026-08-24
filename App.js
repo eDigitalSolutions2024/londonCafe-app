@@ -31,6 +31,7 @@ import RegisterScreen from "./src/screens/RegisterScreen";
 import VerifyEmailScreen from "./src/screens/VerifyEmailScreen";
 
 import RewardsScreen from "./src/screens/RewardsScreen";
+import WalletHistoryScreen from "./src/screens/WalletHistoryScreen";
 import RedeemQRScreen from "./src/screens/RedeemQRScreen";
 
 import PedidosScreen from "./src/screens/PedidosScreen";
@@ -60,6 +61,7 @@ function HomeStackNav() {
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="Home" component={HomeScreen} />
       <HomeStack.Screen name="Rewards" component={RewardsScreen} />
+      <HomeStack.Screen name="WalletHistory" component={WalletHistoryScreen} />
       <HomeStack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
       <HomeStack.Screen name="AccountSettings" component={AccountSettingsScreen} />
       <HomeStack.Screen name="RedeemQR" component={RedeemQRScreen} />

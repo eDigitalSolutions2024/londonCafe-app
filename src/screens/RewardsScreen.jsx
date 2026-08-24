@@ -38,13 +38,16 @@ export default function RewardsScreen({ navigation }) {
     try {
       setLoading(true);
 
-      // ✅ puntos desde APP backend (3001)
-      const p = await apiFetch("/points/me", {
+      // ✅ Buddy Coins desde Wallet V2 (proxy servidor-a-servidor de la
+      // APP backend hacia apps/api -- ver ARCHITECTURE.md §6). Sin wallet
+      // todavía (usuario nuevo, sin ningún movimiento) es saldo $0, no un
+      // error.
+      const w = await apiFetch("/points/wallet", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setPoints(Number(p?.points) || 0);
-      setLifetimePoints(Number(p?.lifetimePoints) || 0);
+      setPoints(Number(w?.wallet?.balance) || 0);
+      setLifetimePoints(Number(w?.wallet?.totalEarned) || 0);
 
       // ✅ perfil desde APP backend (3001)
       const r = await apiFetch("/me", {
@@ -244,6 +247,14 @@ export default function RewardsScreen({ navigation }) {
           </Text>
 
           <Text style={styles.lifetimeText}>Acumulados: {displayLifetime}</Text>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate("WalletHistory")}
+            activeOpacity={0.7}
+            style={{ marginTop: 10 }}
+          >
+            <Text style={styles.historyLink}>Ver historial de movimientos →</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Card 2: Nivel */}
@@ -391,6 +402,8 @@ const styles = StyleSheet.create({
   helper: { color: colors.textMuted, fontSize: 13, fontWeight: "700", lineHeight: 18 },
 
   lifetimeText: { marginTop: 8, fontSize: 13, color: colors.textMuted, fontWeight: "700" },
+
+  historyLink: { color: colors.primary, fontSize: 13, fontWeight: "900" },
 
   levelRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 6 },
 
