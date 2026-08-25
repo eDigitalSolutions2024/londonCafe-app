@@ -17,6 +17,7 @@ const buddyRoutes = require("./routes/buddy.routes");
 const authRoutes = require("./routes/auth.routes");
 const salesRoutes = require("./routes/sales");
 const giftcardsRouter = require("./routes/giftcards");
+const eventsRoutes = require("./routes/events.routes");
 // payments
 const paymentsRoutes = require("./routes/payments.routes");
 const paymentsController = require("./controllers/payments.controller"); // para webhook raw
@@ -59,6 +60,7 @@ app.use("/api/promos", promoRoutes);
 app.use("/api/branches", branchRoutes);
 app.use("/api", require("./routes/me.routes"));
 app.use("/api/points", pointsRoutes);
+app.use("/api/events", eventsRoutes);
 app.use("/api/sales", salesRoutes);
 app.use("/api/dev", require("./routes/dev"));
 app.use("/api/rewards", rewardsRoutes);

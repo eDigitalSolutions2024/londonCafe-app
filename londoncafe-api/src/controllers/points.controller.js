@@ -237,4 +237,32 @@ async function getMyWalletTransactions(req, res) {
   }
 }
 
-module.exports = { getMyPoints, getMyQr, posScanQr, posCheckout, getMyWallet, getMyWalletTransactions };
+/**
+ * GET /api/points/reward-rule  (APP)
+ * Fase 1 (ecosistema digital de ventas): proxy de solo lectura hacia
+ * GET /api/wallet/reward-rule/active de apps/api -- earnRate/redeemRate
+ * reales, para que la App muestre un preview de "vas a ganar X BuddyCoins"
+ * en el carrito sin hardcodear la tasa (que se desincronizaría si cambia).
+ */
+async function getRewardRule(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const posRes = await fetch(`${POS_URL}/wallet/reward-rule/active`, {
+      headers: { "x-api-key": process.env.POS_API_KEY || "" },
+    });
+    const data = await posRes.json().catch(() => ({}));
+    if (!posRes.ok) {
+      console.log("getRewardRule POS error:", posRes.status, data);
+      return res.status(502).json({ ok: false, error: "WALLET_UPSTREAM_ERROR" });
+    }
+
+    return res.json({ ok: true, rewardRule: data.rewardRule });
+  } catch (err) {
+    console.log("getRewardRule error:", err?.message);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+}
+
+module.exports = { getMyPoints, getMyQr, posScanQr, posCheckout, getMyWallet, getMyWalletTransactions, getRewardRule };
