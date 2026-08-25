@@ -161,7 +161,11 @@ export default function ReorderSection() {
         );
       }
 
-      navigation.navigate("Cart");
+      // "Cart" vive dentro del stack del tab "Ordena" (OrderStackNav, ver
+      // App.js) -- ReorderSection corre dentro del stack de "Inicio", un tab
+      // hermano, así que hay que navegar al tab y pasarle la pantalla
+      // anidada, no solo el nombre de la pantalla.
+      navigation.navigate("Ordena", { screen: "Cart" });
     } finally {
       setAdding(false);
     }
