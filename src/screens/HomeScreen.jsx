@@ -182,6 +182,11 @@ export default function HomeScreen({ navigation }) {
   const [feeding, setFeeding] = useState(false);
   const [me, setMe] = useState(null);
 
+  // ✅ streak/recover-streak sigue en el ledger legado (User.points en
+  // londoncafe-api), no en Wallet V2 -- se toca en una fase futura. Se lee
+  // de /me (ya lo trae) para no mezclarlo con el balance de Wallet V2 que
+  // ahora usa PointsStepperBar.
+  const legacyPoints = Number(me?.points ?? 0);
 
   // ✅ Daily Reward / Streak
 const [claimingDaily, setClaimingDaily] = useState(false);
@@ -214,8 +219,9 @@ const onRecoverStreak = useCallback(async () => {
   if (!token) return;
   if (recovering) return;
 
-  // ✅ check coins local (UX)
-  if (Number(points || 0) < recoveryCost) {
+  // ✅ check coins local (UX) -- contra el ledger legado, que es el que
+  // /me/streak/recover realmente descuenta (User.points, no Wallet V2)
+  if (legacyPoints < recoveryCost) {
     Alert.alert("Buddy Coins insuficientes", `Necesitas ${recoveryCost} BuddyCoins para recuperar la racha.`);
     return;
   }
@@ -233,9 +239,13 @@ const onRecoverStreak = useCallback(async () => {
       return;
     }
 
-    // ✅ actualiza UI con respuesta del backend
+    // ✅ actualiza UI con respuesta del backend -- r.points es el ledger
+    // legado, se guarda en `me` (no en el `points` de Wallet V2 que usa
+    // PointsStepperBar, para no mezclar los dos números)
     if (r?.streak) setStreak(r.streak);
-    if (Number.isFinite(Number(r?.points))) setPoints(Number(r.points));
+    if (Number.isFinite(Number(r?.points))) {
+      setMe((prev) => (prev ? { ...prev, points: Number(r.points) } : prev));
+    }
     if (r?.buddy) setBuddy(r.buddy);
 
     setRecoverVisible(false);
@@ -250,7 +260,7 @@ const onRecoverStreak = useCallback(async () => {
   } finally {
     setRecovering(false);
   }
-}, [token, recovering, points, recoveryCost]);
+}, [token, recovering, legacyPoints, recoveryCost]);
 
 
 // Animated values
@@ -321,15 +331,16 @@ useEffect(() => {
     try {
       setLoadingPoints(true);
 
-      // ✅ GET /api/points/me
-      const r = await apiFetch("/points/me", {
+      // ✅ Buddy Coins desde Wallet V2 (mismo proxy y mapeo que
+      // RewardsScreen.jsx -- sin wallet todavía es saldo $0, no un error).
+      const w = await apiFetch("/points/wallet", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setPoints(Number(r?.points) || 0);
-      setLifetimePoints(Number(r?.lifetimePoints) || 0);
+      setPoints(Number(w?.wallet?.balance) || 0);
+      setLifetimePoints(Number(w?.wallet?.totalEarned) || 0);
     } catch (e) {
-      console.log("❌ points/me:", e?.data || e?.message);
+      console.log("❌ points/wallet:", e?.data || e?.message);
     } finally {
       setLoadingPoints(false);
     }
@@ -617,9 +628,13 @@ const prevEnergy = Number.isFinite(Number(buddy?.energy)) ? Number(buddy.energy)
     // ✅ actualiza estado local
     setStreak(r?.streak || { count: 0, best: 0, claimedToday: true });
 
-    // ✅ si el backend regresó buddy/points, actualiza UI
+    // ✅ si el backend regresó buddy/points, actualiza UI -- r.points es el
+    // ledger legado (daily-reward todavía no acredita Wallet V2), se guarda
+    // en `me` para no pisar el balance de Wallet V2 que muestra Home
     if (r?.buddy) setBuddy(r.buddy);
-    if (Number.isFinite(Number(r?.points))) setPoints(Number(r.points));
+    if (Number.isFinite(Number(r?.points))) {
+      setMe((prev) => (prev ? { ...prev, points: Number(r.points) } : prev));
+    }
 
   } catch (e) {
     console.log("❌ daily-reward:", e?.data || e?.message);
@@ -952,7 +967,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
 
       <View style={styles.recoverRow}>
         <Text style={styles.recoverSmall}>Tienes:</Text>
-        <Text style={styles.recoverCoins}>{Number(points || 0)} 🪙</Text>
+        <Text style={styles.recoverCoins}>{legacyPoints} 🪙</Text>
       </View>
 
       <View style={styles.recoverBtns}>
@@ -969,10 +984,10 @@ const moodEmoji = moodEmojiFromEnergy(energy);
           style={[
             styles.recoverBtn,
             styles.recoverConfirm,
-            (recovering || Number(points || 0) < recoveryCost) && { opacity: 0.6 },
+            (recovering || legacyPoints < recoveryCost) && { opacity: 0.6 },
           ]}
           onPress={onRecoverStreak}
-          disabled={recovering || Number(points || 0) < recoveryCost}
+          disabled={recovering || legacyPoints < recoveryCost}
           activeOpacity={0.85}
         >
           <Text style={styles.recoverConfirmText}>
@@ -981,7 +996,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
         </TouchableOpacity>
       </View>
 
-      {Number(points || 0) < recoveryCost ? (
+      {legacyPoints < recoveryCost ? (
         <Text style={styles.recoverWarn}>No tienes suficientes BuddyCoins.</Text>
       ) : null}
     </View>
