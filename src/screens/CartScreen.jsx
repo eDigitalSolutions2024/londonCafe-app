@@ -1,10 +1,11 @@
-import React, { useContext, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, FlatList, Image, Pressable, ActivityIndicator, Alert } from "react-native";
 import Screen from "../components/Screen";
 import { useCart } from "../context/CartContext";
 import { AuthContext } from "../context/AuthContext";
 import { useStripe } from "@stripe/stripe-react-native";
-import { apiFetch } from "../api/client"; // ✅ usa BASE_URL del client.js
+import { apiFetch, posFetch } from "../api/client"; // ✅ usa BASE_URL del client.js
+import { getAppMenu } from "../api/appMenu";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -20,6 +21,62 @@ const COLORS = {
 
 const money = (n) =>
   Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+
+// Mismas CrossSellRule que consume el Kiosk (Fase 1, plan aprobado) --
+// matching client-side contra el carrito actual, igual reparto de trabajo
+// que KioskOrderPage.tsx (el backend sirve las reglas completas).
+function ruleMatchesCart(rule, cartItems) {
+  if (rule.triggerType === "any") return cartItems.length > 0;
+  if (rule.triggerType === "item") {
+    return cartItems.some((l) => (rule.triggerItemIds || []).includes(l.productId));
+  }
+  if (rule.triggerType === "category") {
+    return cartItems.some((l) => l.category === rule.triggerCategory);
+  }
+  return false;
+}
+
+function matchCrossSellSuggestions(cartItems, rules, catalog) {
+  const inCart = new Set(cartItems.map((l) => l.productId));
+  const byId = new Map((catalog || []).map((c) => [String(c._id), c]));
+  const seen = new Set();
+  const items = [];
+  const ruleIds = [];
+  let cap = 3;
+
+  const applicable = (rules || [])
+    .filter((r) => r.type === "cross-sell" && ruleMatchesCart(r, cartItems))
+    .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+  for (const rule of applicable) {
+    cap = Math.min(cap, rule.maxSuggestions || 3);
+    let used = false;
+    for (const id of rule.suggestItemIds || []) {
+      if (items.length >= cap) break;
+      if (inCart.has(id) || seen.has(id)) continue;
+      const catalogItem = byId.get(id);
+      if (!catalogItem || catalogItem.soldOut) continue;
+      seen.add(id);
+      items.push(catalogItem);
+      used = true;
+    }
+    if (used) ruleIds.push(rule._id);
+    if (items.length >= cap) break;
+  }
+
+  return { items, ruleIds };
+}
+
+// Telemetría de cross-sell (Fase 1) -- fire-and-forget vía el proxy de
+// londoncafe-api (Commit 9), nunca debe romper el carrito si falla. Solo
+// para usuarios con sesión (el proxy exige auth); invitados no se miden.
+function postAppEvent(type, token, payload) {
+  if (!token) return;
+  apiFetch("/events", {
+    method: "POST",
+    body: JSON.stringify({ type, ...payload }),
+  }).catch((e) => console.log(`[events] ${type} falló:`, e?.data || e?.message));
+}
 
 function CartItem({ item, onInc, onDec, onRemove }) {
   return (
@@ -171,6 +228,73 @@ function CartItem({ item, onInc, onDec, onRemove }) {
   );
 }
 
+function SuggestionCard({ item, onAdd }) {
+  return (
+    <Pressable
+      onPress={() => onAdd(item)}
+      style={{
+        width: 130,
+        backgroundColor: "#fff",
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        padding: 10,
+        marginRight: 10,
+      }}
+    >
+      <Image
+        source={item.imageUrl ? { uri: item.imageUrl } : require("../assets/promo_placeholder.png")}
+        style={{ width: "100%", height: 80, borderRadius: 12, backgroundColor: "#eee" }}
+      />
+      <Text style={{ marginTop: 8, fontWeight: "900", color: COLORS.ink, fontSize: 12 }} numberOfLines={2}>
+        {item.title}
+      </Text>
+      <View
+        style={{
+          marginTop: 6,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ fontWeight: "900", color: COLORS.wine, fontSize: 12 }}>
+          {money(item.price)}
+        </Text>
+        <View
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: COLORS.wine,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 14 }}>+</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function SuggestionsRow({ items, onAdd }) {
+  if (!items.length) return null;
+
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Text style={{ fontWeight: "900", color: COLORS.ink, fontSize: 14, marginBottom: 10 }}>
+        También te puede gustar
+      </Text>
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        data={items}
+        keyExtractor={(it) => String(it._id)}
+        renderItem={({ item }) => <SuggestionCard item={item} onAdd={onAdd} />}
+      />
+    </View>
+  );
+}
 
 
 function buildOrderPayload(
@@ -207,12 +331,61 @@ function buildOrderPayload(
 
 
 export default function CartScreen({ navigation }) {
-  const { items, subtotal, inc, dec, remove, clear } = useCart();
+  const { items, subtotal, inc, dec, remove, clear, add } = useCart();
   const { user, token } = useContext(AuthContext);
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [paying, setPaying] = useState(false);
 const tabBarHeight = useBottomTabBarHeight();
 
+  // ✅ Recomendaciones / cross-sell (Fase 1) -- mismas CrossSellRule que el
+  // Kiosk, ruta pública (sin proxy, GET /api/cross-sell-rules/active).
+  const [crossSellRules, setCrossSellRules] = useState([]);
+  const [catalog, setCatalog] = useState([]);
+  const shownRuleIdsRef = useRef("");
+
+  useEffect(() => {
+    posFetch("/cross-sell-rules/active?channel=app")
+      .then((data) => setCrossSellRules(Array.isArray(data?.rules) ? data.rules : []))
+      .catch((e) => console.log("❌ cross-sell-rules:", e?.data || e?.message));
+
+    getAppMenu()
+      .then((data) => setCatalog(Array.isArray(data) ? data : []))
+      .catch((e) => console.log("❌ app-menu (cross-sell):", e?.data || e?.message));
+  }, []);
+
+  const suggestions = useMemo(
+    () => matchCrossSellSuggestions(items, crossSellRules, catalog),
+    [items, crossSellRules, catalog]
+  );
+
+  useEffect(() => {
+    const key = suggestions.ruleIds.join(",");
+    if (!key || key === shownRuleIdsRef.current) return;
+    shownRuleIdsRef.current = key;
+
+    postAppEvent("cross_sell_shown", token, {
+      ruleId: suggestions.ruleIds[0],
+      itemIds: suggestions.items.map((i) => i._id),
+    });
+  }, [suggestions, token]);
+
+  const onAddSuggestion = useCallback(
+    (item) => {
+      add({
+        ...item,
+        basePrice: Number(item.price || 0),
+        price: Number(item.price || 0),
+        selectedOptions: { milk: null, temp: null, flavors: [] },
+      });
+
+      postAppEvent("cross_sell_accepted", token, {
+        ruleId: suggestions.ruleIds[0],
+        itemIds: [item._id],
+        revenueImpact: Number(item.price || 0),
+      });
+    },
+    [add, token, suggestions]
+  );
 
 
 
@@ -516,6 +689,8 @@ showsVerticalScrollIndicator={false}
   </View>
 }
         />
+
+        <SuggestionsRow items={suggestions.items} onAdd={onAddSuggestion} />
 
         <View
   style={{

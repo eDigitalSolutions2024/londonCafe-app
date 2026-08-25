@@ -1,0 +1,225 @@
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { colors } from "../theme/colors";
+import { AuthContext } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
+import { apiFetch } from "../api/client";
+import { getAppMenu } from "../api/appMenu";
+
+const money = (n) =>
+  Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+
+function getChoiceLabel(choice) {
+  if (typeof choice === "string") return choice;
+  return choice?.label || choice?.name || "";
+}
+
+function getChoiceExtra(choice) {
+  if (typeof choice === "string") return 0;
+  return Number(choice?.extraPrice ?? choice?.price ?? choice?.extra ?? choice?.delta ?? 0);
+}
+
+function findSelectedChoice(choices = [], selectedValue) {
+  return choices.find((c) => getChoiceLabel(c) === selectedValue) || null;
+}
+
+// Mismo cálculo que OrderScreen.jsx (options.milk/temp/flavors -> extra) --
+// se duplica aquí en vez de importar porque OrderScreen.jsx no lo exporta;
+// se necesita para recalcular el precio configurado del pedido histórico
+// contra el catálogo vivo, por si los precios cambiaron desde entonces.
+function calcConfiguredPrice(item, selectedOptions) {
+  const base = Number(item?.price || 0);
+  const milkChoice = findSelectedChoice(item?.options?.milk?.choices || [], selectedOptions?.milk);
+  const tempChoice = findSelectedChoice(item?.options?.temp?.choices || [], selectedOptions?.temp);
+  const flavorChoices = (item?.options?.flavors?.choices || []).filter((c) =>
+    (selectedOptions?.flavors || []).includes(getChoiceLabel(c))
+  );
+  const milkExtra = getChoiceExtra(milkChoice);
+  const tempExtra = getChoiceExtra(tempChoice);
+  const flavorsExtra = flavorChoices.reduce((acc, c) => acc + getChoiceExtra(c), 0);
+  return base + milkExtra + tempExtra + flavorsExtra;
+}
+
+// Order.items históricos no guardan un link a AppMenuItem (no existe
+// appMenuItemId) -- se reconstruye por coincidencia de nameSnapshot contra
+// el catálogo vivo (Fase 1, plan aprobado). Items sin match o agotados se
+// omiten, nunca rompen la sección.
+function matchOrderItemsToCatalog(orderItems, catalog) {
+  const byTitle = new Map(catalog.map((c) => [String(c.title || "").trim().toLowerCase(), c]));
+  const matched = [];
+  const skippedNames = [];
+
+  for (const it of orderItems || []) {
+    const name = String(it?.nameSnapshot || it?.title || it?.name || "").trim();
+    const catalogItem = byTitle.get(name.toLowerCase());
+
+    if (!catalogItem || catalogItem.soldOut) {
+      skippedNames.push(name || "Producto");
+      continue;
+    }
+
+    matched.push({
+      catalogItem,
+      qty: Math.max(1, Number(it?.qty || 1)),
+      selectedOptions: it?.selectedOptions || {},
+    });
+  }
+
+  return { matched, skippedNames };
+}
+
+export default function ReorderSection() {
+  const navigation = useNavigation();
+  const { user, token } = useContext(AuthContext);
+  const { add } = useCart();
+
+  const [loading, setLoading] = useState(false);
+  const [reorder, setReorder] = useState(null); // { matched, skippedNames } | null
+  const [adding, setAdding] = useState(false);
+
+  const load = useCallback(async () => {
+    const userId = user?._id || user?.id;
+    if (!token || !userId) {
+      setReorder(null);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const [ordersRes, catalog] = await Promise.all([
+        apiFetch(`/orders/my/${userId}`),
+        getAppMenu(),
+      ]);
+
+      const orders = Array.isArray(ordersRes?.orders) ? ordersRes.orders : [];
+      const lastOrder = orders[0];
+      const orderItems = Array.isArray(lastOrder?.items) ? lastOrder.items : [];
+
+      if (!orderItems.length) {
+        setReorder(null);
+        return;
+      }
+
+      const { matched, skippedNames } = matchOrderItemsToCatalog(
+        orderItems,
+        Array.isArray(catalog) ? catalog : []
+      );
+
+      setReorder(matched.length ? { matched, skippedNames } : null);
+    } catch (e) {
+      console.log("❌ ReorderSection:", e?.data || e?.message);
+      setReorder(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, user]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const summaryLabel = useMemo(() => {
+    if (!reorder) return "";
+    return reorder.matched.map((m) => `${m.qty}× ${m.catalogItem.title}`).join(", ");
+  }, [reorder]);
+
+  const total = useMemo(() => {
+    if (!reorder) return 0;
+    return reorder.matched.reduce(
+      (acc, m) => acc + m.qty * calcConfiguredPrice(m.catalogItem, m.selectedOptions),
+      0
+    );
+  }, [reorder]);
+
+  const onReorder = useCallback(() => {
+    if (!reorder || adding) return;
+
+    setAdding(true);
+    try {
+      for (const m of reorder.matched) {
+        const price = calcConfiguredPrice(m.catalogItem, m.selectedOptions);
+        for (let i = 0; i < m.qty; i++) {
+          add({
+            ...m.catalogItem,
+            basePrice: Number(m.catalogItem.price || 0),
+            price,
+            selectedOptions: {
+              milk: m.selectedOptions?.milk || null,
+              temp: m.selectedOptions?.temp || null,
+              flavors: Array.isArray(m.selectedOptions?.flavors) ? m.selectedOptions.flavors : [],
+            },
+          });
+        }
+      }
+
+      if (reorder.skippedNames.length) {
+        Alert.alert(
+          "Algunos productos ya no están disponibles",
+          `Agregamos el resto de tu pedido. No pudimos incluir: ${reorder.skippedNames.join(", ")}.`
+        );
+      }
+
+      navigation.navigate("Cart");
+    } finally {
+      setAdding(false);
+    }
+  }, [reorder, adding, add, navigation]);
+
+  if (!token || loading || !reorder) return null;
+
+  return (
+    <View style={styles.wrap}>
+      <Text style={styles.title}>Vuelve a pedir</Text>
+
+      <View style={styles.card}>
+        <Text style={styles.itemsLine} numberOfLines={2}>
+          {summaryLabel}
+        </Text>
+
+        <View style={styles.footerRow}>
+          <Text style={styles.total}>{money(total)}</Text>
+
+          <TouchableOpacity
+            onPress={onReorder}
+            disabled={adding}
+            activeOpacity={0.85}
+            style={[styles.btn, adding && { opacity: 0.7 }]}
+          >
+            <Text style={styles.btnText}>{adding ? "..." : "Pedir de nuevo"}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { paddingHorizontal: 20, marginTop: 14 },
+  title: { fontSize: 16, fontWeight: "900", color: colors.text, marginBottom: 8 },
+  card: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: colors.card,
+    padding: 14,
+  },
+  itemsLine: { color: colors.text, fontWeight: "700", fontSize: 13, lineHeight: 18 },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+  },
+  total: { color: colors.primary, fontWeight: "900", fontSize: 16 },
+  btn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnText: { color: "#fff", fontWeight: "900", fontSize: 13 },
+});

@@ -52,6 +52,7 @@ function cartReducer(state, action) {
             title: p.title,
             price: Number(p.price || 0),
             imageUrl: p.imageUrl || "",
+            category: p.category || p.categorySnapshot || "",
             qty: nextQty,
             selectedOptions: {
               milk: p?.selectedOptions?.milk || null,
