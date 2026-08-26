@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import Screen from "../components/Screen";
 import { getAppMenu } from "../api/appMenu";
+import ReorderSection from "../components/ReorderSection";
 
 import { useCart } from "../context/CartContext";
 import { apiFetch } from "../api/client";
@@ -139,11 +140,14 @@ function CategoryPillsHorizontal({ categories, value, onChange }) {
   );
 }
 
-/** ✅ Card compacta tipo Caffenio (grid) */
+/** ✅ Card compacta tipo Caffenio (grid) -- toda la tarjeta agrega al
+    carrito (o abre selección de leche/opciones si aplica), no solo el
+    ícono "+", para que sea más fácil de tocar en una pantalla chica. */
 function ProductTile({ item, onAdd }) {
   return (
-    <View
-      style={{
+    <Pressable
+      onPress={(e) => onAdd(item, e)}
+      style={({ pressed }) => ({
         flex: 1,
         backgroundColor: "#fff",
         borderRadius: 18,
@@ -151,7 +155,8 @@ function ProductTile({ item, onAdd }) {
         borderColor: COLORS.border,
         padding: 10,
         minHeight: 210,
-      }}
+        opacity: pressed ? 0.92 : 1,
+      })}
     >
       <View style={{ position: "relative" }}>
         <Image
@@ -166,7 +171,7 @@ function ProductTile({ item, onAdd }) {
         />
 
         <Pressable
-          onPress={() => onAdd(item)}
+          onPress={(e) => onAdd(item, e)}
           style={({ pressed }) => ({
             position: "absolute",
             right: 10,
@@ -215,15 +220,17 @@ function ProductTile({ item, onAdd }) {
 <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.wine }}>
   {money(item.price)}
 </Text>
-    </View>
+    </Pressable>
   );
 }
 
-/** ✅ Card tipo lista (list) */
+/** ✅ Card tipo lista (list) -- toda la fila agrega al carrito, no solo el
+    círculo "+". */
 function ProductRow({ item, onAdd }) {
   return (
-    <View
-      style={{
+    <Pressable
+      onPress={(e) => onAdd(item, e)}
+      style={({ pressed }) => ({
         backgroundColor: "#fff",
         borderRadius: 16,
         borderWidth: 1,
@@ -233,7 +240,8 @@ function ProductRow({ item, onAdd }) {
         flexDirection: "row",
         gap: 12,
         alignItems: "center",
-      }}
+        opacity: pressed ? 0.92 : 1,
+      })}
     >
       <Image
         source={item.imageUrl ? { uri: item.imageUrl } : require("../assets/promo_placeholder.png")}
@@ -265,7 +273,7 @@ function ProductRow({ item, onAdd }) {
 </View>
 
       <Pressable
-        onPress={() => onAdd(item)}
+        onPress={(e) => onAdd(item, e)}
         style={({ pressed }) => ({
           width: 40,
           height: 40,
@@ -278,7 +286,7 @@ function ProductRow({ item, onAdd }) {
       >
         <Text style={{ color: "#fff", fontSize: 18, fontWeight: "900" }}>+</Text>
       </Pressable>
-    </View>
+    </Pressable>
   );
 }
 
@@ -303,6 +311,71 @@ const [bubbleX] = useState(new Animated.Value(0));
 const [bubbleY] = useState(new Animated.Value(0));
 const [bubbleScale] = useState(new Animated.Value(1));
 const [bubbleOpacity] = useState(new Animated.Value(0));
+
+// ✅ Animación "se agregó al carrito": un bubble 🛒 que vuela desde donde
+// tocaste (el producto, o el botón "Agregar" del modal de opciones) hasta
+// el ícono del carrito -- confirmación visual de que sí se agregó, ya que
+// ahora toda la tarjeta agrega (antes solo el ícono "+").
+const cartIconRef = React.useRef(null);
+const [addBubbleVisible, setAddBubbleVisible] = useState(false);
+const [addBubbleOrigin, setAddBubbleOrigin] = useState({ x: 0, y: 0 });
+const [addBubbleX] = useState(new Animated.Value(0));
+const [addBubbleY] = useState(new Animated.Value(0));
+const [addBubbleScale] = useState(new Animated.Value(1));
+const [addBubbleOpacity] = useState(new Animated.Value(0));
+const [cartBadgeScale] = useState(new Animated.Value(1));
+
+const triggerAddBubble = useCallback((originX, originY) => {
+  if (typeof originX !== "number" || typeof originY !== "number") return;
+  if (!cartIconRef.current?.measureInWindow) return;
+
+  cartIconRef.current.measureInWindow((cx, cy, cw, ch) => {
+    setAddBubbleOrigin({ x: originX - 14, y: originY - 14 });
+    setAddBubbleVisible(true);
+    addBubbleX.setValue(0);
+    addBubbleY.setValue(0);
+    addBubbleScale.setValue(1);
+    addBubbleOpacity.setValue(1);
+
+    Animated.parallel([
+      Animated.timing(addBubbleX, {
+        toValue: cx + cw / 2 - originX,
+        duration: 550,
+        useNativeDriver: true,
+      }),
+      Animated.timing(addBubbleY, {
+        toValue: cy + ch / 2 - originY,
+        duration: 550,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.timing(addBubbleScale, {
+          toValue: 1.15,
+          duration: 120,
+          useNativeDriver: true,
+        }),
+        Animated.timing(addBubbleScale, {
+          toValue: 0.4,
+          duration: 430,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(addBubbleOpacity, {
+        toValue: 0,
+        duration: 550,
+        delay: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setAddBubbleVisible(false);
+      cartBadgeScale.setValue(1);
+      Animated.sequence([
+        Animated.timing(cartBadgeScale, { toValue: 1.3, duration: 120, useNativeDriver: true }),
+        Animated.timing(cartBadgeScale, { toValue: 1, duration: 120, useNativeDriver: true }),
+      ]).start();
+    });
+  });
+}, [addBubbleX, addBubbleY, addBubbleScale, addBubbleOpacity, cartBadgeScale]);
 
   // si ya tienes carrito real, conecta esto a tu store/context
  const { cartCount, add } = useCart();
@@ -478,8 +551,11 @@ useEffect(() => {
     );
 }, [items, cat, search]);
 
-  function onAdd(item) {
+  function onAdd(item, tapEvent) {
   const opts = getEnabledOptions(item);
+  const origin = tapEvent?.nativeEvent
+    ? { x: tapEvent.nativeEvent.pageX, y: tapEvent.nativeEvent.pageY }
+    : null;
 
   if (!opts.hasAny) {
   add({
@@ -492,6 +568,7 @@ useEffect(() => {
       flavors: [],
     },
   });
+  if (origin) triggerAddBubble(origin.x, origin.y);
   return;
 }
   setSelectedMilk(null);
@@ -540,17 +617,19 @@ function toggleFlavor(flavor) {
     <Screen>
       <StatusBar barStyle="dark-content" />
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
-        {/* Header */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }}>
-          {/* Top bar: titulo centrado + carrito */}
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
-  <View style={{ flexDirection: "row", gap: 8, width: 96 }}>
+        {/* Header -- compacto a propósito: lo que importa en esta pantalla
+            es el catálogo y el carrito, no el encabezado. */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 }}>
+          {/* Top bar: titulo centrado + carrito (el carrito es el botón más
+              grande de la barra para que se encuentre de un vistazo). */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+  <View style={{ width: 56 }}>
   <Pressable
     onPress={() => navigation?.navigate?.("Pedidos")}
     style={({ pressed }) => ({
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       borderWidth: 1,
       borderColor: COLORS.border,
       backgroundColor: "#fff",
@@ -560,7 +639,7 @@ function toggleFlavor(flavor) {
       position: "relative",
     })}
   >
-    <Text style={{ fontSize: 16 }}>📦</Text>
+    <Text style={{ fontSize: 14 }}>📦</Text>
 
     {activeOrdersCount > 0 ? (
   <Animated.View
@@ -568,17 +647,17 @@ function toggleFlavor(flavor) {
       position: "absolute",
       top: -4,
       right: -4,
-      minWidth: 18,
-      height: 18,
-      borderRadius: 9,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 8,
       backgroundColor: "#B00020",
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: 4,
+      paddingHorizontal: 3,
       transform: [{ scale: badgeScale }],
     }}
   >
-    <Text style={{ color: "#fff", fontSize: 10, fontWeight: "900" }}>
+    <Text style={{ color: "#fff", fontSize: 9, fontWeight: "900" }}>
       {activeOrdersCount > 99 ? "99+" : activeOrdersCount}
     </Text>
   </Animated.View>
@@ -587,65 +666,65 @@ function toggleFlavor(flavor) {
 </View>
 
   <View style={{ flex: 1, alignItems: "center" }}>
-    <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.ink }}>
+    <Text style={{ fontSize: 17, fontWeight: "900", color: COLORS.ink }}>
       Ordena y recoge
     </Text>
 
-    <View
-      style={{
-        marginTop: 6,
-        height: 3,
-        width: 76,
-        borderRadius: 999,
-        backgroundColor: COLORS.wine,
-      }}
-    />
-
-    <Text style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}>
+    <Text style={{ fontSize: 10, color: COLORS.muted, marginTop: 2 }}>
       Pide desde la app y recoge sin filas
     </Text>
   </View>
 
-  <View style={{ width: 96, alignItems: "flex-end" }}>
+  <View style={{ width: 76, alignItems: "flex-end" }}>
     <Pressable
+      ref={cartIconRef}
       onPress={() => navigation?.navigate?.("Cart")}
       style={({ pressed }) => ({
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        backgroundColor: "#fff",
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: COLORS.wine,
         alignItems: "center",
         justifyContent: "center",
         opacity: pressed ? 0.85 : 1,
+        shadowColor: COLORS.wine,
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 4,
       })}
     >
-      <Text style={{ fontSize: 18 }}>🛒</Text>
+      <Text style={{ fontSize: 28 }}>🛒</Text>
 
       {cartCount > 0 ? (
-        <View
+        <Animated.View
           style={{
             position: "absolute",
-            top: 6,
-            right: 6,
-            minWidth: 18,
-            height: 18,
-            borderRadius: 9,
-            backgroundColor: COLORS.wine,
+            top: -4,
+            right: -4,
+            minWidth: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: "#fff",
+            borderWidth: 2,
+            borderColor: COLORS.wine,
             alignItems: "center",
             justifyContent: "center",
             paddingHorizontal: 5,
+            transform: [{ scale: cartBadgeScale }],
           }}
         >
-          <Text style={{ color: "#fff", fontSize: 11, fontWeight: "900" }}>
+          <Text style={{ color: COLORS.wine, fontSize: 12, fontWeight: "900" }}>
             {cartCount > 99 ? "99+" : String(cartCount)}
           </Text>
-        </View>
+        </Animated.View>
       ) : null}
     </Pressable>
   </View>
 </View>
+
+          {/* ✅ Vuelve a pedir -- movido de Home a esta pestaña */}
+          <ReorderSection />
 
           {/* ✅ FILA A: Categorías horizontal (full width) */}
           <View style={{ marginTop: 8 }}>
@@ -989,7 +1068,9 @@ function toggleFlavor(flavor) {
           </Pressable>
 
           <Pressable
-            onPress={() => {
+            onPress={(e) => {
+              const originX = e?.nativeEvent?.pageX;
+              const originY = e?.nativeEvent?.pageY;
               const needsMilk =
                 selectedItem?.options?.milk?.enabled &&
                 Array.isArray(selectedItem?.options?.milk?.choices) &&
@@ -1028,6 +1109,7 @@ function toggleFlavor(flavor) {
               });
 
               closeOptionsModal();
+              if (typeof originX === "number") triggerAddBubble(originX, originY);
             }}
             style={{
               paddingHorizontal: 14,
@@ -1080,6 +1162,34 @@ function toggleFlavor(flavor) {
   </Animated.View>
 ) : null}
 
+{addBubbleVisible ? (
+  <Animated.View
+    pointerEvents="none"
+    style={{
+      position: "absolute",
+      left: addBubbleOrigin.x,
+      top: addBubbleOrigin.y,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: COLORS.wine,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      elevation: 6,
+      opacity: addBubbleOpacity,
+      transform: [
+        { translateX: addBubbleX },
+        { translateY: addBubbleY },
+        { scale: addBubbleScale },
+      ],
+    }}
+  >
+    <Text style={{ fontSize: 14 }}>🛒</Text>
+  </Animated.View>
+) : null}
 
       </View>
     </Screen>

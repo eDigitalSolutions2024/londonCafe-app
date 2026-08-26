@@ -36,7 +36,6 @@ import BoothMask from "../assets/markers/London.png";
 import LondonCafeLogo from "../assets/markers/londoncafe1.jpg";
 // Promociones desde POS
 import PromosSection from "../components/PromoSection";
-import ReorderSection from "../components/ReorderSection";
 
 // ✅ Modal avatar grande
 import AvatarPreview from "../components/AvatarPreview";
@@ -899,9 +898,6 @@ const moodEmoji = moodEmojiFromEnergy(energy);
             
           </View>
         </View>
-
-        {/* Vuelve a pedir */}
-        <ReorderSection />
 
         {/* Promociones */}
         <PromosSection limit={5}  />

@@ -1,5 +1,6 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from "react-native";
+import PromoPlaceholder from "../assets/promo_placeholder.png";
 import { useNavigation } from "@react-navigation/native";
 import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
@@ -173,57 +174,64 @@ export default function ReorderSection() {
 
   if (!token || loading || !reorder) return null;
 
+  const thumbItem = reorder.matched[0]?.catalogItem;
+
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>Vuelve a pedir</Text>
 
       <View style={styles.card}>
-        <Text style={styles.itemsLine} numberOfLines={2}>
-          {summaryLabel}
-        </Text>
+        <Image
+          source={thumbItem?.imageUrl ? { uri: thumbItem.imageUrl } : PromoPlaceholder}
+          style={styles.thumb}
+        />
 
-        <View style={styles.footerRow}>
+        <View style={styles.info}>
+          <Text style={styles.itemsLine} numberOfLines={1}>
+            {summaryLabel}
+          </Text>
           <Text style={styles.total}>{money(total)}</Text>
-
-          <TouchableOpacity
-            onPress={onReorder}
-            disabled={adding}
-            activeOpacity={0.85}
-            style={[styles.btn, adding && { opacity: 0.7 }]}
-          >
-            <Text style={styles.btnText}>{adding ? "..." : "Pedir de nuevo"}</Text>
-          </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          onPress={onReorder}
+          disabled={adding}
+          activeOpacity={0.85}
+          style={[styles.btn, adding && { opacity: 0.7 }]}
+        >
+          <Text style={styles.btnText}>{adding ? "..." : "Pedir de nuevo"}</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: 20, marginTop: 14 },
-  title: { fontSize: 16, fontWeight: "900", color: colors.text, marginBottom: 8 },
+  // Sin padding horizontal propio -- vive dentro del header de OrderScreen.jsx,
+  // que ya trae su paddingHorizontal:16.
+  wrap: { marginTop: 4, marginBottom: 4 },
+  title: { fontSize: 13, fontWeight: "900", color: colors.text, marginBottom: 6 },
   card: {
-    borderRadius: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: colors.card,
-    padding: 14,
+    padding: 8,
   },
-  itemsLine: { color: colors.text, fontWeight: "700", fontSize: 13, lineHeight: 18 },
-  footerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 12,
-  },
-  total: { color: colors.primary, fontWeight: "900", fontSize: 16 },
+  thumb: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#f2f2f2" },
+  info: { flex: 1 },
+  itemsLine: { color: colors.text, fontWeight: "700", fontSize: 12 },
+  total: { color: colors.primary, fontWeight: "900", fontSize: 13, marginTop: 1 },
   btn: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    height: 40,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 34,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { color: "#fff", fontWeight: "900", fontSize: 13 },
+  btnText: { color: "#fff", fontWeight: "900", fontSize: 11 },
 });
