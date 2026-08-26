@@ -23,6 +23,31 @@ const { sendExpoPushNotification } = require("../utils/push");
 
 const RECOVERY_COST = 25;
 
+// Mismo POS_URL/POS_API_KEY que points.controller.js usa para hablar con
+// apps/api server-a-servidor (ARCHITECTURE.md §6). El claim de racha solo
+// abonaba al campo legado (user.points) -- la App muestra el saldo de
+// Wallet V2 desde Fase 6, así que sin este puente el cliente nunca veía
+// reflejado lo que ganaba por racha, aunque el punto sí quedara guardado.
+// Fire-and-forget: si Wallet V2 no responde, el claim real (ya guardado en
+// el campo legado arriba) no debe fallar por eso.
+const POS_URL = process.env.POS_URL || "https://api.londoncafejrz.com/api";
+
+async function creditWalletBonus(userId, coins, dayKey, reason) {
+  if (!(coins > 0)) return;
+  try {
+    const res = await fetch(`${POS_URL}/wallet/${userId}/bonus`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": process.env.POS_API_KEY || "" },
+      body: JSON.stringify({ coins, dayKey, reason }),
+    });
+    if (!res.ok) {
+      console.log("creditWalletBonus error:", res.status, await res.text().catch(() => ""));
+    }
+  } catch (err) {
+    console.log("creditWalletBonus error:", err?.message);
+  }
+}
+
 /** helper: saca uid del token */
 function getUid(req) {
   return req.user?.uid || req.user?.sub || req.user?.userId || req.user?.id || null;
@@ -50,6 +75,10 @@ async function claimReward(req, res) {
 
     user.markModified("buddy");
     await user.save();
+
+    if (result.ok && result.reward?.coins > 0) {
+      creditWalletBonus(String(user._id), result.reward.coins, result.today, "Recompensa diaria / racha");
+    }
 
     const canRecover = calcCanRecover(user);
 
