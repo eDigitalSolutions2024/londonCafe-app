@@ -114,6 +114,11 @@ export default function RegisterScreen({ navigation }) {
 
       const res = await register(payload);
 
+      Alert.alert(
+        "Cuenta creada ✅",
+        "Te enviamos un código de verificación a tu correo. Si no lo ves en unos minutos, revisa tu carpeta de spam o correo no deseado -- ahí es donde suele llegar."
+      );
+
       navigation.navigate("VerifyEmail", { email: res?.email || email });
     } catch (e) {
       Alert.alert("Error", e?.data?.error || e?.message || "No se pudo registrar");

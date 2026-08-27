@@ -25,7 +25,10 @@ export default function VerifyEmailScreen({ route, navigation }) {
   async function onResend() {
     try {
       await resendVerification({ email });
-      Alert.alert("Enviado", "Revisa tu correo, te hemos enviado un nuevo código de verificación.");
+      Alert.alert(
+        "Enviado",
+        "Te hemos enviado un nuevo código de verificación. Si no lo ves en tu bandeja de entrada, revisa spam o correo no deseado."
+      );
     } catch (e) {
       Alert.alert("Error", e?.data?.error || e.message);
     }
@@ -36,6 +39,9 @@ export default function VerifyEmailScreen({ route, navigation }) {
       <View style={styles.wrap}>
         <Text style={styles.title}>Verifica tu correo</Text>
         <Text style={styles.subtitle}>Email: {email}</Text>
+        <Text style={styles.hint}>
+          ¿No te llega el código? Revisa tu carpeta de spam o correo no deseado -- muchas veces cae ahí.
+        </Text>
 
         <TextInput
           value={code}
@@ -63,6 +69,12 @@ const styles = StyleSheet.create({
   wrap: { padding: 20, gap: 12 },
   title: { color: colors.text, fontSize: 22, fontWeight: "700" },
   subtitle: { color: colors.textMuted },
+  hint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontStyle: "italic",
+    marginTop: -4,
+  },
   input: {
     backgroundColor: colors.card,
     borderColor: colors.primarySoft,
