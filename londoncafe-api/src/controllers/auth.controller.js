@@ -199,7 +199,7 @@ async function register(req, res) {
     if (process.env.NODE_ENV === "development" && showOtp) {
       console.log(`🟣 [DEV OTP] Email: ${user.email} | Code: ${code}`);
     } else {
-      await sendVerificationEmail({ to: user.email, code });
+      await sendVerificationEmail({ to: user.email, code, name: user.name });
     }
 
     return res.json({
@@ -290,7 +290,7 @@ async function resendVerification(req, res) {
     if (process.env.NODE_ENV === "development" && showOtp) {
       console.log(`🟣 [DEV OTP - RESEND] Email: ${user.email} | Code: ${code}`);
     } else {
-      await sendVerificationEmail({ to: user.email, code });
+      await sendVerificationEmail({ to: user.email, code, name: user.name });
     }
 
     return res.json({ ok: true, cooldown: RESEND_COOLDOWN_SEC });
