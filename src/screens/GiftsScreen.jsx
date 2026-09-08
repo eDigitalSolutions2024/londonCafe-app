@@ -27,7 +27,8 @@ import { GuestLockCard } from "../components/GuestPrompt";
 const moneyPresets = [50, 100, 200, 300, 500];
 
 const UI = {
-  bg: colors?.background || "#f6f6f7",
+  bg: "#0b0709",
+  pageTitle: "#ffffff",
   card: "#ffffff",
   border: "rgba(0,0,0,0.08)",
   text: colors?.text || "#101318",
@@ -551,7 +552,7 @@ const tabBarHeight = useBottomTabBarHeight();
         contentContainerStyle={{ padding: 16, paddingTop: 40, paddingBottom: 60 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={{ color: UI.text, fontSize: 22, fontWeight: "900", marginBottom: 14 }}>
+        <Text style={{ color: UI.pageTitle, fontSize: 22, fontWeight: "900", marginBottom: 14 }}>
           Regalos 🎁
         </Text>
 
@@ -639,7 +640,7 @@ const tabBarHeight = useBottomTabBarHeight();
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={{ color: UI.text, fontSize: 22, fontWeight: "900", marginBottom: 12 }}>
+      <Text style={{ color: UI.pageTitle, fontSize: 22, fontWeight: "900", marginBottom: 12 }}>
         Regalos 🎁
       </Text>
 
