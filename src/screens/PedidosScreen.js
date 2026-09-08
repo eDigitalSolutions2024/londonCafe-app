@@ -15,9 +15,14 @@ import { apiFetch } from "../api/client";
 import GuestPrompt from "../components/GuestPrompt";
 
 const COLORS = {
-  bg: "#F7F7F7",
+  bg: "#0b0709",
   ink: "#1B1B1B",
   muted: "rgba(27,27,27,0.55)",
+  // ✅ ink/muted son para texto DENTRO de tarjetas/modal blancos -- no
+  // tocar ahí. pageText/pageMuted son para texto directo sobre el fondo
+  // de página (ahora oscuro): título, subtítulo, estado vacío.
+  pageText: "#ffffff",
+  pageMuted: "rgba(255,255,255,0.6)",
   border: "rgba(27,27,27,0.10)",
   wine: "#7A1E3A",
   wineSoft: "rgba(122,30,58,0.12)",
@@ -99,7 +104,7 @@ const [showOrderModal, setShowOrderModal] = useState(false);
 
   if (!token) {
     return (
-      <Screen>
+      <Screen safeStyle={{ backgroundColor: COLORS.bg }}>
         <GuestPrompt
           title="Pedidos"
           message="Inicia sesión para ver el historial de tus pedidos."
@@ -109,7 +114,7 @@ const [showOrderModal, setShowOrderModal] = useState(false);
   }
 
   return (
-    <Screen>
+    <Screen safeStyle={{ backgroundColor: COLORS.bg }}>
       <View style={{ flex: 1, backgroundColor: COLORS.bg, padding: 16 }}>
         <View style={{ marginBottom: 14 }}>
           <Pressable
@@ -132,10 +137,10 @@ const [showOrderModal, setShowOrderModal] = useState(false);
             </Text>
           </Pressable>
 
-          <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.ink }}>
+          <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.pageText }}>
             Pedidos
           </Text>
-          <Text style={{ marginTop: 8, color: COLORS.muted }}>
+          <Text style={{ marginTop: 8, color: COLORS.pageMuted }}>
             Aquí aparecerán tus pedidos y su estatus.
           </Text>
         </View>
@@ -248,7 +253,7 @@ const [showOrderModal, setShowOrderModal] = useState(false);
   );
 }}
             ListEmptyComponent={
-              <Text style={{ color: COLORS.muted }}>
+              <Text style={{ color: COLORS.pageMuted }}>
                 Aún no tienes pedidos.
               </Text>
             }

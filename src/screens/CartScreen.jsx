@@ -10,10 +10,16 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const COLORS = {
-  bg: "#F7F7F7",
+  bg: "#0b0709",
   card: "#FFFFFF",
   ink: "#1B1B1B",
   muted: "rgba(27,27,27,0.55)",
+  // ✅ ink/muted arriba siguen siendo para texto DENTRO de tarjetas blancas
+  // (CartItem, SuggestionCard) -- no tocarlos ahí. pageText/pageMuted son
+  // solo para texto que vive directo sobre el fondo de página (ahora
+  // oscuro), como el título "Tu carrito" o el subtotal.
+  pageText: "#ffffff",
+  pageMuted: "rgba(255,255,255,0.6)",
   border: "rgba(27,27,27,0.10)",
   wine: "#7A1E3A",
   wineSoft: "rgba(122,30,58,0.12)",
@@ -282,7 +288,7 @@ function SuggestionsRow({ items, onAdd }) {
 
   return (
     <View style={{ marginBottom: 16 }}>
-      <Text style={{ fontWeight: "900", color: COLORS.ink, fontSize: 14, marginBottom: 10 }}>
+      <Text style={{ fontWeight: "900", color: COLORS.pageText, fontSize: 14, marginBottom: 10 }}>
         También te puede gustar
       </Text>
       <FlatList
@@ -564,7 +570,7 @@ navigation.navigate("Order", {
 };
 
   return (
-    <Screen>
+    <Screen safeStyle={{ backgroundColor: COLORS.bg }}>
       <View
   style={{
     flex: 1,
@@ -620,10 +626,10 @@ navigation.navigate("Order", {
     )}
   </View>
 
-  <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.ink }}>
+  <Text style={{ fontSize: 24, fontWeight: "900", color: COLORS.pageText }}>
     Tu carrito
   </Text>
-  <Text style={{ marginTop: 6, color: COLORS.muted }}>
+  <Text style={{ marginTop: 6, color: COLORS.pageMuted }}>
     Revisa tus productos antes de continuar.
   </Text>
 </View>
@@ -668,7 +674,7 @@ showsVerticalScrollIndicator={false}
     <Text
       style={{
         fontWeight: "900",
-        color: COLORS.ink,
+        color: COLORS.pageText,
         fontSize: 18,
         textAlign: "center",
       }}
@@ -679,7 +685,7 @@ showsVerticalScrollIndicator={false}
     <Text
       style={{
         marginTop: 8,
-        color: COLORS.muted,
+        color: COLORS.pageMuted,
         textAlign: "center",
         lineHeight: 20,
       }}
@@ -710,8 +716,8 @@ showsVerticalScrollIndicator={false}
     }}
   >
     <View>
-      <Text style={{ color: COLORS.muted, fontWeight: "700" }}>Subtotal</Text>
-      <Text style={{ color: COLORS.ink, fontWeight: "900", fontSize: 22 }}>
+      <Text style={{ color: COLORS.pageMuted, fontWeight: "700" }}>Subtotal</Text>
+      <Text style={{ color: COLORS.pageText, fontWeight: "900", fontSize: 22 }}>
         {money(subtotal)}
       </Text>
     </View>
