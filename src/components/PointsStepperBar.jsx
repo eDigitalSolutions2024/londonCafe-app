@@ -144,10 +144,10 @@ export default function PointsStepperBar({
 const styles = StyleSheet.create({
   // ✅ un poquito más grande que la racha
   card: {
-    marginTop: 10,
+    marginTop: 6,
     ...appStyles.card,
 
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 12,
 
     // “premium” sin cambiar appStyles

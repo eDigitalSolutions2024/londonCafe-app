@@ -278,7 +278,7 @@ function BoothStreakBar({
   const shown = claimedToday ? day : Math.max(0, day - 1);
   const pct = shown / totalDays; // 0..1
 
-  const BOOTH_H = 128; // debe ser igual a styles.boothBox.height
+  const BOOTH_H = 112; // debe ser igual a styles.boothBox.height
 
   // ✅ animación del llenado
  const fillAnim = useRef(new Animated.Value(pct * BOOTH_H)).current;
@@ -997,7 +997,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
                 bloque. */}
             <View style={styles.guestPromosHeaderRow}>
               <Text style={styles.guestPromosIcon}>🔥</Text>
-              <Text style={styles.guestPromosTitle}>Promociones de hoy</Text>
+              <Text style={styles.guestPromosTitle}>Promociones</Text>
             </View>
             {/* width:100% explícito -- guestDark usa alignItems:"center", así
                 que sin esto PromosSection se encoge a su contenido en vez de
@@ -1147,7 +1147,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
         {/* Promociones */}
         <View style={styles.homePromosHeaderRow}>
           <Text style={styles.homePromosIcon}>🔥</Text>
-          <Text style={styles.homePromosTitle}>Promociones de hoy</Text>
+          <Text style={styles.homePromosTitle}>Promociones</Text>
         </View>
         <PromosSection limit={5}  />
       </ScrollView>
@@ -1410,14 +1410,14 @@ const styles = StyleSheet.create({
   hero: { paddingHorizontal: 20, paddingVertical: 0 },
   heroDark: {
     paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
     backgroundColor: "#0b0709",
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
     overflow: "hidden",
   },
-  heroHeader: { marginBottom: 6 },
+  heroHeader: { marginBottom: 2 },
 
   /* ✅ Top header: logo + welcome + logout */
   topBar: {
@@ -1486,8 +1486,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 10,
+    marginTop: -18,
+    marginBottom: 8,
   },
   homePromosIcon: { fontSize: 18 },
   homePromosTitle: {
@@ -1499,9 +1499,9 @@ const styles = StyleSheet.create({
 
   /* ✅ Streak Card (cabina + botón + texto) */
   duoCard: {
-    marginTop: 10,
+    marginTop: 6,
     borderRadius: 16,
-    padding: 10,
+    padding: 8,
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: colors.primary,
@@ -1561,13 +1561,13 @@ const styles = StyleSheet.create({
   },
 
   boothBox: {
-    width: 96,
-    height: 128,
+    width: 84,
+    height: 112,
     overflow: "hidden",
   },
   boothImg: {
-    width: 96,
-    height: 128,
+    width: 84,
+    height: 112,
   },
 
   boothHint: {

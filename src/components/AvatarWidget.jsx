@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   ...appStyles.card,
   flexDirection: "row",
   gap: 10,
-  paddingVertical: 10,  // ✅ más compacto
+  paddingVertical: 8,  // ✅ más compacto
 },
 
 left: { width: 96, justifyContent: "center" }, // ✅ reduce espacio
