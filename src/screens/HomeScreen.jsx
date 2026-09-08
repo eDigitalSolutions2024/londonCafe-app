@@ -1486,7 +1486,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 20,
-    marginTop: -18,
+    marginTop: 6,
     marginBottom: 8,
   },
   homePromosIcon: { fontSize: 18 },
