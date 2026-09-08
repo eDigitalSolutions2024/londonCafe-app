@@ -15,7 +15,7 @@ export default function AvatarPreviewLargeScreen({ route, navigation }) {
   };
 
   return (
-    <Screen>
+    <Screen safeStyle={styles.safeDark}>
       <View style={styles.container}>
         {/* Botón cerrar */}
         <Pressable style={styles.closeBtn} onPress={() => navigation.goBack()}>
@@ -38,10 +38,11 @@ export default function AvatarPreviewLargeScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
+  safeDark: { backgroundColor: "#0b0709" },
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: colors.background,
+    backgroundColor: "#0b0709",
   },
 
   closeBtn: {
@@ -49,12 +50,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
 
   closeText: {
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.8)",
     fontSize: 12,
     fontWeight: "800",
   },
@@ -70,16 +72,21 @@ const styles = StyleSheet.create({
     height: 300,
     borderRadius: 150,
     backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
+    borderWidth: 2,
+    borderColor: "rgba(232,207,174,0.4)",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    shadowColor: colors.accent,
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
   },
 
   hint: {
     marginTop: 16,
     fontSize: 12,
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.55)",
   },
 });

@@ -87,7 +87,7 @@ export default function WalletHistoryScreen({ navigation }) {
   }, [fetchHistory]);
 
   return (
-    <Screen>
+    <Screen safeStyle={styles.safeDark}>
       <View style={styles.headerTop}>
         <Text style={styles.pageTitle}>Historial</Text>
 
@@ -96,7 +96,7 @@ export default function WalletHistoryScreen({ navigation }) {
           activeOpacity={0.85}
           style={styles.backBtn}
         >
-          <Text style={{ color: colors.text, fontWeight: "900" }}>← Regresar</Text>
+          <Text style={{ color: "#fff", fontWeight: "900" }}>← Regresar</Text>
         </TouchableOpacity>
       </View>
 
@@ -124,13 +124,14 @@ export default function WalletHistoryScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  safeDark: { backgroundColor: "#0b0709" },
   headerTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 14,
   },
-  pageTitle: { color: colors.text, fontSize: 32, fontWeight: "900" },
+  pageTitle: { color: "#fff", fontSize: 32, fontWeight: "900" },
   backBtn: {
     alignSelf: "flex-start",
     paddingHorizontal: 14,
@@ -138,9 +139,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   card: {
     backgroundColor: colors.card,

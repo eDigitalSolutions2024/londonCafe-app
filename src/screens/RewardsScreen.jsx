@@ -178,7 +178,7 @@ export default function RewardsScreen({ navigation }) {
   }
 
   return (
-    <Screen>
+    <Screen safeStyle={styles.safeDark}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAll} />}
@@ -197,12 +197,12 @@ export default function RewardsScreen({ navigation }) {
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   }}
 >
-  <Text style={{ color: colors.text, fontWeight: "900" }}>
+  <Text style={{ color: "#fff", fontWeight: "900" }}>
     ← Regresar
   </Text>
 </TouchableOpacity>
@@ -306,6 +306,7 @@ export default function RewardsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  safeDark: { backgroundColor: "#0b0709" },
   headerTop: {
     flexDirection: "row",
     alignItems: "center",
@@ -314,7 +315,7 @@ const styles = StyleSheet.create({
   },
 
   pageTitle: {
-    color: colors.text,
+    color: "#fff",
     fontSize: 32,
     fontWeight: "900",
   },

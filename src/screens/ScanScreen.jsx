@@ -20,7 +20,7 @@ export default function ScanScreen() {
 
   if (!token) {
     return (
-      <Screen>
+      <Screen safeStyle={styles.safeDark}>
         <GuestPrompt
           title="Mi QR"
           message="Inicia sesión para generar tu código QR de fidelidad."
@@ -30,7 +30,7 @@ export default function ScanScreen() {
   }
 
   return (
-    <Screen>
+    <Screen safeStyle={styles.safeDark}>
       <View style={styles.wrap}>
         <Text style={styles.h1}>Mi QR</Text>
         <Text style={styles.sub}>Muestra este QR en caja para vincular tu compra</Text>
@@ -57,9 +57,10 @@ export default function ScanScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, padding: 20, backgroundColor: colors.background },
-  h1: { color: colors.text, fontSize: 22, fontWeight: "900", marginBottom: 6 },
-  sub: { color: colors.textMuted, marginBottom: 14 },
+  safeDark: { backgroundColor: "#0b0709" },
+  wrap: { flex: 1, padding: 20, backgroundColor: "#0b0709" },
+  h1: { color: "#fff", fontSize: 22, fontWeight: "900", marginBottom: 6 },
+  sub: { color: "rgba(255,255,255,0.6)", marginBottom: 14 },
 
   card: {
     borderRadius: 18,
