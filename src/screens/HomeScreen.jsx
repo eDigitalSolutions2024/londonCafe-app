@@ -1013,7 +1013,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
   }
 
   return (
-    <Screen edges={["top"]} withPadding={false}>
+    <Screen edges={["top"]} withPadding={false} safeStyle={styles.safeDark}>
             <ScrollView
   style={styles.container}
   showsVerticalScrollIndicator={false}
@@ -1028,19 +1028,38 @@ const moodEmoji = moodEmojiFromEnergy(energy);
     <RefreshControl
       refreshing={loadingPoints || loadingMe}
       onRefresh={refreshHome}
+      tintColor={colors.accent}
     />
   }
 >
-        {/* Hero */}
-        <View style={styles.hero}>
+        {/* Hero -- mismo lenguaje oscuro/glow que Boot/Bienvenido/Login (ver
+            BootScreen.jsx y la rama !token de este mismo archivo), llevado
+            al home autenticado. Los widgets hijos (AvatarWidget,
+            BoothStreakBar, PointsStepperBar) no se tocan -- ya son tarjetas
+            de fondo sólido (blanco/vino), así que "flotan" bien sobre el
+            fondo oscuro sin necesitar ningún cambio interno. */}
+        <View style={styles.heroDark}>
+          <DriftingOrb size={200} top={-50} right={-60} color={colors.accent} duration={5400} />
+          <DriftingOrb size={180} top={90} left={-70} color={colors.primary} duration={6000} delay={500} />
+
           <View style={styles.heroHeader}>
   <View style={styles.topBar}>
     <View style={styles.brandLeft}>
-      {/* ✅ Placeholder del logo (luego lo cambias por <Image source={...} />) */}
-      <Image source={LondonCafeLogo} style={styles.logoBubble} resizeMode="cover" />
+      <View style={styles.logoRingSmall}>
+        <Svg width={54} height={54} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <SvgLinearGradient id="homeRing" x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0%" stopColor={colors.accent} stopOpacity="1" />
+              <Stop offset="100%" stopColor="#fff" stopOpacity="0.35" />
+            </SvgLinearGradient>
+          </Defs>
+          <Circle cx="27" cy="27" r="26" stroke="url(#homeRing)" strokeWidth="1.5" fill="none" />
+        </Svg>
+        <Image source={LondonCafeLogo} style={styles.logoBubble} resizeMode="cover" />
+      </View>
 
       <View style={styles.welcomeBlock}>
-  <Text style={styles.welcomeLabel}>Bienvenido</Text>
+  <Text style={styles.welcomeLabel}>BIENVENIDO</Text>
   <Text style={styles.welcomeNameLine} numberOfLines={1}>
     {displayName}
   </Text>
@@ -1126,6 +1145,10 @@ const moodEmoji = moodEmojiFromEnergy(energy);
         </View>
 
         {/* Promociones */}
+        <View style={styles.homePromosHeaderRow}>
+          <Text style={styles.homePromosIcon}>🔥</Text>
+          <Text style={styles.homePromosTitle}>Promociones de hoy</Text>
+        </View>
         <PromosSection limit={5}  />
       </ScrollView>
 
@@ -1381,9 +1404,19 @@ const styles = StyleSheet.create({
   },
 
   /* Screen / layout base */
-  container: { flex: 1, backgroundColor: colors.background },
+  safeDark: { backgroundColor: "#0b0709" },
+  container: { flex: 1, backgroundColor: "#0b0709" },
 
   hero: { paddingHorizontal: 20, paddingVertical: 0 },
+  heroDark: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 20,
+    backgroundColor: "#0b0709",
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: "hidden",
+  },
   heroHeader: { marginBottom: 6 },
 
   /* ✅ Top header: logo + welcome + logout */
@@ -1404,13 +1437,16 @@ const styles = StyleSheet.create({
     minWidth: 0, // importante para ellipsis
   },
 
+  logoRingSmall: {
+    width: 54,
+    height: 54,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   logoBubble: {
-    width: 50,
-    height: 50,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: colors.card,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     overflow: "hidden", // ✅ para que el borderRadius recorte la imagen
   },
 
@@ -1420,28 +1456,46 @@ const styles = StyleSheet.create({
   },
 
   welcomeLabel: {
-    color: colors.textMuted,
-    fontSize: 15, // ✅ más grande
+    color: colors.accent,
+    fontSize: 11,
     fontWeight: "800",
-    lineHeight: 17,
+    letterSpacing: 2,
+    lineHeight: 14,
   },
 
   welcomeNameLine: {
-    color: colors.text,
-    fontSize: 17, // ✅ más grande
+    color: "#fff",
+    fontSize: 18, // ✅ más grande
     fontWeight: "900",
-    lineHeight: 20, // ✅ NO inflar a 28
+    lineHeight: 21, // ✅ NO inflar a 28
+    marginTop: 2,
   },
 
   logoutBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
-  logoutText: { color: colors.textMuted, fontSize: 11, fontWeight: "900" },
+  logoutText: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "900" },
+
+  homePromosHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 10,
+  },
+  homePromosIcon: { fontSize: 18 },
+  homePromosTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
 
   /* ✅ Streak Card (cabina + botón + texto) */
   duoCard: {
