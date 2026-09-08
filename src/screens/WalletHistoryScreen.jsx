@@ -67,7 +67,12 @@ export default function WalletHistoryScreen({ navigation }) {
     try {
       setLoading(true);
       setError(null);
-      const r = await apiFetch("/points/wallet/transactions?limit=100");
+      // Igual que el resto de las llamadas autenticadas en HomeScreen.jsx --
+      // no confiar solo en la búsqueda automática de apiFetch (ver el fix en
+      // client.js: buscaba la llave equivocada en AsyncStorage).
+      const r = await apiFetch("/points/wallet/transactions?limit=100", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setTransactions(Array.isArray(r?.transactions) ? r.transactions : []);
     } catch (e) {
       console.log("❌ WalletHistory fetchHistory:", e?.status, e?.data || e?.message);

@@ -16,7 +16,13 @@ async function parseJsonSafe(res) {
 export async function apiFetch(path, options = {}) {
   const url = `${BASE_URL}${path}`;
 
+  // "londoncaf_token" es la llave real que usa AuthContext.jsx -- las otras
+  // tres nunca existieron ahí, así que cualquier pantalla que confiara solo
+  // en esta búsqueda automática (sin pasar Authorization a mano, como sí
+  // hace HomeScreen.jsx en cada llamada) mandaba la petición sin token y
+  // siempre recibía 401 NO_TOKEN. Bug real: así fallaba WalletHistoryScreen.
   const token =
+    (await AsyncStorage.getItem("londoncaf_token")) ||
     (await AsyncStorage.getItem("token")) ||
     (await AsyncStorage.getItem("auth_token")) ||
     (await AsyncStorage.getItem("jwt")) ||
