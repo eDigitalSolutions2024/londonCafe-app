@@ -142,7 +142,7 @@ export default function AccountSettingsScreen({ navigation }) {
 
   if (!token) {
     return (
-      <Screen style={styles.screen} edges={["top", "left", "right"]}>
+      <Screen style={styles.screen} safeStyle={styles.screen} edges={["top", "left", "right"]}>
         <GuestPrompt
           title="Configuración"
           message="Inicia sesión para gestionar tu cuenta y avatar."
@@ -152,7 +152,7 @@ export default function AccountSettingsScreen({ navigation }) {
   }
 
   return (
-    <Screen style={styles.screen} edges={["top", "left", "right"]}>
+    <Screen style={styles.screen} safeStyle={styles.screen} edges={["top", "left", "right"]}>
       <ScrollView
         style={styles.wrap}
         contentContainerStyle={[
@@ -255,7 +255,7 @@ export default function AccountSettingsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   // ✅ Screen ya maneja paddingHorizontal, aquí solo aseguras el fondo
-  screen: { backgroundColor: colors.background },
+  screen: { backgroundColor: "#0b0709" },
 
   wrap: { flex: 1, backgroundColor: "transparent" },
 
@@ -263,18 +263,18 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 28 },
 
   header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
-  title: { color: colors.text, fontSize: 22, fontWeight: "900" },
-  sub: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
+  title: { color: "#fff", fontSize: 22, fontWeight: "900" },
+  sub: { marginTop: 4, color: "rgba(255,255,255,0.6)", fontSize: 12 },
 
   logoutBtn: {
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
-  logoutText: { color: colors.primary, fontWeight: "800", fontSize: 12 },
+  logoutText: { color: colors.accent, fontWeight: "800", fontSize: 12 },
 
   card: {
     backgroundColor: colors.card,

@@ -35,7 +35,7 @@ export default function VerifyEmailScreen({ route, navigation }) {
   }
 
   return (
-    <Screen>
+    <Screen safeStyle={styles.safeDark}>
       <View style={styles.wrap}>
         <Text style={styles.title}>Verifica tu correo</Text>
         <Text style={styles.subtitle}>Email: {email}</Text>
@@ -66,31 +66,32 @@ export default function VerifyEmailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { padding: 20, gap: 12 },
-  title: { color: colors.text, fontSize: 22, fontWeight: "700" },
-  subtitle: { color: colors.textMuted },
+  safeDark: { backgroundColor: "#0b0709" },
+  wrap: { padding: 20, gap: 12, flex: 1, backgroundColor: "#0b0709" },
+  title: { color: "#fff", fontSize: 22, fontWeight: "700" },
+  subtitle: { color: "rgba(255,255,255,0.6)" },
   hint: {
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.5)",
     fontSize: 12,
     fontStyle: "italic",
     marginTop: -4,
   },
   input: {
-    backgroundColor: colors.card,
-    borderColor: colors.primarySoft,
-    borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1.5,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: colors.text,
+    color: "#fff",
   },
   btn: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accent,
     paddingVertical: 12,
     borderRadius: 999,
     marginTop: 6,
     alignItems: "center",
   },
-  btnText: { color: colors.accent, fontSize: 16, fontWeight: "700" },
-  link: { color: colors.textMuted, marginTop: 8 },
+  btnText: { color: "#2A0E18", fontSize: 16, fontWeight: "700" },
+  link: { color: "rgba(255,255,255,0.55)", marginTop: 8 },
 });

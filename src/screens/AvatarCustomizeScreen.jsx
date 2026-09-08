@@ -135,7 +135,7 @@ export default function AvatarCustomizeScreen({ navigation }) {
   };
 
   return (
-    <Screen>
+    <Screen safeStyle={styles.safeDark}>
       <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
@@ -196,22 +196,23 @@ export default function AvatarCustomizeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.background },
+  safeDark: { backgroundColor: "#0b0709" },
+  wrap: { flex: 1, backgroundColor: "#0b0709" },
   content: { padding: 20, paddingBottom: 28 },
 
   header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
-  title: { color: colors.text, fontSize: 20, fontWeight: "900" },
-  sub: { marginTop: 4, color: colors.textMuted, fontSize: 12 },
+  title: { color: "#fff", fontSize: 20, fontWeight: "900" },
+  sub: { marginTop: 4, color: "rgba(255,255,255,0.6)", fontSize: 12 },
 
   closeBtn: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: colors.card,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
-  closeText: { color: colors.textMuted, fontWeight: "800", fontSize: 12 },
+  closeText: { color: "rgba(255,255,255,0.8)", fontWeight: "800", fontSize: 12 },
 
   card: { backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.primarySoft },
 

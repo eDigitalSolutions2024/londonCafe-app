@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,10 +7,13 @@ import {
   StyleSheet,
   Alert,
   Image,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from "react-native";
+import Svg, { Defs, RadialGradient, LinearGradient as SvgLinearGradient, Stop, Circle } from "react-native-svg";
 
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
@@ -20,6 +23,78 @@ import { AuthContext } from "../context/AuthContext";
 // ✅ mismo logo que Login (ajusta si lo cambiaste)
 import LondonCafeLogo from "../assets/markers/londoncafe.png";
 
+// Mismo lenguaje oscuro/glass que LoginScreen.jsx -- duplicado a propósito
+// (ver comentario ahí) en vez de compartido, son pantallas distintas.
+function Glow({ size = 220 }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+
+  return (
+    <Animated.View pointerEvents="none" style={[registerFxStyles.glow, { width: size, height: size, opacity, transform: [{ scale }] }]}>
+      <Svg width={size} height={size}>
+        <Defs>
+          <RadialGradient id="registerGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={colors.accent} stopOpacity="0.55" />
+            <Stop offset="55%" stopColor={colors.accent} stopOpacity="0.18" />
+            <Stop offset="90%" stopColor={colors.accent} stopOpacity="0" />
+            <Stop offset="100%" stopColor={colors.accent} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={size * 0.42} fill="url(#registerGlow)" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+const registerFxStyles = StyleSheet.create({
+  glow: { position: "absolute", alignItems: "center", justifyContent: "center" },
+});
+
+function GlassInput({ label, focused, onFocus, onBlur, ...rest }) {
+  const glow = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(glow, {
+      toValue: focused ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [focused, glow]);
+
+  const borderColor = glow.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.16)", colors.accent],
+  });
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <Animated.View style={[styles.inputWrap, { borderColor }]}>
+        <TextInput
+          placeholderTextColor="rgba(255,255,255,0.35)"
+          style={styles.input}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          {...rest}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
 export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState("");
   const [gender, setGender] = useState(""); // "male" | "female" | "other"
@@ -28,6 +103,7 @@ export default function RegisterScreen({ navigation }) {
   const [birthDate, setBirthDate] = useState(""); // DD/MM/AAAA
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState(null);
 
   const { token } = useContext(AuthContext) || {};
 
@@ -144,7 +220,7 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <Screen>
+    <Screen safeStyle={styles.safeDark}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -156,12 +232,26 @@ export default function RegisterScreen({ navigation }) {
         >
           {/* Header / Logo (igual que Login) */}
           <View style={styles.header}>
-            <View style={styles.logoWrap}>
-              <Image
-                source={LondonCafeLogo}
-                style={styles.logo}
-                resizeMode="contain"
-              />
+            <View style={styles.glowStage}>
+              <Glow />
+              <View style={styles.logoRing}>
+                <Svg width={104} height={104} style={StyleSheet.absoluteFill}>
+                  <Defs>
+                    <SvgLinearGradient id="registerRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <Stop offset="0%" stopColor={colors.accent} stopOpacity="1" />
+                      <Stop offset="100%" stopColor="#fff" stopOpacity="0.35" />
+                    </SvgLinearGradient>
+                  </Defs>
+                  <Circle cx="52" cy="52" r="51" stroke="url(#registerRing)" strokeWidth="1.5" fill="none" />
+                </Svg>
+                <View style={styles.logoWrap}>
+                  <Image
+                    source={LondonCafeLogo}
+                    style={styles.logo}
+                    resizeMode="contain"
+                  />
+                </View>
+              </View>
             </View>
 
             <Text style={styles.title}>Crear cuenta</Text>
@@ -172,17 +262,16 @@ export default function RegisterScreen({ navigation }) {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Registro</Text>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Nombre</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="Tu nombre"
-                placeholderTextColor={colors.textMuted}
-                style={styles.input}
-                returnKeyType="next"
-              />
-            </View>
+            <GlassInput
+              label="Nombre"
+              value={name}
+              onChangeText={setName}
+              placeholder="Tu nombre"
+              returnKeyType="next"
+              focused={focusedField === "name"}
+              onFocus={() => setFocusedField("name")}
+              onBlur={() => setFocusedField(null)}
+            />
 
             {/* ✅ Género */}
             <View style={styles.field}>
@@ -194,65 +283,61 @@ export default function RegisterScreen({ navigation }) {
               </View>
             </View>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="tu@email.com"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                style={styles.input}
-                returnKeyType="next"
-                autoComplete="email"
-                textContentType="emailAddress"
-              />
-            </View>
+            <GlassInput
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="tu@email.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              returnKeyType="next"
+              autoComplete="email"
+              textContentType="emailAddress"
+              focused={focusedField === "email"}
+              onFocus={() => setFocusedField("email")}
+              onBlur={() => setFocusedField(null)}
+            />
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Teléfono (opcional)</Text>
-              <TextInput
-                value={phone}
-                onChangeText={(v) => setPhone(normalizePhone(v))}
-                placeholder="6561234567 o +1..."
-                placeholderTextColor={colors.textMuted}
-                keyboardType="phone-pad"
-                style={styles.input}
-                returnKeyType="next"
-                autoComplete="tel"
-                textContentType="telephoneNumber"
-              />
-            </View>
+            <GlassInput
+              label="Teléfono (opcional)"
+              value={phone}
+              onChangeText={(v) => setPhone(normalizePhone(v))}
+              placeholder="6561234567 o +1..."
+              keyboardType="phone-pad"
+              returnKeyType="next"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+              focused={focusedField === "phone"}
+              onFocus={() => setFocusedField("phone")}
+              onBlur={() => setFocusedField(null)}
+            />
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Fecha de nacimiento (opcional)</Text>
-              <TextInput
-                value={birthDate}
-                onChangeText={(v) => setBirthDate(formatBirthDate(v))}
-                placeholder="DD/MM/AAAA"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="number-pad"
-                style={styles.input}
-                returnKeyType="next"
-              />
-            </View>
+            <GlassInput
+              label="Fecha de nacimiento (opcional)"
+              value={birthDate}
+              onChangeText={(v) => setBirthDate(formatBirthDate(v))}
+              placeholder="DD/MM/AAAA"
+              keyboardType="number-pad"
+              returnKeyType="next"
+              focused={focusedField === "birthDate"}
+              onFocus={() => setFocusedField("birthDate")}
+              onBlur={() => setFocusedField(null)}
+            />
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Contraseña</Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor={colors.textMuted}
-                secureTextEntry
-                style={styles.input}
-                returnKeyType="done"
-                onSubmitEditing={onSubmit}
-                autoComplete="password"
-                textContentType="newPassword"
-              />
-            </View>
+            <GlassInput
+              label="Contraseña"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              secureTextEntry
+              returnKeyType="done"
+              onSubmitEditing={onSubmit}
+              autoComplete="password"
+              textContentType="newPassword"
+              focused={focusedField === "password"}
+              onFocus={() => setFocusedField("password")}
+              onBlur={() => setFocusedField(null)}
+            />
 
             <TouchableOpacity
               style={[styles.btn, loading && styles.btnDisabled]}
@@ -294,12 +379,13 @@ export default function RegisterScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  safeDark: { backgroundColor: "#0b0709" },
   container: {
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 26,
     paddingBottom: 30,
-    backgroundColor: colors.background,
+    backgroundColor: "#0b0709",
     justifyContent: "center",
   },
 
@@ -308,51 +394,62 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  logoWrap: {
-    width: 92,
-    height: 92,
-    borderRadius: 26,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
+  glowStage: {
+    width: 104,
+    height: 104,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
+    marginBottom: 14,
+  },
+  logoRing: {
+    width: 104,
+    height: 104,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoWrap: {
+    width: 84,
+    height: 84,
+    borderRadius: 22,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: colors.accent,
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
     elevation: 3,
   },
-  logo: { width: 78, height: 78 },
+  logo: { width: 70, height: 70 },
 
   title: {
-    color: colors.text,
+    color: "#fff",
     fontSize: 22,
     fontWeight: "900",
   },
   subtitle: {
     marginTop: 4,
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.6)",
     fontSize: 13,
     fontWeight: "700",
   },
 
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: colors.primarySoft,
+    borderColor: "rgba(255,255,255,0.12)",
     borderRadius: 18,
     padding: 16,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 10 },
     elevation: 3,
   },
 
   cardTitle: {
-    color: colors.text,
+    color: "#fff",
     fontSize: 18,
     fontWeight: "900",
     marginBottom: 10,
@@ -361,7 +458,7 @@ const styles = StyleSheet.create({
   field: { marginBottom: 12 },
 
   label: {
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.5)",
     fontSize: 12,
     fontWeight: "900",
     marginBottom: 6,
@@ -369,14 +466,15 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
 
-  input: {
-    backgroundColor: "#fff",
-    borderColor: colors.primarySoft,
-    borderWidth: 1,
+  inputWrap: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1.5,
     borderRadius: 14,
+  },
+  input: {
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: colors.text,
+    color: "#fff",
     fontWeight: "700",
   },
 
@@ -390,39 +488,44 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   pillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   pillText: {
-    color: colors.text,
+    color: "#fff",
     fontWeight: "900",
     fontSize: 13,
   },
   pillTextActive: {
-    color: "#fff",
+    color: "#2A0E18",
   },
   helper: {
     marginTop: 6,
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.55)",
     fontSize: 12,
     fontWeight: "700",
   },
 
   btn: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accent,
     paddingVertical: 13,
     borderRadius: 999,
     marginTop: 6,
     alignItems: "center",
+    shadowColor: colors.accent,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  btnDisabled: { opacity: 0.7 },
+  btnDisabled: { opacity: 0.6 },
   btnText: {
-    color: "#fff",
+    color: "#2A0E18",
     fontSize: 15,
     fontWeight: "900",
     letterSpacing: 0.2,
@@ -438,10 +541,10 @@ const styles = StyleSheet.create({
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: "rgba(255,255,255,0.14)",
   },
   dividerText: {
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.5)",
     fontWeight: "900",
     fontSize: 12,
   },
@@ -451,18 +554,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   linkText: {
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.6)",
     fontWeight: "800",
   },
   linkStrong: {
-    color: colors.primary,
+    color: colors.accent,
     fontWeight: "900",
   },
 
   footerNote: {
     marginTop: 14,
     textAlign: "center",
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.4)",
     fontSize: 11,
     fontWeight: "700",
   },
