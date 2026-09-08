@@ -1499,7 +1499,7 @@ const styles = StyleSheet.create({
 
   /* ✅ Streak Card (cabina + botón + texto) */
   duoCard: {
-    marginTop: 6,
+    marginTop: 12,
     borderRadius: 16,
     padding: 8,
     borderWidth: 1,

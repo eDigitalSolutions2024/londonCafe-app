@@ -61,7 +61,7 @@ export default function LocationScreen() {
 const styles = StyleSheet.create({
   wrap: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: "#0b0709",
   },
   bg: {
     flex: 1,
