@@ -1,5 +1,5 @@
 import React, { useContext } from "react";
-import { View } from "react-native";
+import BootScreen from "./src/components/BootScreen";
 import { NavigationContainer, CommonActions } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -167,7 +167,7 @@ function AppContent() {
   if (loading) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: colors.background }} />
+        <BootScreen />
       </SafeAreaProvider>
     );
   }

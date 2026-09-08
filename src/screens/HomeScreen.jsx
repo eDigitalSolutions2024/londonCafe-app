@@ -31,6 +31,7 @@ import EmojiBurst from "../components/EmojiBurst";
 import AvatarWidget from "../components/AvatarWidget";
 import PointsStepperBar from "../components/PointsStepperBar";
 import MaskedView from "@react-native-masked-view/masked-view";
+import Svg, { Defs, LinearGradient as SvgLinearGradient, RadialGradient, Stop, Rect, Circle } from "react-native-svg";
 
 import BoothMask from "../assets/markers/London.png";
 import LondonCafeLogo from "../assets/markers/londoncafe1.jpg";
@@ -57,7 +58,210 @@ function moodEmojiFromEnergy(energy = 0) {
   return "💀";                  // muerto
 }
 
+// Brillo animado detrás del logo en la pantalla de bienvenida (invitado) --
+// tamaño fijo a propósito (no absoluteFill sobre un padre de alto
+// intrínseco), para evitar el bug de recorte que ya salió una vez con SVG +
+// alto dinámico en esta misma pantalla.
+function GuestGlow() {
+  const pulse = useRef(new Animated.Value(0)).current;
 
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[guestGlowStyles.glow, { opacity, transform: [{ scale }] }]}
+    >
+      <Svg width={220} height={220}>
+        <Defs>
+          <RadialGradient id="guestGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={colors.accent} stopOpacity="0.55" />
+            <Stop offset="55%" stopColor={colors.accent} stopOpacity="0.18" />
+            <Stop offset="90%" stopColor={colors.accent} stopOpacity="0" />
+            <Stop offset="100%" stopColor={colors.accent} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        {/* Radio menor al lienzo (110 en vez de 220/2 hasta el borde) -- deja
+            margen real transparente antes del borde del Svg. Sin esto, el
+            filo del círculo se magnifica con el scale animado y se ve como
+            un cuadro (bug real que reportó el usuario). */}
+        <Circle cx="110" cy="110" r="92" fill="url(#guestGlow)" />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+const guestGlowStyles = StyleSheet.create({
+  glow: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
+// Orbes de luz a la deriva de fondo -- pura decoración (pointerEvents=none),
+// tamaño y posición fijos para no repetir el bug de SVG + alto dinámico.
+function DriftingOrb({ size, top, left, right, color, duration, delay = 0 }) {
+  const t = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(t, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(t, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [t, duration, delay]);
+
+  const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [0, 22] });
+  const translateX = t.interpolate({ inputRange: [0, 1], outputRange: [0, -16] });
+  const opacity = t.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0.85] });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top,
+        left,
+        right,
+        width: size,
+        height: size,
+        opacity,
+        transform: [{ translateY }, { translateX }],
+      }}
+    >
+      <Svg width={size} height={size}>
+        <Defs>
+          <RadialGradient id={`orb-${color}-${size}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={color} stopOpacity="0.5" />
+            <Stop offset="85%" stopColor={color} stopOpacity="0" />
+            <Stop offset="100%" stopColor={color} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={size * 0.4} fill={`url(#orb-${color}-${size})`} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+function GuestBackgroundOrbs() {
+  return (
+    <>
+      <DriftingOrb size={260} top={-60} left={-70} color={colors.primary} duration={5200} />
+      <DriftingOrb size={220} top={120} right={-80} color={colors.accent} duration={6400} delay={400} />
+      <DriftingOrb size={200} top={420} left={-60} color="#8E2545" duration={5800} delay={800} />
+    </>
+  );
+}
+
+// Logo "vivo": flota y se inclina levemente en 3D (perspective + rotateX/Y),
+// looping suave, en vez de quedarse estático -- lo que el usuario pidió como
+// "efecto 3D / experiencia digital".
+function FloatingLogo3D({ children }) {
+  const t = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(t, { toValue: 1, duration: 3200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(t, { toValue: 0, duration: 3200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [t]);
+
+  const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
+  const rotateY = t.interpolate({ inputRange: [0, 1], outputRange: ["-8deg", "8deg"] });
+  const rotateX = t.interpolate({ inputRange: [0, 1], outputRange: ["4deg", "-4deg"] });
+
+  return (
+    <Animated.View
+      style={{
+        transform: [
+          { perspective: 800 },
+          { translateY },
+          { rotateY },
+          { rotateX },
+        ],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+// Botón con retroceso táctil (escala al presionar) -- da sensación de
+// profundidad/3D en la interacción, no solo en lo visual estático.
+function PressableScale({ style, onPress, children, ...rest }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const pressIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
+
+  return (
+    <Animated.View style={[style, { transform: [{ scale }] }]}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={onPress}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        style={pressableScaleStyles.fill}
+        {...rest}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+const pressableScaleStyles = StyleSheet.create({
+  fill: { flex: 1, alignItems: "center", justifyContent: "center" },
+});
+
+// Entrada escalonada (fade + slide-up) para las tarjetas de beneficios --
+// se disparan una tras otra al montar la pantalla, en vez de aparecer todas
+// de golpe.
+function StaggeredIn({ index, children, style }) {
+  const t = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(t, {
+      toValue: 1,
+      duration: 420,
+      delay: 250 + index * 90,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [t, index]);
+
+  const opacity = t;
+  const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [16, 0] });
+
+  return (
+    <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
 
 function BoothStreakBar({
   streakCount = 0,
@@ -714,72 +918,94 @@ const moodEmoji = moodEmojiFromEnergy(energy);
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 80 }}
         >
-          {/* Welcome section */}
-          <View style={styles.guestWrap}>
-            <View style={styles.guestLogoWrap}>
-              <Image source={LondonCafeLogo} style={styles.guestLogo} resizeMode="cover" />
+          {/* Welcome section -- oscuro/glass a propósito, mismo lenguaje que
+              BootScreen (App.js), para que la primera impresión de la app se
+              sienta como un producto digital premium, no un catálogo plano. */}
+          <View style={styles.guestDark}>
+            <GuestBackgroundOrbs />
+
+            <View style={styles.guestGlowStage}>
+              <GuestGlow />
+              <FloatingLogo3D>
+                <View style={styles.guestLogoRing}>
+                  <Svg width={116} height={116} style={StyleSheet.absoluteFill}>
+                    <Defs>
+                      <SvgLinearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <Stop offset="0%" stopColor={colors.accent} stopOpacity="1" />
+                        <Stop offset="100%" stopColor="#fff" stopOpacity="0.35" />
+                      </SvgLinearGradient>
+                    </Defs>
+                    <Circle cx="58" cy="58" r="57" stroke="url(#ring)" strokeWidth="1.5" fill="none" />
+                  </Svg>
+                  <View style={styles.guestLogoWrap}>
+                    <Image source={LondonCafeLogo} style={styles.guestLogo} resizeMode="cover" />
+                  </View>
+                </View>
+              </FloatingLogo3D>
             </View>
 
-            <Text style={styles.guestTitle}>Bienvenido a London Cafe</Text>
+            <Text style={styles.guestEyebrow}>BIENVENIDO A</Text>
+            <Text style={styles.guestTitle}>London Café</Text>
             <Text style={styles.guestMessage}>
               Inicia sesión para acumular puntos, mantener tu racha diaria y canjear recompensas.
             </Text>
 
-            <TouchableOpacity
-              style={styles.guestPrimaryBtn}
-              onPress={() => navigation.navigate("AuthModal")}
-              activeOpacity={0.9}
-              accessibilityRole="button"
-            >
-              <Text style={styles.guestPrimaryBtnText}>Iniciar sesión</Text>
-            </TouchableOpacity>
+            <View style={styles.guestActions}>
+              <PressableScale
+                onPress={() => navigation.navigate("AuthModal")}
+                accessibilityRole="button"
+                style={styles.guestPrimaryBtn}
+              >
+                <Text style={styles.guestPrimaryBtnText}>Iniciar sesión</Text>
+              </PressableScale>
 
-            <TouchableOpacity
-              style={styles.guestSecondaryBtn}
-              onPress={() => navigation.navigate("AuthModal", { screen: "Register" })}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-            >
-              <Text style={styles.guestSecondaryBtnText}>Crear cuenta gratuita</Text>
-            </TouchableOpacity>
+              <PressableScale
+                style={styles.guestSecondaryBtn}
+                onPress={() => navigation.navigate("AuthModal", { screen: "Register" })}
+                accessibilityRole="button"
+              >
+                <Text style={styles.guestSecondaryBtnText}>Crear cuenta gratuita</Text>
+              </PressableScale>
 
-            <TouchableOpacity
-              onPress={() => navigation.navigate("Ordena")}
-              activeOpacity={0.8}
-              style={styles.guestContinueBtn}
-              accessibilityRole="button"
-            >
-              <Text style={styles.guestContinueBtnText}>Continuar como invitado</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigation.navigate("Ordena")}
+                activeOpacity={0.8}
+                style={styles.guestContinueBtn}
+                accessibilityRole="button"
+              >
+                <Text style={styles.guestContinueBtnText}>Continuar como invitado</Text>
+              </TouchableOpacity>
+            </View>
 
-            <View style={styles.guestBenefits}>
+            <View style={styles.guestBenefitsGrid}>
               {[
-                { icon: "☕", text: "Acumula puntos por cada compra" },
-                { icon: "🎁", text: "Canjea recompensas exclusivas" },
-                { icon: "🔥", text: "Mantén tu racha diaria" },
-                { icon: "📍", text: "Encuentra nuestras sucursales fácilmente" },
+                { icon: "☕", text: "Puntos por cada compra" },
+                { icon: "🎁", text: "Recompensas exclusivas" },
+                { icon: "🔥", text: "Racha diaria" },
+                { icon: "📍", text: "Tus sucursales" },
               ].map((b, i) => (
-                <View key={i} style={styles.guestBenefitRow}>
+                <StaggeredIn key={i} index={i} style={styles.guestBenefitTile}>
                   <Text style={styles.guestBenefitIcon}>{b.icon}</Text>
                   <Text style={styles.guestBenefitText}>{b.text}</Text>
-                </View>
+                </StaggeredIn>
               ))}
             </View>
-          </View>
 
-          {/* Promotions visible to guests */}
-          <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "900",
-                color: colors.text,
-                marginBottom: 6,
-              }}
-            >
-              Promociones
-            </Text>
-            <PromosSection limit={5} />
+            {/* Promociones ahora vive DENTRO de la misma tarjeta oscura --
+                antes era una tarjeta clara aparte "colgando" del héroe, se
+                sentía como una sección olvidada en vez de parte del mismo
+                bloque. */}
+            <View style={styles.guestPromosHeaderRow}>
+              <Text style={styles.guestPromosIcon}>🔥</Text>
+              <Text style={styles.guestPromosTitle}>Promociones de hoy</Text>
+            </View>
+            {/* width:100% explícito -- guestDark usa alignItems:"center", así
+                que sin esto PromosSection se encoge a su contenido en vez de
+                estirarse (antes vivía en un contenedor con stretch por
+                default y nunca lo necesitó). */}
+            <View style={{ width: "100%" }}>
+              <PromosSection limit={5} />
+            </View>
           </View>
         </ScrollView>
       </Screen>
@@ -1008,97 +1234,150 @@ const moodEmoji = moodEmojiFromEnergy(energy);
 }
 
 const styles = StyleSheet.create({
-  /* Guest welcome section */
-  guestWrap: {
+  /* Guest welcome section -- oscuro/glass, ver comentario en el JSX */
+  guestDark: {
     alignItems: "center",
-    paddingHorizontal: 32,
+    // El contenedor de Screen (withPadding=false) igual mete 16px de
+    // padding horizontal -- este margen negativo lo cancela para que la
+    // tarjeta llegue de verdad a los bordes de la pantalla, no se quede
+    // "flotando" con aire a los lados.
+    marginHorizontal: -16,
+    paddingHorizontal: 28,
     paddingTop: 48,
     paddingBottom: 32,
-    backgroundColor: colors.background,
+    backgroundColor: "#0b0709",
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    overflow: "hidden",
+  },
+  guestGlowStage: {
+    width: 116,
+    height: 116,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 22,
+  },
+  guestLogoRing: {
+    width: 116,
+    height: 116,
+    alignItems: "center",
+    justifyContent: "center",
   },
   guestLogoWrap: {
-    width: 110,
-    height: 110,
-    borderRadius: 28,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+    shadowColor: colors.accent,
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
   },
   guestLogo: { width: "100%", height: "100%" },
+  guestEyebrow: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: colors.accent,
+    letterSpacing: 4,
+    marginBottom: 4,
+  },
   guestTitle: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: "900",
-    color: colors.text,
+    color: "#fff",
     textAlign: "center",
-    marginBottom: 10,
-    letterSpacing: -0.3,
+    marginBottom: 12,
+    letterSpacing: -0.5,
   },
   guestMessage: {
     fontSize: 14,
     fontWeight: "600",
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.6)",
     textAlign: "center",
     lineHeight: 21,
-    marginBottom: 28,
     maxWidth: 300,
+    marginBottom: 30,
+  },
+  guestActions: {
+    width: "100%",
+    alignItems: "center",
   },
   guestPrimaryBtn: {
     width: "100%",
-    height: 52,
-    borderRadius: 999,
-    backgroundColor: colors.primary,
+    height: 54,
+    borderRadius: 27,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    backgroundColor: colors.accent,
+    shadowColor: colors.accent,
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
   },
-  guestPrimaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "900" },
+  guestPrimaryBtnText: { color: "#2A0E18", fontSize: 16, fontWeight: "900", letterSpacing: 0.2 },
   guestSecondaryBtn: {
     width: "100%",
-    height: 52,
-    borderRadius: 999,
+    height: 54,
+    borderRadius: 27,
     borderWidth: 1.5,
-    borderColor: colors.primary,
-    backgroundColor: "#fff",
+    borderColor: "rgba(255,255,255,0.28)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
   },
-  guestSecondaryBtnText: { color: colors.primary, fontSize: 16, fontWeight: "900" },
-  guestContinueBtn: { paddingVertical: 12, alignItems: "center", marginBottom: 28 },
+  guestSecondaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "900" },
+  guestContinueBtn: { paddingVertical: 12, alignItems: "center", marginBottom: 30 },
   guestContinueBtnText: {
-    color: colors.textMuted,
+    color: "rgba(255,255,255,0.55)",
     fontSize: 14,
     fontWeight: "700",
     textDecorationLine: "underline",
   },
-  guestBenefits: {
+  guestBenefitsGrid: {
     width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  guestBenefitTile: {
+    width: "48%",
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: "#fff",
-    padding: 16,
-    gap: 14,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    gap: 8,
   },
-  guestBenefitRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  guestBenefitIcon: { fontSize: 20, width: 28, textAlign: "center" },
+  guestBenefitIcon: { fontSize: 22 },
   guestBenefitText: {
-    flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
-    color: colors.text,
-    lineHeight: 18,
+    color: "rgba(255,255,255,0.85)",
+    textAlign: "center",
+    lineHeight: 16,
+  },
+  guestPromosHeaderRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 28,
+    marginBottom: 12,
+  },
+  guestPromosIcon: { fontSize: 18 },
+  guestPromosTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.2,
   },
 
   /* Screen / layout base */
