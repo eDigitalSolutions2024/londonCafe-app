@@ -5,28 +5,35 @@ import { colors } from "../theme/colors";
 import { appStyles } from "../theme/styles";
 import AvatarPreview from "./AvatarPreview";
 
-// ✅ Resalta el avatar con un brillo dorado detrás -- a propósito distinto
-// del anillo delgado (stroke) que ya usa el logo de London Café arriba en
-// el header, para que no se confundan visualmente (pedido del usuario).
-// Mismo patrón de radio-seguro que el resto de la app (r bien dentro del
-// lienzo, más un stop final en 0% de opacidad) para no repetir el bug del
-// "cuadro" al magnificarse con el scale animado.
-function AvatarGlow({ size = 100 }) {
+// ✅ Un solo pulso compartido: mueve el brillo de fondo Y el círculo del
+// avatar (escala + borde) al mismo tiempo, para que el "parpadeo" se note
+// en el avatar mismo, no solo en un halo detrás que se puede perder.
+function useAvatarPulse() {
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, [pulse]);
 
-  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
-  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+  return pulse;
+}
+
+// ✅ Resalta el avatar con un brillo dorado detrás -- a propósito distinto
+// del anillo delgado (stroke) que ya usa el logo de London Café arriba en
+// el header, para que no se confundan visualmente (pedido del usuario).
+// Mismo patrón de radio-seguro que el resto de la app (r bien dentro del
+// lienzo, más un stop final en 0% de opacidad) para no repetir el bug del
+// "cuadro" al magnificarse con el scale animado.
+function AvatarGlow({ size = 100, pulse }) {
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
   return (
     <Animated.View
@@ -92,6 +99,7 @@ export default function AvatarWidget({
   // ✅ opcional: si lo estás pasando desde Home
   energyFlash = false,
 }) {
+  const pulse = useAvatarPulse();
   const hasEnergy = energy !== null && energy !== undefined && !Number.isNaN(Number(energy));
   const energyPct = hasEnergy ? Math.max(0, Math.min(100, Number(energy))) : 0;
 
@@ -169,12 +177,22 @@ export default function AvatarWidget({
             delayLongPress={250}
             style={styles.avatarPressable}
           >
-            <AvatarGlow size={112} />
+            <AvatarGlow size={112} pulse={pulse} />
             {/* avatarCircle recorta la imagen (overflow hidden) -- el badge
-                vive fuera de ese contenedor para no cortarse en la orilla. */}
-            <View style={styles.avatarCircle}>
+                vive fuera de ese contenedor para no cortarse en la orilla.
+                El círculo mismo también pulsa (escala + borde), no solo el
+                glow de atrás -- así el "parpadeo" se nota en el avatar. */}
+            <Animated.View
+              style={[
+                styles.avatarCircle,
+                {
+                  transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }],
+                  borderColor: pulse.interpolate({ inputRange: [0, 1], outputRange: [colors.accent, "#fff"] }),
+                },
+              ]}
+            >
               <AvatarPreview config={safeConfig} size={76} />
-            </View>
+            </Animated.View>
             <EditBadge />
           </Pressable>
 
