@@ -125,16 +125,14 @@ export default function AvatarCustomizeScreen({ navigation }) {
       }
     }, [gender, filteredOptions]);
 
+  // ✅ Tocar un estilo VIP sin ser VIP SÍ actualiza la vista previa -- así
+  // la persona ve cómo se vería con ese estilo ("si llego, tendría
+  // acceso"). Lo que se bloquea es guardarlo (ver onSave), no verlo.
   const setPart = (key, value) => {
-    if (key === "hair" && VIP_IDS.has(value) && !isVIP) {
-      Alert.alert(
-        "Estilo VIP 🔒",
-        `Este estilo se desbloquea al llegar a ${VIP_THRESHOLD} Buddy Coins (llevas ${points}).`
-      );
-      return;
-    }
     setAvatarConfig((prev) => ({ ...prev, [key]: value }));
   };
+
+  const previewingLockedVIP = VIP_IDS.has(avatarConfig.hair) && !isVIP;
 
   const onSave = async () => {
     try {
@@ -231,6 +229,10 @@ export default function AvatarCustomizeScreen({ navigation }) {
                 {vipHair.map((v) => {
                   const active = avatarConfig.hair === v;
                   const locked = !isVIP;
+                  // ✅ Si está bloqueado pero es el que se está previsualizando,
+                  // se ve "activo" igual que cualquier otro seleccionado (no
+                  // atenuado) -- el candado en el texto sigue avisando que
+                  // falta desbloquearlo para poder guardarlo.
                   return (
                     <Pressable
                       key={`hair-${v}`}
@@ -238,16 +240,16 @@ export default function AvatarCustomizeScreen({ navigation }) {
                       style={[
                         styles.optionBtn,
                         styles.vipBtn,
+                        locked && !active && styles.vipBtnLocked,
                         active && styles.optionBtnActive,
-                        locked && styles.vipBtnLocked,
                       ]}
                     >
                       <Text
                         style={[
                           styles.optionText,
                           styles.vipText,
+                          locked && !active && styles.vipTextLocked,
                           active && styles.optionTextActive,
-                          locked && styles.vipTextLocked,
                         ]}
                       >
                         {locked ? "🔒 " : "★ "}
@@ -257,6 +259,12 @@ export default function AvatarCustomizeScreen({ navigation }) {
                   );
                 })}
               </View>
+
+              {previewingLockedVIP && (
+                <Text style={styles.previewHint}>
+                  👁 Vista previa -- necesitas {VIP_THRESHOLD} Buddy Coins para guardar este estilo
+                </Text>
+              )}
             </View>
           )}
 
@@ -311,6 +319,7 @@ const styles = StyleSheet.create({
 
   vipHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   vipHint: { color: colors.textMuted, fontSize: 10.5, fontWeight: "700" },
+  previewHint: { marginTop: 6, color: colors.accent, fontSize: 11, fontWeight: "700" },
 
   optionsRow: { flexDirection: "row", flexWrap: "wrap" },
 
