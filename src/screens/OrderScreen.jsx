@@ -22,10 +22,17 @@ import { AuthContext } from "../context/AuthContext";
 
 
 const COLORS = {
-  bg: "#F7F7F7",
+  bg: "#0b0709",
   card: "#FFFFFF",
   ink: "#1B1B1B",
   muted: "rgba(27,27,27,0.55)",
+  // ✅ ink/muted son para texto DENTRO de tarjetas blancas (ProductTile,
+  // ProductRow, la barra de búsqueda, el modal "Configurar producto") --
+  // no tocarlos ahí. pageText/pageMuted son solo para el puñado de textos
+  // que viven directo sobre el fondo de página (título del header, estado
+  // vacío del catálogo).
+  pageText: "#ffffff",
+  pageMuted: "rgba(255,255,255,0.6)",
   border: "rgba(27,27,27,0.10)",
   wine: "#7A1E3A",
   wineSoft: "rgba(122,30,58,0.12)",
@@ -614,8 +621,8 @@ function toggleFlavor(flavor) {
 }, [selectedItem, selectedMilk, selectedTemp, selectedFlavors]);
 
   return (
-    <Screen>
-      <StatusBar barStyle="dark-content" />
+    <Screen safeStyle={{ backgroundColor: COLORS.bg }}>
+      <StatusBar barStyle="light-content" />
       <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
         {/* Header -- compacto a propósito: lo que importa en esta pantalla
             es el catálogo y el carrito, no el encabezado. */}
@@ -666,11 +673,11 @@ function toggleFlavor(flavor) {
 </View>
 
   <View style={{ flex: 1, alignItems: "center" }}>
-    <Text style={{ fontSize: 17, fontWeight: "900", color: COLORS.ink }}>
+    <Text style={{ fontSize: 17, fontWeight: "900", color: COLORS.pageText }}>
       Ordena y recoge
     </Text>
 
-    <Text style={{ fontSize: 10, color: COLORS.muted, marginTop: 2 }}>
+    <Text style={{ fontSize: 10, color: COLORS.pageMuted, marginTop: 2 }}>
       Pide desde la app y recoge sin filas
     </Text>
   </View>
@@ -878,7 +885,7 @@ function toggleFlavor(flavor) {
             }
             ListEmptyComponent={
               <View style={{ padding: 18, opacity: 0.75 }}>
-                <Text style={{ color: COLORS.ink, fontWeight: "900" }}>
+                <Text style={{ color: COLORS.pageText, fontWeight: "900" }}>
                   No hay items en el menú.
                 </Text>
               </View>

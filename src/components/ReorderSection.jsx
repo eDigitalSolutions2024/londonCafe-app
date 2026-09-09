@@ -210,7 +210,9 @@ const styles = StyleSheet.create({
   // Sin padding horizontal propio -- vive dentro del header de OrderScreen.jsx,
   // que ya trae su paddingHorizontal:16.
   wrap: { marginTop: 4, marginBottom: 4 },
-  title: { fontSize: 13, fontWeight: "900", color: colors.text, marginBottom: 6 },
+  // "Vuelve a pedir" vive directo sobre el fondo oscuro de OrderScreen.jsx,
+  // no dentro de la tarjeta blanca de abajo -- necesita texto claro.
+  title: { fontSize: 13, fontWeight: "900", color: "#fff", marginBottom: 6 },
   card: {
     flexDirection: "row",
     alignItems: "center",
