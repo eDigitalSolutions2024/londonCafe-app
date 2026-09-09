@@ -14,7 +14,7 @@ export default function RedeemQRScreen({ navigation, route }) {
   }, [rewardType]);
 
   return (
-    <Screen>
+    <Screen safeStyle={styles.safeDark}>
       <View style={styles.headerTop}>
         <Text style={styles.pageTitle}>{title}</Text>
 
@@ -51,6 +51,7 @@ export default function RedeemQRScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  safeDark: { backgroundColor: "#0b0709" },
   headerTop: {
     flexDirection: "row",
     alignItems: "center",
@@ -58,7 +59,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   pageTitle: {
-    color: colors.text,
+    color: "#fff",
     fontSize: 22,
     fontWeight: "900",
   },
@@ -66,11 +67,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
-  backText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
+  backText: { color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: "800" },
 
   card: {
     backgroundColor: colors.card,

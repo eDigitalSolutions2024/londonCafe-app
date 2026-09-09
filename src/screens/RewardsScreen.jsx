@@ -113,7 +113,7 @@ export default function RewardsScreen({ navigation }) {
 
   if (!token) {
     return (
-      <Screen>
+      <Screen safeStyle={styles.safeDark}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           <View style={styles.headerTop}>
             <Text style={styles.pageTitle}>Recompensas</Text>

@@ -914,7 +914,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
 
   if (!token) {
     return (
-      <Screen edges={["top"]} withPadding={false}>
+      <Screen edges={["top"]} withPadding={false} safeStyle={styles.safeDark}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 80 }}
