@@ -22,7 +22,11 @@ import { AuthContext } from "../context/AuthContext";
 
 
 const COLORS = {
-  bg: "#0b0709",
+  // Ordena es la pantalla con más densidad de tarjetas blancas (grid de
+  // productos) -- un negro casi puro detrás se sentía demasiado duro contra
+  // tanto blanco. Se usa un vino-carbón más cálido, sigue siendo oscuro
+  // pero con menos contraste "de golpe".
+  bg: "#2e1b22",
   card: "#FFFFFF",
   ink: "#1B1B1B",
   muted: "rgba(27,27,27,0.55)",
