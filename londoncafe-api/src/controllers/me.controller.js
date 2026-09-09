@@ -281,7 +281,7 @@ async function updateMe(req, res) {
 // guardar un hair VIP llamando la API directo, sin pasar por la pantalla.
 const VIP_HAIR_IDS = new Set(["hair_07", "hair_f_05"]);
 const VIP_THRESHOLD = 200;
-const POS_URL = process.env.POS_URL || "https://api.londoncafejrz.com/api";
+// POS_URL ya está declarado arriba (línea 33), reusado aquí.
 
 async function isUserVIP(uid) {
   try {
