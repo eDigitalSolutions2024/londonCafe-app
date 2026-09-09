@@ -58,28 +58,14 @@ function AvatarGlow({ size = 100 }) {
   );
 }
 
-// ✅ Badge de "editar" con pulso sutil -- antes nada indicaba que el avatar
-// se puede tocar para personalizarlo, quedaba enterrado en Configuración.
+// ✅ Badge de "editar" -- estático a propósito, el pulso ya lo hace el
+// brillo del avatar (AvatarGlow); dos cosas parpadeando a la vez competían
+// por la atención.
 function EditBadge() {
-  const pulse = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
-
-  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
-
   return (
-    <Animated.View pointerEvents="none" style={[styles.editBadge, { transform: [{ scale }] }]}>
+    <View pointerEvents="none" style={styles.editBadge}>
       <Text style={styles.editBadgeText}>✏️</Text>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -368,11 +354,11 @@ chipDarText: {
     position: "absolute",
     bottom: -2,
     right: -2,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 19,
+    height: 19,
+    borderRadius: 10,
     backgroundColor: colors.accent,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
@@ -382,7 +368,7 @@ chipDarText: {
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
-  editBadgeText: { fontSize: 12 },
+  editBadgeText: { fontSize: 9 },
 
   avatarName: { color: colors.text, fontWeight: "900", fontSize: 12, textAlign: "center" },
   avatarMood: { color: colors.textMuted, fontSize: 11 },
