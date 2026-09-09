@@ -470,6 +470,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     marginTop: 8,
     overflow: "hidden",
+    // ✅ antes este centrado lo daba el wrapper que se quitó al fusionar
+    // el transform directo en el TouchableOpacity (ver PressableScale) --
+    // sin esto el texto queda pegado a la izquierda en vez de centrado.
+    alignItems: "center",
+    justifyContent: "center",
     shadowColor: colors.accent,
     shadowOpacity: 0.4,
     shadowRadius: 14,
