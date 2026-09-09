@@ -49,7 +49,7 @@ const OrderStack = createNativeStackNavigator();
 // Modal auth stack — Login / Register / VerifyEmail
 function AuthStack() {
   return (
-    <AuthNav.Navigator screenOptions={{ headerShown: false }}>
+    <AuthNav.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0b0709" } }}>
       <AuthNav.Screen name="Login" component={LoginScreen} />
       <AuthNav.Screen name="Register" component={RegisterScreen} />
       <AuthNav.Screen name="VerifyEmail" component={VerifyEmailScreen} />
@@ -60,7 +60,7 @@ function AuthStack() {
 
 function HomeStackNav() {
   return (
-    <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+    <HomeStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0b0709" } }}>
       <HomeStack.Screen name="Home" component={HomeScreen} />
       <HomeStack.Screen name="Rewards" component={RewardsScreen} />
       <HomeStack.Screen name="WalletHistory" component={WalletHistoryScreen} />
@@ -74,7 +74,7 @@ function HomeStackNav() {
 
 function OrderStackNav() {
   return (
-    <OrderStack.Navigator screenOptions={{ headerShown: false }}>
+    <OrderStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0b0709" } }}>
       <OrderStack.Screen name="Order" component={OrderScreen} />
       <OrderStack.Screen name="Cart" component={CartScreen} />
       <OrderStack.Screen name="Pedidos" component={PedidosScreen} />
@@ -85,6 +85,7 @@ function OrderStackNav() {
 function MainTabs() {
   return (
     <Tab.Navigator
+      sceneContainerStyle={{ backgroundColor: "#0b0709" }}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
@@ -151,12 +152,12 @@ function MainTabs() {
 // Root: always renders tabs; auth is a modal on top
 function RootNav() {
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+    <RootStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#0b0709" } }}>
       <RootStack.Screen name="Main" component={MainTabs} />
       <RootStack.Screen
         name="AuthModal"
         component={AuthStack}
-        options={{ presentation: "modal" }}
+        options={{ presentation: "modal", contentStyle: { backgroundColor: "#0b0709" } }}
       />
     </RootStack.Navigator>
   );

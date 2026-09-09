@@ -211,6 +211,13 @@ function FloatingLogo3D({ children }) {
 
 // Botón con retroceso táctil (escala al presionar) -- da sensación de
 // profundidad/3D en la interacción, no solo en lo visual estático.
+// ✅ El scale va DIRECTO en el TouchableOpacity animado (no en un
+// Animated.View que lo envuelve) -- envolver el touchable en un padre con
+// su propio transform rompe el hit-testing en iOS (el área tocable se
+// reduce al contenido visual, no al tamaño real del botón; en Android no
+// se notaba). Reportado por el usuario probando el build de iOS.
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 function PressableScale({ style, onPress, children, ...rest }) {
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -218,24 +225,18 @@ function PressableScale({ style, onPress, children, ...rest }) {
   const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
 
   return (
-    <Animated.View style={[style, { transform: [{ scale }] }]}>
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={onPress}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
-        style={pressableScaleStyles.fill}
-        {...rest}
-      >
-        {children}
-      </TouchableOpacity>
-    </Animated.View>
+    <AnimatedTouchable
+      activeOpacity={0.9}
+      onPress={onPress}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
+      style={[style, { transform: [{ scale }] }]}
+      {...rest}
+    >
+      {children}
+    </AnimatedTouchable>
   );
 }
-
-const pressableScaleStyles = StyleSheet.create({
-  fill: { flex: 1, alignItems: "center", justifyContent: "center" },
-});
 
 // Entrada escalonada (fade + slide-up) para las tarjetas de beneficios --
 // se disparan una tras otra al montar la pantalla, en vez de aparecer todas

@@ -137,25 +137,29 @@ function FloatingLogo3D({ children }) {
   );
 }
 
+// ✅ El scale va DIRECTO en el TouchableOpacity animado, no en un
+// Animated.View que lo envuelve -- ese wrapper rompía el hit-testing en
+// iOS (el área tocable se reducía al contenido visual del botón). Mismo
+// fix que HomeScreen.jsx, reportado por el usuario probando el build de iOS.
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 function PressableScale({ style, onPress, children, disabled, ...rest }) {
   const scale = useRef(new Animated.Value(1)).current;
   const pressIn = () => !disabled && Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 40, bounciness: 0 }).start();
   const pressOut = () => !disabled && Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
 
   return (
-    <Animated.View style={[style, { transform: [{ scale }] }]}>
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={onPress}
-        onPressIn={pressIn}
-        onPressOut={pressOut}
-        disabled={disabled}
-        style={loginFxStyles.fill}
-        {...rest}
-      >
-        {children}
-      </TouchableOpacity>
-    </Animated.View>
+    <AnimatedTouchable
+      activeOpacity={0.9}
+      onPress={onPress}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
+      disabled={disabled}
+      style={[style, { transform: [{ scale }] }]}
+      {...rest}
+    >
+      {children}
+    </AnimatedTouchable>
   );
 }
 
@@ -196,7 +200,6 @@ function GlassInput({ label, focused, onFocus, onBlur, ...rest }) {
 
 const loginFxStyles = StyleSheet.create({
   glow: { position: "absolute", alignItems: "center", justifyContent: "center" },
-  fill: { flex: 1, alignItems: "center", justifyContent: "center" },
 });
 
 export default function LoginScreen({ route, navigation }) {
