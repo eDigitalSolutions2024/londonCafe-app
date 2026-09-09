@@ -19,13 +19,23 @@ function normalizeFlavors(flavors) {
   return [...flavors].map((x) => String(x)).sort();
 }
 
+// ✅ Antes buildLineId solo veía milk/temp/flavors -- dos chilaquiles con
+// distinta salsa/proteínas se consideraban "la misma línea" y se
+// mezclaban por qty (con el precio de la primera, ignorando la
+// diferencia real de la segunda). Se ordena el arreglo para que el
+// mismo combo agrupe igual sin importar el orden en que se tocó cada
+// topping (el precio ya viene calculado en p.price, buildLineId solo
+// decide qué se agrupa).
 function buildLineId(product) {
   const productId = String(product?._id || product?.productId || "");
   const milk = String(product?.selectedOptions?.milk || "");
   const temp = String(product?.selectedOptions?.temp || "");
   const flavors = normalizeFlavors(product?.selectedOptions?.flavors).join("|");
+  const eggStyle = String(product?.selectedOptions?.eggStyle || "");
+  const salsa = String(product?.selectedOptions?.salsa || "");
+  const toppings = normalizeFlavors(product?.selectedOptions?.toppings).join("|");
 
-  return `${productId}__${milk}__${temp}__${flavors}`;
+  return `${productId}__${milk}__${temp}__${flavors}__${eggStyle}__${salsa}__${toppings}`;
 }
 
 function cartReducer(state, action) {
@@ -58,6 +68,15 @@ function cartReducer(state, action) {
               milk: p?.selectedOptions?.milk || null,
               temp: p?.selectedOptions?.temp || null,
               flavors: normalizeFlavors(p?.selectedOptions?.flavors),
+              eggStyle: p?.selectedOptions?.eggStyle || null,
+              salsa: p?.selectedOptions?.salsa || null,
+              // ✅ orden original, NO normalizeFlavors -- el orden de
+              // selección importa para "el primero es gratis" (ver
+              // getToppingsExtra en OrderScreen.jsx/ReorderSection.jsx).
+              // buildLineId ya ordena su propia copia solo para agrupar.
+              toppings: Array.isArray(p?.selectedOptions?.toppings)
+                ? [...p.selectedOptions.toppings]
+                : [],
             },
           },
         },

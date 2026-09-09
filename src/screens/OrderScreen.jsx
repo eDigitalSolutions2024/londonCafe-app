@@ -123,11 +123,29 @@ function getEnabledOptions(item) {
   const flavors =
     item?.options?.flavors?.enabled && hasChoices(item?.options?.flavors?.choices);
 
+  // ✅ Mismas 3 categorías que ya soporta el kiosk (KioskOrderPage.tsx) --
+  // toppings (ej. proteína extra en chilaquiles, relleno de crepas),
+  // eggStyle (estilo de huevo) y salsa (tipo de salsa) aplican a
+  // cualquier categoría, no solo Bebidas. Antes esta pantalla solo
+  // conocía milk/temp/flavors, así que chilaquiles/huevos al
+  // gusto/crepas se agregaban al carrito sin preguntar nada.
+  const toppings =
+    item?.options?.toppings?.enabled && hasChoices(item?.options?.toppings?.choices);
+
+  const eggStyle =
+    item?.options?.eggStyle?.enabled && hasChoices(item?.options?.eggStyle?.choices);
+
+  const salsa =
+    item?.options?.salsa?.enabled && hasChoices(item?.options?.salsa?.choices);
+
   return {
     milk,
     temp,
     flavors,
-    hasAny: milk || temp || flavors,
+    toppings,
+    eggStyle,
+    salsa,
+    hasAny: milk || temp || flavors || toppings || eggStyle || salsa,
   };
 }
 
@@ -151,21 +169,62 @@ function findSelectedChoice(choices = [], selectedValue) {
   return choices.find((choice) => getChoiceLabel(choice) === selectedValue) || null;
 }
 
+// ✅ Toppings son siempre multi-selección con cantidad (se puede elegir el
+// mismo label más de una vez). Igual que lineExtra() en KioskOrderPage.tsx:
+// si freeLabels tiene elementos, esos labels específicos salen gratis (1a
+// unidad de cada uno); si no, y firstFree (default true), el primero
+// elegido (índice 0 del arreglo, en orden de selección) es gratis.
+function getToppingsExtra(item, selectedToppings) {
+  const opts = item?.options?.toppings;
+  if (!opts || !Array.isArray(selectedToppings)) return 0;
+
+  const freeLabels = opts.freeLabels || [];
+  const firstFree = opts.firstFree !== false;
+  const freedLabelSeen = new Set();
+  let extra = 0;
+
+  selectedToppings.forEach((label, idx) => {
+    let isFree = false;
+    if (freeLabels.length) {
+      if (freeLabels.includes(label) && !freedLabelSeen.has(label)) {
+        isFree = true;
+        freedLabelSeen.add(label);
+      }
+    } else if (firstFree && idx === 0) {
+      isFree = true;
+    }
+    if (isFree) return;
+
+    const choice = findSelectedChoice(opts.choices || [], label);
+    if (choice) extra += getChoiceExtra(choice);
+  });
+
+  return extra;
+}
+
 function calcConfiguredPrice(item, selectedOptions) {
   const base = Number(item?.price || 0);
 
   const milkChoice = findSelectedChoice(item?.options?.milk?.choices || [], selectedOptions?.milk);
   const tempChoice = findSelectedChoice(item?.options?.temp?.choices || [], selectedOptions?.temp);
+  const eggStyleChoice = findSelectedChoice(item?.options?.eggStyle?.choices || [], selectedOptions?.eggStyle);
+  const salsaChoice = findSelectedChoice(item?.options?.salsa?.choices || [], selectedOptions?.salsa);
 
   const flavorChoices = (item?.options?.flavors?.choices || []).filter((choice) =>
     (selectedOptions?.flavors || []).includes(getChoiceLabel(choice))
   );
 
-  const milkExtra = getChoiceExtra(milkChoice);
+  // Bebida de especialidad (item.noMilkSurcharge): la leche vegetal ya
+  // viene incluida, no se cobra su extraPrice -- ver AppMenuSection.tsx
+  // (admin) y lineExtra() en KioskOrderPage.tsx, mismo campo.
+  const milkExtra = item?.noMilkSurcharge ? 0 : getChoiceExtra(milkChoice);
   const tempExtra = getChoiceExtra(tempChoice);
+  const eggStyleExtra = getChoiceExtra(eggStyleChoice);
+  const salsaExtra = getChoiceExtra(salsaChoice);
   const flavorsExtra = flavorChoices.reduce((acc, choice) => acc + getChoiceExtra(choice), 0);
+  const toppingsExtra = getToppingsExtra(item, selectedOptions?.toppings);
 
-  return base + milkExtra + tempExtra + flavorsExtra;
+  return base + milkExtra + tempExtra + eggStyleExtra + salsaExtra + flavorsExtra + toppingsExtra;
 }
 
 /** ✅ Chips de categorías horizontal */
@@ -375,6 +434,9 @@ export default function OrderScreen({ navigation, route }) {
   const [selectedMilk, setSelectedMilk] = useState(null);
 const [selectedTemp, setSelectedTemp] = useState(null);
 const [selectedFlavors, setSelectedFlavors] = useState([]);
+const [selectedToppings, setSelectedToppings] = useState([]);
+const [selectedEggStyle, setSelectedEggStyle] = useState(null);
+const [selectedSalsa, setSelectedSalsa] = useState(null);
 const [activeOrdersCount, setActiveOrdersCount] = useState(0);
 const [badgeScale] = useState(new Animated.Value(1));
 
@@ -638,6 +700,9 @@ useEffect(() => {
       milk: null,
       temp: null,
       flavors: [],
+      toppings: [],
+      eggStyle: null,
+      salsa: null,
     },
   });
   if (origin) triggerAddBubble(origin.x, origin.y);
@@ -646,6 +711,9 @@ useEffect(() => {
   setSelectedMilk(null);
   setSelectedTemp(null);
   setSelectedFlavors([]);
+  setSelectedToppings([]);
+  setSelectedEggStyle(null);
+  setSelectedSalsa(null);
   setSelectedItem(item);
   setShowOptions(true);
 }
@@ -657,6 +725,9 @@ function closeOptionsModal() {
   setSelectedMilk(null);
   setSelectedTemp(null);
   setSelectedFlavors([]);
+  setSelectedToppings([]);
+  setSelectedEggStyle(null);
+  setSelectedSalsa(null);
 }
 
 function toggleFlavor(flavor) {
@@ -673,6 +744,31 @@ function toggleFlavor(flavor) {
       : [...prev, flavor]
   );
 }
+
+// ✅ Toppings admiten cantidad (ej. 2x Huevo) -- cada toque de "+" agrega
+// otra unidad de ese label al arreglo (duplicados a propósito, el precio
+// se calcula por posición en getToppingsExtra), "-" quita la última
+// unidad. Mismo patrón y mismo tope que KioskOrderPage.tsx.
+const MAX_TOPPING_QTY = 5;
+
+function addTopping(label) {
+  setSelectedToppings((prev) => {
+    const qty = prev.filter((t) => t === label).length;
+    if (qty >= MAX_TOPPING_QTY) return prev;
+    return [...prev, label];
+  });
+}
+
+function removeTopping(label) {
+  setSelectedToppings((prev) => {
+    const idx = prev.lastIndexOf(label);
+    if (idx === -1) return prev;
+    const next = [...prev];
+    next.splice(idx, 1);
+    return next;
+  });
+}
+
   const isGrid = viewMode === "grid";
 
   const configuredPrice = useMemo(() => {
@@ -682,8 +778,11 @@ function toggleFlavor(flavor) {
     milk: selectedMilk,
     temp: selectedTemp,
     flavors: selectedFlavors,
+    toppings: selectedToppings,
+    eggStyle: selectedEggStyle,
+    salsa: selectedSalsa,
   });
-}, [selectedItem, selectedMilk, selectedTemp, selectedFlavors]);
+}, [selectedItem, selectedMilk, selectedTemp, selectedFlavors, selectedToppings, selectedEggStyle, selectedSalsa]);
 
   return (
     <Screen safeStyle={{ backgroundColor: COLORS.bg }}>
@@ -1132,6 +1231,190 @@ function toggleFlavor(flavor) {
           </View>
         ) : null}
 
+        {selectedItem?.options?.eggStyle?.enabled &&
+        Array.isArray(selectedItem?.options?.eggStyle?.choices) &&
+        selectedItem.options.eggStyle.choices.length > 0 ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+              Estilo de huevo
+            </Text>
+
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {selectedItem.options.eggStyle.choices.map((choice, idx) => {
+                const label = getChoiceLabel(choice);
+                const extra = getChoiceExtra(choice);
+                const active = selectedEggStyle === label;
+
+                return (
+                  <Pressable
+                    key={`eggStyle-${label}-${idx}`}
+                    onPress={() => setSelectedEggStyle(label)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: active ? COLORS.wine : COLORS.border,
+                      backgroundColor: active ? COLORS.wineSoft : "#fff",
+                    }}
+                  >
+                    <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
+                      {label} {extra > 0 ? `(+${money(extra)})` : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
+
+        {selectedItem?.options?.salsa?.enabled &&
+        Array.isArray(selectedItem?.options?.salsa?.choices) &&
+        selectedItem.options.salsa.choices.length > 0 ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+              Salsa
+            </Text>
+
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {selectedItem.options.salsa.choices.map((choice, idx) => {
+                const label = getChoiceLabel(choice);
+                const extra = getChoiceExtra(choice);
+                const active = selectedSalsa === label;
+
+                return (
+                  <Pressable
+                    key={`salsa-${label}-${idx}`}
+                    onPress={() => setSelectedSalsa(label)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: active ? COLORS.wine : COLORS.border,
+                      backgroundColor: active ? COLORS.wineSoft : "#fff",
+                    }}
+                  >
+                    <Text style={{ color: active ? COLORS.wine : COLORS.ink, fontWeight: "700" }}>
+                      {label} {extra > 0 ? `(+${money(extra)})` : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
+
+        {selectedItem?.options?.toppings?.enabled &&
+        Array.isArray(selectedItem?.options?.toppings?.choices) &&
+        selectedItem.options.toppings.choices.length > 0 ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ fontWeight: "900", color: COLORS.ink, marginBottom: 8 }}>
+              {selectedItem.options.toppings.firstFree === false ? "Proteínas adicionales" : "Toppings"}
+            </Text>
+
+            {(() => {
+              const opts = selectedItem.options.toppings;
+              const freeLabels = opts.freeLabels || [];
+              const useFreeLabels = freeLabels.length > 0;
+              const firstFree = opts.firstFree !== false;
+              // El primero elegido (índice 0, orden de selección) es el
+              // gratis -- solo aplica sin freeLabels, mismo criterio que
+              // getToppingsExtra() y el kiosk.
+              const orderFreeLabel = !useFreeLabels && firstFree ? selectedToppings[0] : undefined;
+
+              return (
+                <View style={{ gap: 8 }}>
+                  {useFreeLabels ? (
+                    <Text style={{ color: COLORS.wine, fontSize: 12 }}>
+                      {freeLabels.join(", ")} incluido sin costo, el resto tiene costo extra.
+                    </Text>
+                  ) : firstFree ? (
+                    <Text style={{ color: COLORS.wine, fontSize: 12 }}>
+                      La primera unidad es gratis, las demás tienen costo extra.
+                    </Text>
+                  ) : null}
+
+                  {opts.choices.map((choice, idx) => {
+                    const label = getChoiceLabel(choice);
+                    const extra = getChoiceExtra(choice);
+                    const qty = selectedToppings.filter((t) => t === label).length;
+                    const isFreeLabel = useFreeLabels
+                      ? freeLabels.includes(label)
+                      : firstFree && label === orderFreeLabel;
+
+                    return (
+                      <View
+                        key={`topping-${label}-${idx}`}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          borderWidth: 1,
+                          borderColor: qty > 0 ? COLORS.wine : COLORS.border,
+                          backgroundColor: qty > 0 ? COLORS.wineSoft : "#fff",
+                          borderRadius: 12,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                        }}
+                      >
+                        <Text style={{ color: COLORS.ink, fontWeight: "700", flexShrink: 1 }}>
+                          {label}{" "}
+                          <Text style={{ color: COLORS.muted, fontWeight: "600" }}>
+                            {isFreeLabel
+                              ? qty > 1
+                                ? `(1 gratis + ${money(extra)} c/u extra)`
+                                : "(gratis)"
+                              : extra > 0
+                              ? `(+${money(extra)} c/u)`
+                              : ""}
+                          </Text>
+                        </Text>
+
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                          <Pressable
+                            onPress={() => removeTopping(label)}
+                            disabled={qty === 0}
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 15,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              backgroundColor: COLORS.wineSoft,
+                              opacity: qty === 0 ? 0.4 : 1,
+                            }}
+                          >
+                            <Text style={{ color: COLORS.wine, fontWeight: "900", fontSize: 16 }}>−</Text>
+                          </Pressable>
+                          <Text style={{ color: COLORS.ink, fontWeight: "900", minWidth: 16, textAlign: "center" }}>
+                            {qty}
+                          </Text>
+                          <Pressable
+                            onPress={() => addTopping(label)}
+                            disabled={qty >= MAX_TOPPING_QTY}
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 15,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              backgroundColor: COLORS.wineSoft,
+                              opacity: qty >= MAX_TOPPING_QTY ? 0.4 : 1,
+                            }}
+                          >
+                            <Text style={{ color: COLORS.wine, fontWeight: "900", fontSize: 16 }}>+</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })()}
+          </View>
+        ) : null}
+
         <View
           style={{
             flexDirection: "row",
@@ -1183,6 +1466,9 @@ function toggleFlavor(flavor) {
                 milk: selectedMilk,
                 temp: selectedTemp,
                 flavors: selectedFlavors,
+                toppings: selectedToppings,
+                eggStyle: selectedEggStyle,
+                salsa: selectedSalsa,
               });
 
               add({
@@ -1193,6 +1479,9 @@ function toggleFlavor(flavor) {
                   milk: selectedMilk,
                   temp: selectedTemp,
                   flavors: selectedFlavors,
+                  toppings: selectedToppings,
+                  eggStyle: selectedEggStyle,
+                  salsa: selectedSalsa,
                 },
               });
 

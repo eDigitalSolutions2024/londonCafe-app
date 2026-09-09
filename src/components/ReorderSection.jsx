@@ -24,21 +24,54 @@ function findSelectedChoice(choices = [], selectedValue) {
   return choices.find((c) => getChoiceLabel(c) === selectedValue) || null;
 }
 
-// Mismo cálculo que OrderScreen.jsx (options.milk/temp/flavors -> extra) --
-// se duplica aquí en vez de importar porque OrderScreen.jsx no lo exporta;
-// se necesita para recalcular el precio configurado del pedido histórico
-// contra el catálogo vivo, por si los precios cambiaron desde entonces.
+// Mismo cálculo que OrderScreen.jsx -- se duplica aquí en vez de importar
+// porque OrderScreen.jsx no lo exporta; se necesita para recalcular el
+// precio configurado del pedido histórico contra el catálogo vivo, por si
+// los precios cambiaron desde entonces.
+function getToppingsExtra(item, selectedToppings) {
+  const opts = item?.options?.toppings;
+  if (!opts || !Array.isArray(selectedToppings)) return 0;
+
+  const freeLabels = opts.freeLabels || [];
+  const firstFree = opts.firstFree !== false;
+  const freedLabelSeen = new Set();
+  let extra = 0;
+
+  selectedToppings.forEach((label, idx) => {
+    let isFree = false;
+    if (freeLabels.length) {
+      if (freeLabels.includes(label) && !freedLabelSeen.has(label)) {
+        isFree = true;
+        freedLabelSeen.add(label);
+      }
+    } else if (firstFree && idx === 0) {
+      isFree = true;
+    }
+    if (isFree) return;
+
+    const choice = findSelectedChoice(opts.choices || [], label);
+    if (choice) extra += getChoiceExtra(choice);
+  });
+
+  return extra;
+}
+
 function calcConfiguredPrice(item, selectedOptions) {
   const base = Number(item?.price || 0);
   const milkChoice = findSelectedChoice(item?.options?.milk?.choices || [], selectedOptions?.milk);
   const tempChoice = findSelectedChoice(item?.options?.temp?.choices || [], selectedOptions?.temp);
+  const eggStyleChoice = findSelectedChoice(item?.options?.eggStyle?.choices || [], selectedOptions?.eggStyle);
+  const salsaChoice = findSelectedChoice(item?.options?.salsa?.choices || [], selectedOptions?.salsa);
   const flavorChoices = (item?.options?.flavors?.choices || []).filter((c) =>
     (selectedOptions?.flavors || []).includes(getChoiceLabel(c))
   );
-  const milkExtra = getChoiceExtra(milkChoice);
+  const milkExtra = item?.noMilkSurcharge ? 0 : getChoiceExtra(milkChoice);
   const tempExtra = getChoiceExtra(tempChoice);
+  const eggStyleExtra = getChoiceExtra(eggStyleChoice);
+  const salsaExtra = getChoiceExtra(salsaChoice);
   const flavorsExtra = flavorChoices.reduce((acc, c) => acc + getChoiceExtra(c), 0);
-  return base + milkExtra + tempExtra + flavorsExtra;
+  const toppingsExtra = getToppingsExtra(item, selectedOptions?.toppings);
+  return base + milkExtra + tempExtra + eggStyleExtra + salsaExtra + flavorsExtra + toppingsExtra;
 }
 
 // Order.items históricos no guardan un link a AppMenuItem (no existe
@@ -149,6 +182,9 @@ export default function ReorderSection() {
               milk: m.selectedOptions?.milk || null,
               temp: m.selectedOptions?.temp || null,
               flavors: Array.isArray(m.selectedOptions?.flavors) ? m.selectedOptions.flavors : [],
+              toppings: Array.isArray(m.selectedOptions?.toppings) ? m.selectedOptions.toppings : [],
+              eggStyle: m.selectedOptions?.eggStyle || null,
+              salsa: m.selectedOptions?.salsa || null,
             },
           });
         }

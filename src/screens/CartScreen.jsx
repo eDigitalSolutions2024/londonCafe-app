@@ -150,6 +150,33 @@ function CartItem({ item, onInc, onDec, onRemove }) {
           </Text>
         ) : null}
 
+        {item?.selectedOptions?.eggStyle ? (
+          <Text style={{ marginTop: 2, color: COLORS.muted, fontSize: 12 }}>
+            Huevo: {item.selectedOptions.eggStyle}
+          </Text>
+        ) : null}
+
+        {item?.selectedOptions?.salsa ? (
+          <Text style={{ marginTop: 2, color: COLORS.muted, fontSize: 12 }}>
+            Salsa: {item.selectedOptions.salsa}
+          </Text>
+        ) : null}
+
+        {Array.isArray(item?.selectedOptions?.toppings) &&
+        item.selectedOptions.toppings.length > 0 ? (
+          <Text style={{ marginTop: 2, color: COLORS.muted, fontSize: 12 }}>
+            {/* ✅ agrupa duplicados: "Huevo, Huevo" -> "Huevo x2" */}
+            Extras: {Object.entries(
+              item.selectedOptions.toppings.reduce((acc, label) => {
+                acc[label] = (acc[label] || 0) + 1;
+                return acc;
+              }, {})
+            )
+              .map(([label, qty]) => (qty > 1 ? `${label} x${qty}` : label))
+              .join(", ")}
+          </Text>
+        ) : null}
+
         <View
           style={{
             flexDirection: "row",
@@ -381,7 +408,7 @@ const tabBarHeight = useBottomTabBarHeight();
         ...item,
         basePrice: Number(item.price || 0),
         price: Number(item.price || 0),
-        selectedOptions: { milk: null, temp: null, flavors: [] },
+        selectedOptions: { milk: null, temp: null, flavors: [], toppings: [], eggStyle: null, salsa: null },
       });
 
       postAppEvent("cross_sell_accepted", token, {
