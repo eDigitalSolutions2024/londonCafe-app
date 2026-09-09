@@ -29,6 +29,7 @@ import AvatarPreviewLargeScreen from "./src/screens/AvatarPreviewLargeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import VerifyEmailScreen from "./src/screens/VerifyEmailScreen";
+import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 
 import RewardsScreen from "./src/screens/RewardsScreen";
 import WalletHistoryScreen from "./src/screens/WalletHistoryScreen";
@@ -52,6 +53,7 @@ function AuthStack() {
       <AuthNav.Screen name="Login" component={LoginScreen} />
       <AuthNav.Screen name="Register" component={RegisterScreen} />
       <AuthNav.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+      <AuthNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </AuthNav.Navigator>
   );
 }

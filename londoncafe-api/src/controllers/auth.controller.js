@@ -3,8 +3,9 @@
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 const EmailVerification = require("../models/EmailVerification");
+const PasswordReset = require("../models/PasswordReset");
 const { generateOtp6, hashOtp } = require("../utils/otp");
-const { sendVerificationEmail } = require("../utils/email");
+const { sendVerificationEmail, sendPasswordResetEmail } = require("../utils/email");
 const { signAccessToken } = require("../utils/tokens");
 
 const OTP_EXPIRE_MIN = 10;
@@ -347,6 +348,88 @@ async function login(req, res) {
   }
 }
 
+// Mismo patrón OTP que register/verifyEmail: código de 6 dígitos hasheado,
+// expira en 10 min, cooldown de reenvío de 60s, tope de intentos. Se
+// responde USER_NOT_FOUND si el correo no existe -- igual que
+// resendVerification, para no divergir del resto del auth en este mismo
+// archivo.
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "MISSING_FIELDS" });
+
+    const user = await User.findOne({ email: String(email).toLowerCase() });
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    const last = await PasswordReset.findOne({ userId: user._id }).sort({ createdAt: -1 });
+    const now = new Date();
+
+    if (last && now < last.resendAvailableAt) {
+      const secondsLeft = Math.ceil((last.resendAvailableAt.getTime() - now.getTime()) / 1000);
+      return res.status(429).json({ error: "RESEND_COOLDOWN", secondsLeft });
+    }
+
+    const code = generateOtp6();
+    const codeHash = hashOtp(code);
+    const expiresAt = new Date(now.getTime() + OTP_EXPIRE_MIN * 60 * 1000);
+    const resendAvailableAt = new Date(now.getTime() + RESEND_COOLDOWN_SEC * 1000);
+
+    await PasswordReset.create({
+      userId: user._id,
+      codeHash,
+      expiresAt,
+      attempts: 0,
+      resendAvailableAt,
+    });
+
+    const showOtp = process.env.DEV_SHOW_OTP === "true";
+    if (process.env.NODE_ENV === "development" && showOtp) {
+      console.log(`🟣 [DEV OTP - RESET PASSWORD] Email: ${user.email} | Code: ${code}`);
+    } else {
+      await sendPasswordResetEmail({ to: user.email, code, name: user.name });
+    }
+
+    return res.json({ ok: true, cooldown: RESEND_COOLDOWN_SEC });
+  } catch (err) {
+    console.error("FORGOT PASSWORD ERROR:", err);
+    return res.status(500).json({ error: "SERVER_ERROR", detail: err.message });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) return res.status(400).json({ error: "MISSING_FIELDS" });
+    if (String(newPassword).length < 8) return res.status(400).json({ error: "WEAK_PASSWORD" });
+
+    const user = await User.findOne({ email: String(email).toLowerCase() });
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    const record = await PasswordReset.findOne({ userId: user._id }).sort({ createdAt: -1 });
+    if (!record) return res.status(400).json({ error: "NO_RESET_PENDING" });
+
+    const now = new Date();
+    if (now > record.expiresAt) return res.status(400).json({ error: "OTP_EXPIRED" });
+    if (record.attempts >= MAX_ATTEMPTS) return res.status(429).json({ error: "TOO_MANY_ATTEMPTS" });
+
+    const incomingHash = hashOtp(String(code));
+    if (incomingHash !== record.codeHash) {
+      record.attempts += 1;
+      await record.save();
+      return res.status(400).json({ error: "INVALID_CODE", attemptsLeft: MAX_ATTEMPTS - record.attempts });
+    }
+
+    user.passwordHash = await bcrypt.hash(String(newPassword), 10);
+    await user.save();
+    await PasswordReset.deleteMany({ userId: user._id });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("RESET PASSWORD ERROR:", err);
+    return res.status(500).json({ error: "SERVER_ERROR" });
+  }
+}
+
 async function me(req, res) {
   try {
     const user = await User.findById(req.user.uid);
@@ -377,4 +460,4 @@ async function me(req, res) {
   }
 }
 
-module.exports = { register, verifyEmail, resendVerification, login, me };
+module.exports = { register, verifyEmail, resendVerification, login, me, forgotPassword, resetPassword };

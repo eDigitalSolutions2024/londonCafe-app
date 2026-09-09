@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-//const BASE_URL = "http://10.0.2.2:3001/api";
 const BASE_URL = "https://app.londoncafejrz.com/api";
 const POS_URL = "https://api.londoncafejrz.com/api";
 

@@ -297,6 +297,14 @@ export default function LoginScreen({ route, navigation }) {
               onBlur={() => setFocusedField(null)}
             />
 
+            <TouchableOpacity
+              onPress={() => navigation.navigate("ForgotPassword", { email })}
+              activeOpacity={0.8}
+              style={styles.forgotBtn}
+            >
+              <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+            </TouchableOpacity>
+
             <PressableScale
               style={[styles.btn, loading && styles.btnDisabled]}
               onPress={onSubmit}
@@ -428,6 +436,9 @@ const styles = StyleSheet.create({
   },
 
   field: { marginBottom: 14 },
+
+  forgotBtn: { alignSelf: "flex-end", marginTop: -6, marginBottom: 10 },
+  forgotText: { color: colors.accent, fontSize: 12, fontWeight: "800" },
 
   label: {
     color: "rgba(255,255,255,0.5)",

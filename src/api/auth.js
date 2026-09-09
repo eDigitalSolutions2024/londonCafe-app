@@ -28,6 +28,20 @@ export function login({ email, password }) {
   });
 }
 
+export function forgotPassword({ email }) {
+  return apiFetch("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword({ email, code, newPassword }) {
+  return apiFetch("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ email, code, newPassword }),
+  });
+}
+
 export function me(token) {
   return apiFetch("/auth/me", {
     method: "GET",
