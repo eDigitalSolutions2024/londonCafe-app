@@ -13,15 +13,15 @@
       "backgroundColor": "#0b0709"
     },
     "ios": {
-  "supportsTablet": true,
-  "buildNumber": "18",
-  "infoPlist": {
-    "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa.",
-    "ITSAppUsesNonExemptEncryption": false,
-    "NSCameraUsageDescription": "Usamos la cámara para escanear tarjetas de pago al realizar compras en la app."
-  },
-  "bundleIdentifier": "com.londoncafe.app"
-},
+      "supportsTablet": true,
+      "buildNumber": "18",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Usamos la cámara para escanear tarjetas de pago al realizar compras en la app."
+      },
+      "bundleIdentifier": "com.londoncafe.app"
+    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -30,8 +30,9 @@
       "edgeToEdgeEnabled": true,
       "package": "com.londoncafe.app",
       "googleServicesFile": "./google-services.json",
-      
-      "blockedPermissions": ["android.permission.ACTIVITY_RECOGNITION"]
+      "blockedPermissions": [
+        "android.permission.ACTIVITY_RECOGNITION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -47,6 +48,16 @@
         "@stripe/stripe-react-native",
         {
           "enableGooglePay": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep class com.stripe.android.** { *; }\n-keep class com.reactnativestripesdk.** { *; }\n-dontwarn com.stripe.android.**\n-keep class com.google.firebase.** { *; }\n-keep class com.google.android.gms.** { *; }\n-dontwarn com.google.firebase.**\n-dontwarn com.google.android.gms.**\n-keep class com.google.android.gms.maps.** { *; }\n-keep interface com.google.android.gms.maps.** { *; }"
+          }
         }
       ]
     ]
