@@ -29,6 +29,15 @@ const OPTIONS = {
 const VIP_IDS = new Set(["hair_07", "hair_f_05"]);
 const VIP_THRESHOLD = 200;
 
+// ✅ Puro teaser -- sin ids reales, sin lógica de guardado. La mecánica
+// tipo Tamagotchi (alimentar, ánimo, etc.) llega en una próxima
+// liberación; esto solo anuncia que viene y que será VIP.
+const PET_TEASERS = [
+  { id: "cat", emoji: "🐱", label: "Gato" },
+  { id: "dog", emoji: "🐶", label: "Perro" },
+  { id: "hamster", emoji: "🐹", label: "Hámster" },
+];
+
 // Reemplaza "hair 01, hair 02..." por algo neutral que no revele el nombre
 // interno del archivo -- mismo orden que ya mostraba la UI vieja.
 const DISPLAY_NUMBER = {
@@ -268,6 +277,38 @@ export default function AvatarCustomizeScreen({ navigation }) {
             </View>
           )}
 
+          {/* ✅ Mascotas -- teaser visual nada más, la mecánica real (tipo
+              Tamagotchi) llega en una siguiente liberación. Sin selección
+              real todavía, solo anuncia que viene y a quién le tocará. */}
+          <View style={styles.section}>
+            <View style={styles.vipHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: colors.accent }]}>🐾 Mascotas</Text>
+              <Text style={styles.vipHint}>Próximamente · Exclusivo VIP</Text>
+            </View>
+
+            <View style={styles.optionsRow}>
+              {PET_TEASERS.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() =>
+                    Alert.alert(
+                      "Próximamente 🐾",
+                      `${p.emoji} ${p.label} llegará en una próxima actualización -- tu compañero se cuida como un Tamagotchi.`
+                    )
+                  }
+                  style={[styles.optionBtn, styles.vipBtn, styles.vipBtnLocked]}
+                >
+                  <Text
+                    style={[styles.optionText, styles.vipText, styles.vipTextLocked]}
+                    numberOfLines={1}
+                  >
+                    {p.emoji} {p.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           {/* Guardar */}
           <Pressable style={[styles.saveBtn, saving && { opacity: 0.75 }]} onPress={onSave} disabled={saving}>
             <Text style={styles.saveText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
@@ -344,7 +385,10 @@ const styles = StyleSheet.create({
   vipBtn: { backgroundColor: colors.accent, borderColor: colors.accent },
   vipText: { color: "#2A0E18" },
   vipBtnLocked: { backgroundColor: "rgba(232,207,174,0.18)", borderColor: "rgba(232,207,174,0.35)" },
-  vipTextLocked: { color: "rgba(255,255,255,0.55)" },
+  // ✅ Esta pantalla vive sobre una tarjeta BLANCA (colors.card), no un
+  // fondo oscuro -- texto blanco translúcido aquí queda casi invisible.
+  // Vino apagado sí lee bien sobre el dorado suave del pill bloqueado.
+  vipTextLocked: { color: "rgba(122,30,58,0.55)" },
 
   saveBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
   saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },
