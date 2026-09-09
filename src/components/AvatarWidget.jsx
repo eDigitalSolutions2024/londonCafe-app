@@ -1,8 +1,62 @@
 import React, { useRef, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable, Animated, Easing } from "react-native";
+import Svg, { Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import { colors } from "../theme/colors";
 import { appStyles } from "../theme/styles";
 import AvatarPreview from "./AvatarPreview";
+
+// ✅ Resalta el avatar con un brillo dorado detrás -- a propósito distinto
+// del anillo delgado (stroke) que ya usa el logo de London Café arriba en
+// el header, para que no se confundan visualmente (pedido del usuario).
+// Mismo patrón de radio-seguro que el resto de la app (r bien dentro del
+// lienzo, más un stop final en 0% de opacidad) para no repetir el bug del
+// "cuadro" al magnificarse con el scale animado.
+function AvatarGlow({ size = 100 }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        width: size,
+        height: size,
+        top: -(size - 76) / 2,
+        left: -(size - 76) / 2,
+        alignItems: "center",
+        justifyContent: "center",
+        opacity,
+        transform: [{ scale }],
+      }}
+    >
+      <Svg width={size} height={size}>
+        <Defs>
+          <RadialGradient id="avatarGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={colors.accent} stopOpacity="0.6" />
+            <Stop offset="60%" stopColor={colors.accent} stopOpacity="0.22" />
+            <Stop offset="90%" stopColor={colors.accent} stopOpacity="0" />
+            <Stop offset="100%" stopColor={colors.accent} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={size * 0.42} fill="url(#avatarGlow)" />
+      </Svg>
+    </Animated.View>
+  );
+}
 
 // ✅ Badge de "editar" con pulso sutil -- antes nada indicaba que el avatar
 // se puede tocar para personalizarlo, quedaba enterrado en Configuración.
@@ -129,10 +183,11 @@ export default function AvatarWidget({
             delayLongPress={250}
             style={styles.avatarPressable}
           >
+            <AvatarGlow size={112} />
             {/* avatarCircle recorta la imagen (overflow hidden) -- el badge
                 vive fuera de ese contenedor para no cortarse en la orilla. */}
             <View style={styles.avatarCircle}>
-              <AvatarPreview config={safeConfig} size={90} />
+              <AvatarPreview config={safeConfig} size={76} />
             </View>
             <EditBadge />
           </Pressable>
@@ -293,14 +348,17 @@ chipDarText: {
 
   avatarBox: { alignItems: "center", gap: 4 },
 
-  avatarPressable: { position: "relative", width: 88, height: 88 },
+  avatarPressable: { position: "relative", width: 76, height: 76 },
   avatarCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 39,
+    width: 76,
+    height: 76,
+    borderRadius: 34,
     backgroundColor: colors.primarySoft,
-    borderWidth: 1,
-    borderColor: colors.border,
+    // ✅ borde dorado sólido (no el anillo delgado tipo gradiente que ya
+    // usa el logo del header) + el glow detrás -- así se lee como "esto
+    // es especial/tócalo", con un lenguaje visual distinto al del logo.
+    borderWidth: 2,
+    borderColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
