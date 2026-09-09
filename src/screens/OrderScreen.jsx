@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   ActivityIndicator,
   StatusBar,
   Animated,
+  Easing,
   TextInput,
   ScrollView,
 } from "react-native";
+import Svg, { Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import Screen from "../components/Screen";
 import { getAppMenu } from "../api/appMenu";
 import ReorderSection from "../components/ReorderSection";
@@ -41,7 +43,62 @@ const COLORS = {
   wine: "#7A1E3A",
   wineSoft: "rgba(122,30,58,0.12)",
   green: "#7A1E3A",
+  accent: "#E8CFAE",
+  accentSoft: "rgba(232,207,174,0.16)",
 };
+
+// Brillo pulsante detrás del botón del carrito, mismo lenguaje visual que
+// el logo animado de Home/Login (RadialGradient + loop de escala/opacidad).
+// Solo se monta cuando hay algo en el carrito -- así el pulso realmente
+// significa "tienes algo aquí", no es decoración fija.
+function CartGlow() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.95] });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        width: 96,
+        height: 96,
+        top: -18,
+        left: -18,
+        alignItems: "center",
+        justifyContent: "center",
+        opacity,
+        transform: [{ scale }],
+      }}
+    >
+      <Svg width={96} height={96}>
+        <Defs>
+          <RadialGradient id="cartGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={COLORS.accent} stopOpacity="0.65" />
+            <Stop offset="55%" stopColor={COLORS.accent} stopOpacity="0.22" />
+            <Stop offset="90%" stopColor={COLORS.accent} stopOpacity="0" />
+            <Stop offset="100%" stopColor={COLORS.accent} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        {/* r bien dentro del lienzo (no size/2) para no repetir el bug de
+            "cuadro" al magnificarse con el scale animado. */}
+        <Circle cx="48" cy="48" r="40" fill="url(#cartGlow)" />
+      </Svg>
+    </Animated.View>
+  );
+}
 
 const money = (n) =>
   Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
@@ -642,19 +699,27 @@ function toggleFlavor(flavor) {
   <Pressable
     onPress={() => navigation?.navigate?.("Pedidos")}
     style={({ pressed }) => ({
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-      backgroundColor: "#fff",
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      // ✅ antes era un círculo blanco liso -- se perdía entre tanta
+      // tarjeta blanca de abajo. Ahora es "glass" dorado para que se
+      // identifique de un vistazo como su propio botón, no otra tarjeta.
+      borderColor: COLORS.accent,
+      backgroundColor: COLORS.accentSoft,
       alignItems: "center",
       justifyContent: "center",
       opacity: pressed ? 0.85 : 1,
       position: "relative",
+      shadowColor: COLORS.accent,
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 3,
     })}
   >
-    <Text style={{ fontSize: 14 }}>📦</Text>
+    <Text style={{ fontSize: 16 }}>📦</Text>
 
     {activeOrdersCount > 0 ? (
   <Animated.View
@@ -691,24 +756,29 @@ function toggleFlavor(flavor) {
   </View>
 
   <View style={{ width: 76, alignItems: "flex-end" }}>
-    <Pressable
-      ref={cartIconRef}
-      onPress={() => navigation?.navigate?.("Cart")}
-      style={({ pressed }) => ({
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: COLORS.wine,
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: pressed ? 0.85 : 1,
-        shadowColor: COLORS.wine,
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 4,
-      })}
-    >
+    <View style={{ width: 60, height: 60, alignItems: "center", justifyContent: "center" }}>
+      {cartCount > 0 ? <CartGlow /> : null}
+
+      <Pressable
+        ref={cartIconRef}
+        onPress={() => navigation?.navigate?.("Cart")}
+        style={({ pressed }) => ({
+          width: 60,
+          height: 60,
+          borderRadius: 30,
+          backgroundColor: COLORS.wine,
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: pressed ? 0.85 : 1,
+          borderWidth: cartCount > 0 ? 2 : 0,
+          borderColor: COLORS.accent,
+          shadowColor: cartCount > 0 ? COLORS.accent : COLORS.wine,
+          shadowOpacity: cartCount > 0 ? 0.5 : 0.35,
+          shadowRadius: cartCount > 0 ? 12 : 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 4,
+        })}
+      >
       <Text style={{ fontSize: 28 }}>🛒</Text>
 
       {cartCount > 0 ? (
@@ -720,21 +790,24 @@ function toggleFlavor(flavor) {
             minWidth: 24,
             height: 24,
             borderRadius: 12,
-            backgroundColor: "#fff",
+            // ✅ badge ahora dorado sólido -- "llamativo" cuando ya hay algo
+            // en el carrito, en vez del blanco/vino discreto de antes.
+            backgroundColor: COLORS.accent,
             borderWidth: 2,
-            borderColor: COLORS.wine,
+            borderColor: COLORS.bg,
             alignItems: "center",
             justifyContent: "center",
             paddingHorizontal: 5,
             transform: [{ scale: cartBadgeScale }],
           }}
         >
-          <Text style={{ color: COLORS.wine, fontSize: 12, fontWeight: "900" }}>
+          <Text style={{ color: "#3A1420", fontSize: 12, fontWeight: "900" }}>
             {cartCount > 99 ? "99+" : String(cartCount)}
           </Text>
         </Animated.View>
       ) : null}
-    </Pressable>
+      </Pressable>
+    </View>
   </View>
 </View>
 

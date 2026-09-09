@@ -2,7 +2,6 @@ import React, { useCallback, useContext, useEffect, useMemo, useState } from "re
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from "react-native";
 import PromoPlaceholder from "../assets/promo_placeholder.png";
 import { useNavigation } from "@react-navigation/native";
-import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { apiFetch } from "../api/client";
@@ -178,7 +177,10 @@ export default function ReorderSection() {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>Vuelve a pedir</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.titleIcon}>⚡</Text>
+        <Text style={styles.title}>Vuelve a pedir</Text>
+      </View>
 
       <View style={styles.card}>
         <Image
@@ -212,28 +214,34 @@ const styles = StyleSheet.create({
   wrap: { marginTop: 4, marginBottom: 4 },
   // "Vuelve a pedir" vive directo sobre el fondo oscuro de OrderScreen.jsx,
   // no dentro de la tarjeta blanca de abajo -- necesita texto claro.
-  title: { fontSize: 13, fontWeight: "900", color: "#fff", marginBottom: 6 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 6 },
+  titleIcon: { fontSize: 12 },
+  title: { fontSize: 13, fontWeight: "900", color: "#fff", letterSpacing: 0.2 },
+  // ✅ antes era una tarjeta blanca lisa, igual a cualquier otra -- se
+  // perdía entre los productos. Ahora es "glass" oscura con borde dorado,
+  // el mismo lenguaje premium de las tarjetas de Home/Login, para que se
+  // note como algo especial ("esto ya lo pediste antes"), no un producto más.
   card: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: colors.card,
-    padding: 8,
+    borderColor: "rgba(232,207,174,0.35)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    padding: 10,
   },
-  thumb: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#f2f2f2" },
+  thumb: { width: 52, height: 52, borderRadius: 12, backgroundColor: "#f2f2f2" },
   info: { flex: 1 },
-  itemsLine: { color: colors.text, fontWeight: "700", fontSize: 12 },
-  total: { color: colors.primary, fontWeight: "900", fontSize: 13, marginTop: 1 },
+  itemsLine: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  total: { color: "#E8CFAE", fontWeight: "900", fontSize: 14, marginTop: 2 },
   btn: {
-    backgroundColor: colors.primary,
+    backgroundColor: "#E8CFAE",
     paddingHorizontal: 12,
-    height: 34,
+    height: 36,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { color: "#fff", fontWeight: "900", fontSize: 11 },
+  btnText: { color: "#3A1420", fontWeight: "900", fontSize: 11 },
 });
