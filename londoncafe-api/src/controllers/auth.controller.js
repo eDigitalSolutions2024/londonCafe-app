@@ -104,9 +104,17 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").toLowerCase());
 }
 
+// Mismos ids "gratis" que la app muestra en RegisterScreen/AvatarCustomizeScreen
+// (hair_07 y hair_f_05 son VIP -- nadie puede elegirlos al registrarse,
+// ni siquiera mandando el id a mano, porque nadie tiene Buddy Coins todavía).
+const FREE_HAIR_IDS = new Set([
+  "hair_01", "hair_02", "hair_03", "hair_04", "hair_05",
+  "hair_f_01", "hair_f_02", "hair_f_03", "hair_f_04",
+]);
+
 async function register(req, res) {
   try {
-    const { name, email, password, gender, phone, birthDate } = req.body;
+    const { name, email, password, gender, phone, birthDate, avatarHair } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: "MISSING_FIELDS" });
@@ -159,9 +167,11 @@ async function register(req, res) {
       other: "hair_01",
     };
 
+    const chosenHair = FREE_HAIR_IDS.has(String(avatarHair)) ? String(avatarHair) : null;
+
     const avatarConfig = {
       skin: "skin_01",
-      hair: DEFAULT_HAIR_BY_GENDER[safeGender] || "hair_01",
+      hair: chosenHair || DEFAULT_HAIR_BY_GENDER[safeGender] || "hair_01",
       top: "top_01",
       bottom: "bottom_01",
       shoes: "shoes_01",

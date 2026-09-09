@@ -1,8 +1,33 @@
-import React, { useRef } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import React, { useRef, useEffect } from "react";
+import { View, Text, StyleSheet, Pressable, Animated, Easing } from "react-native";
 import { colors } from "../theme/colors";
 import { appStyles } from "../theme/styles";
 import AvatarPreview from "./AvatarPreview";
+
+// ✅ Badge de "editar" con pulso sutil -- antes nada indicaba que el avatar
+// se puede tocar para personalizarlo, quedaba enterrado en Configuración.
+function EditBadge() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.editBadge, { transform: [{ scale }] }]}>
+      <Text style={styles.editBadgeText}>✏️</Text>
+    </Animated.View>
+  );
+}
 
 export default function AvatarWidget({
   name,
@@ -102,9 +127,14 @@ export default function AvatarWidget({
             onPress={handlePress}
             onPressOut={handlePressOut}
             delayLongPress={250}
-            style={styles.avatarCircle}
+            style={styles.avatarPressable}
           >
-            <AvatarPreview config={safeConfig} size={90} />
+            {/* avatarCircle recorta la imagen (overflow hidden) -- el badge
+                vive fuera de ese contenedor para no cortarse en la orilla. */}
+            <View style={styles.avatarCircle}>
+              <AvatarPreview config={safeConfig} size={90} />
+            </View>
+            <EditBadge />
           </Pressable>
 
           {/* <Text style={styles.avatarName} numberOfLines={2}>
@@ -263,6 +293,7 @@ chipDarText: {
 
   avatarBox: { alignItems: "center", gap: 4 },
 
+  avatarPressable: { position: "relative", width: 88, height: 88 },
   avatarCircle: {
     width: 88,
     height: 88,
@@ -274,6 +305,26 @@ chipDarText: {
     justifyContent: "center",
     overflow: "hidden",
   },
+
+  editBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.accent,
+    borderWidth: 2,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  editBadgeText: { fontSize: 12 },
 
   avatarName: { color: colors.text, fontWeight: "900", fontSize: 12, textAlign: "center" },
   avatarMood: { color: colors.textMuted, fontSize: 11 },

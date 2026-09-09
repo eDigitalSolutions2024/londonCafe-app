@@ -19,6 +19,33 @@ import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import { register } from "../api/auth";
 import { AuthContext } from "../context/AuthContext";
+import AvatarPreview from "../components/AvatarPreview";
+
+// Mismos ids/orden que AvatarCustomizeScreen.jsx -- duplicado a propósito
+// (pantallas distintas, ver convención del resto del archivo). Aquí solo se
+// ofrecen los estilos GRATIS: a un usuario recién creado no le puede tocar
+// un estilo VIP porque todavía no tiene Buddy Coins.
+const FREE_HAIR_OPTIONS = [
+  { id: "hair_01", label: "Avatar 01" },
+  { id: "hair_02", label: "Avatar 02" },
+  { id: "hair_03", label: "Avatar 03" },
+  { id: "hair_04", label: "Avatar 04" },
+  { id: "hair_05", label: "Avatar 05" },
+  { id: "hair_f_01", label: "Avatar 06" },
+  { id: "hair_f_02", label: "Avatar 08" },
+  { id: "hair_f_03", label: "Avatar 09" },
+  { id: "hair_f_04", label: "Avatar 10" },
+];
+
+function isFemaleId(id) {
+  return String(id || "").includes("_f_");
+}
+
+function hairOptionsForGender(gender) {
+  if (gender === "male") return FREE_HAIR_OPTIONS.filter((o) => !isFemaleId(o.id));
+  if (gender === "female") return FREE_HAIR_OPTIONS.filter((o) => isFemaleId(o.id));
+  return FREE_HAIR_OPTIONS; // sin género elegido / "otro" => todos
+}
 
 // ✅ mismo logo que Login (ajusta si lo cambiaste)
 import LondonCafeLogo from "../assets/markers/londoncafe.png";
@@ -104,8 +131,20 @@ export default function RegisterScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
+  const [avatarHair, setAvatarHair] = useState("hair_01");
 
   const { token } = useContext(AuthContext) || {};
+
+  const avatarOptions = hairOptionsForGender(gender);
+
+  // ✅ Si cambian de género y el estilo elegido ya no aplica (ej. eligió un
+  // estilo femenino y luego cambió a "Hombre"), se reajusta al primero
+  // disponible -- mismo fallback que ya usa AvatarCustomizeScreen.jsx.
+  useEffect(() => {
+    if (!avatarOptions.some((o) => o.id === avatarHair)) {
+      setAvatarHair(avatarOptions[0]?.id || "hair_01");
+    }
+  }, [gender]);
 
   // ================== Helpers ==================
   function formatBirthDate(input) {
@@ -173,7 +212,7 @@ export default function RegisterScreen({ navigation }) {
 
       setLoading(true);
 
-      const payload = { name: name.trim(), email: email.trim(), password };
+      const payload = { name: name.trim(), email: email.trim(), password, avatarHair };
 
       if (gender) payload.gender = gender;
 
@@ -281,6 +320,40 @@ export default function RegisterScreen({ navigation }) {
                 <GenderPill value="female" label="Mujer" />
                 <GenderPill value="other" label="Otro" />
               </View>
+            </View>
+
+            {/* ✅ Elige tu personaje -- puede cambiarlo después tocando su
+                avatar, así que solo se muestran los estilos gratis aquí. */}
+            <View style={styles.field}>
+              <Text style={styles.label}>Elige tu personaje</Text>
+
+              <View style={styles.avatarPickPreviewWrap}>
+                <View style={styles.avatarPickPreview}>
+                  <AvatarPreview config={{ hair: avatarHair }} size={84} />
+                </View>
+              </View>
+
+              <View style={styles.avatarPickPillsWrap}>
+                {avatarOptions.map((o) => {
+                  const active = avatarHair === o.id;
+                  return (
+                    <TouchableOpacity
+                      key={o.id}
+                      onPress={() => setAvatarHair(o.id)}
+                      activeOpacity={0.9}
+                      style={[styles.avatarPill, active && styles.avatarPillActive]}
+                    >
+                      <Text style={[styles.avatarPillText, active && styles.avatarPillTextActive]}>
+                        {o.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.helper}>
+                ★ Hay estilos VIP exclusivos que se desbloquean con Buddy Coins -- puedes cambiar tu personaje cuando quieras tocando tu avatar.
+              </Text>
             </View>
 
             <GlassInput
@@ -510,6 +583,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
+
+  // ✅ Picker de personaje en el registro -- preview arriba centrado,
+  // pills en fila completa abajo (mismo patrón que AvatarCustomizeScreen).
+  avatarPickPreviewWrap: { alignItems: "center", marginBottom: 12 },
+  avatarPickPreview: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarPickPillsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  avatarPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  avatarPillActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  avatarPillText: { color: "#fff", fontWeight: "800", fontSize: 11.5 },
+  avatarPillTextActive: { color: "#2A0E18" },
 
   btn: {
     backgroundColor: colors.accent,
