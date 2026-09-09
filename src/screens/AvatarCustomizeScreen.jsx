@@ -23,6 +23,28 @@ const OPTIONS = {
   ],
 };
 
+// Mismos 2 estilos marcados VIP en el backend (me.controller.js) -- si se
+// agrega uno nuevo aquí, hay que agregarlo también allá o el guardado lo
+// rechazará con VIP_REQUIRED.
+const VIP_IDS = new Set(["hair_07", "hair_f_05"]);
+const VIP_THRESHOLD = 200;
+
+// Reemplaza "hair 01, hair 02..." por algo neutral que no revele el nombre
+// interno del archivo -- mismo orden que ya mostraba la UI vieja.
+const DISPLAY_NUMBER = {
+  hair_01: "01",
+  hair_02: "02",
+  hair_03: "03",
+  hair_04: "04",
+  hair_05: "05",
+  hair_f_01: "06",
+  hair_07: "07",
+  hair_f_02: "08",
+  hair_f_03: "09",
+  hair_f_04: "10",
+  hair_f_05: "11",
+};
+
 function isFemaleId(id) {
   return String(id || "").includes("_f_");
 }
@@ -34,37 +56,42 @@ function filterByGender(values, gender) {
   return values; // other => todo
 }
 
-const labelMap = {
-  hair: "Personaje",
-};
-
-function prettyLabel(key, v) {
-  if (key === "hair") {
-    if (v === "skin_01") return "Default";
-    if (v === "skin_f_01") return "Mujer";
-  }
-  if (key === "hair") {
-    if (v === "hair_f_01") return "hair 06";
-    if (v === "hair_f_02") return "hair 08";
-    if (v === "hair_f_03") return "hair 09";
-    if (v === "hair_f_04") return "hair 10";
-    if (v === "hair_f_05") return "hair 11";
-  }
-  return String(v).replace(/_/g, " ");
+function prettyLabel(v) {
+  return `Avatar ${DISPLAY_NUMBER[v] || "??"}`;
 }
 
 export default function AvatarCustomizeScreen({ navigation }) {
   const { token, setUser, user } = useContext(AuthContext);
   const [saving, setSaving] = useState(false);
-  
-  const gender = user?.gender || "other";
+  const [points, setPoints] = useState(0);
 
-  // ✅ Opciones filtradas por género (other ve todo)
+  const gender = user?.gender || "other";
+  const isVIP = points >= VIP_THRESHOLD;
+
+  // ✅ Mismo balance de Buddy Coins (Wallet V2) que ya usa RewardsScreen
+  // para decidir VIP -- mismo umbral, misma fuente de verdad.
+  useEffect(() => {
+    if (!token) return;
+    apiFetch("/points/wallet", { headers: { Authorization: `Bearer ${token}` } })
+      .then((w) => setPoints(Number(w?.wallet?.balance) || 0))
+      .catch((e) => console.log("❌ AvatarCustomize wallet:", e?.data || e?.message));
+  }, [token]);
+
+  // ✅ Opciones filtradas por género (other ve todo), separadas en Gratis / VIP
   const filteredOptions = useMemo(() => {
     return {
       hair: filterByGender(OPTIONS.hair, gender),
     };
   }, [gender]);
+
+  const freeHair = useMemo(
+    () => filteredOptions.hair.filter((v) => !VIP_IDS.has(v)),
+    [filteredOptions]
+  );
+  const vipHair = useMemo(
+    () => filteredOptions.hair.filter((v) => VIP_IDS.has(v)),
+    [filteredOptions]
+  );
 
   const defaults = useMemo(
     () => ({
@@ -99,6 +126,13 @@ export default function AvatarCustomizeScreen({ navigation }) {
     }, [gender, filteredOptions]);
 
   const setPart = (key, value) => {
+    if (key === "hair" && VIP_IDS.has(value) && !isVIP) {
+      Alert.alert(
+        "Estilo VIP 🔒",
+        `Este estilo se desbloquea al llegar a ${VIP_THRESHOLD} Buddy Coins (llevas ${points}).`
+      );
+      return;
+    }
     setAvatarConfig((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -106,6 +140,11 @@ export default function AvatarCustomizeScreen({ navigation }) {
     try {
       if (!token) {
         Alert.alert("Sesión", "No hay token. Vuelve a iniciar sesión.");
+        return;
+      }
+
+      if (VIP_IDS.has(avatarConfig.hair) && !isVIP) {
+        Alert.alert("Estilo VIP 🔒", `Necesitas ${VIP_THRESHOLD} Buddy Coins para usar este estilo.`);
         return;
       }
 
@@ -141,7 +180,9 @@ export default function AvatarCustomizeScreen({ navigation }) {
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Personalizar personaje</Text>
-            <Text style={styles.sub}>Toca una opción para ver cambios en tiempo real</Text>
+            <Text style={styles.sub}>
+              {isVIP ? "Eres miembro VIP ⚡" : `Te faltan ${Math.max(0, VIP_THRESHOLD - points)} Buddy Coins para VIP`}
+            </Text>
           </View>
 
           <Pressable onPress={() => navigation.goBack()} style={styles.closeBtn}>
@@ -158,30 +199,66 @@ export default function AvatarCustomizeScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Opciones */}
-          {Object.entries(filteredOptions).map(([key, values]) => (
-            <View key={key} style={styles.section}>
-              {/* ✅ anti-error si no existe label */}
-              <Text style={styles.sectionTitle}>{labelMap[key] || key}</Text>
+          {/* Gratis */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Gratis</Text>
+            <View style={styles.optionsRow}>
+              {freeHair.map((v) => {
+                const active = avatarConfig.hair === v;
+                return (
+                  <Pressable
+                    key={`hair-${v}`}
+                    onPress={() => setPart("hair", v)}
+                    style={[styles.optionBtn, active && styles.optionBtnActive]}
+                  >
+                    <Text style={[styles.optionText, active && styles.optionTextActive]}>
+                      {prettyLabel(v)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
+          {/* VIP exclusivo */}
+          {vipHair.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.vipHeaderRow}>
+                <Text style={[styles.sectionTitle, { color: colors.accent }]}>★ VIP exclusivo</Text>
+                {!isVIP && <Text style={styles.vipHint}>Desbloquea con {VIP_THRESHOLD} Buddy Coins</Text>}
+              </View>
               <View style={styles.optionsRow}>
-                {values.map((v) => {
-                  const active = avatarConfig[key] === v;
+                {vipHair.map((v) => {
+                  const active = avatarConfig.hair === v;
+                  const locked = !isVIP;
                   return (
                     <Pressable
-                      key={`${key}-${v}`} // ✅ key único
-                      onPress={() => setPart(key, v)}
-                      style={[styles.optionBtn, active && styles.optionBtnActive]}
+                      key={`hair-${v}`}
+                      onPress={() => setPart("hair", v)}
+                      style={[
+                        styles.optionBtn,
+                        styles.vipBtn,
+                        active && styles.optionBtnActive,
+                        locked && styles.vipBtnLocked,
+                      ]}
                     >
-                      <Text style={[styles.optionText, active && styles.optionTextActive]}>
-                        {prettyLabel(key, v)}
+                      <Text
+                        style={[
+                          styles.optionText,
+                          styles.vipText,
+                          active && styles.optionTextActive,
+                          locked && styles.vipTextLocked,
+                        ]}
+                      >
+                        {locked ? "🔒 " : "★ "}
+                        {prettyLabel(v)}
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
             </View>
-          ))}
+          )}
 
           {/* Guardar */}
           <Pressable style={[styles.saveBtn, saving && { opacity: 0.75 }]} onPress={onSave} disabled={saving}>
@@ -232,6 +309,9 @@ const styles = StyleSheet.create({
   section: { marginTop: 14 },
   sectionTitle: { color: colors.textMuted, fontSize: 12, fontWeight: "900", letterSpacing: 0.3, marginBottom: 10 },
 
+  vipHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  vipHint: { color: colors.textMuted, fontSize: 10.5, fontWeight: "700" },
+
   optionsRow: { flexDirection: "row", flexWrap: "wrap" },
 
   optionBtn: {
@@ -248,6 +328,14 @@ const styles = StyleSheet.create({
 
   optionText: { color: "#111", fontSize: 12, fontWeight: "900" },
   optionTextActive: { color: "#fff" },
+
+  // ✅ VIP: fondo dorado suave con borde dorado -- se distingue de un
+  // vistazo de los pills gratis (blancos). Cuando está bloqueado, se
+  // atenúa y el candado en el texto ya comunica "no disponible".
+  vipBtn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  vipText: { color: "#2A0E18" },
+  vipBtnLocked: { backgroundColor: "rgba(232,207,174,0.18)", borderColor: "rgba(232,207,174,0.35)" },
+  vipTextLocked: { color: "rgba(255,255,255,0.55)" },
 
   saveBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
   saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },

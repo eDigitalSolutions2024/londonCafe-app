@@ -275,6 +275,29 @@ async function updateMe(req, res) {
   }
 }
 
+// Mismos 2 estilos marcados VIP en el editor (hair_07, hair_f_05) y mismo
+// umbral que ya usa RewardsScreen.jsx en el cliente (200 Buddy Coins) --
+// aquí es donde ese umbral se vuelve real: antes de esto, cualquiera podía
+// guardar un hair VIP llamando la API directo, sin pasar por la pantalla.
+const VIP_HAIR_IDS = new Set(["hair_07", "hair_f_05"]);
+const VIP_THRESHOLD = 200;
+const POS_URL = process.env.POS_URL || "https://api.londoncafejrz.com/api";
+
+async function isUserVIP(uid) {
+  try {
+    const posRes = await fetch(`${POS_URL}/wallet/${uid}`, {
+      headers: { "x-api-key": process.env.POS_API_KEY || "" },
+    });
+    if (posRes.status === 404) return false; // sin wallet todavía = saldo $0
+    const data = await posRes.json().catch(() => ({}));
+    if (!posRes.ok) return false;
+    return (Number(data?.wallet?.balance) || 0) >= VIP_THRESHOLD;
+  } catch (err) {
+    console.log("isUserVIP wallet check error:", err?.message);
+    return false; // si el wallet no responde, no se arriesga a dar acceso VIP gratis
+  }
+}
+
 async function updateAvatar(req, res) {
   try {
     const uid = getUid(req);
@@ -301,6 +324,11 @@ async function updateAvatar(req, res) {
 
     if (Object.keys($set).length === 0) {
       return res.status(400).json({ error: "NO_ALLOWED_FIELDS" });
+    }
+
+    if (VIP_HAIR_IDS.has($set["avatarConfig.hair"])) {
+      const vip = await isUserVIP(uid);
+      if (!vip) return res.status(403).json({ error: "VIP_REQUIRED" });
     }
 
     const updated = await User.findByIdAndUpdate(uid, { $set }, { new: true }).select("avatarConfig");
