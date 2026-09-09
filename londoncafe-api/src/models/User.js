@@ -127,6 +127,14 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // ✅ Cambiar de correo desde Configuración ya no se aplica directo --
+    // se guarda aquí hasta que se confirme con un código enviado al
+    // correo NUEVO (mismo mecanismo de EmailVerification que el
+    // registro). Antes PUT /me aplicaba el correo tal cual, sin probar
+    // que la persona fuera dueña de esa dirección -- cualquiera con la
+    // sesión abierta podía cambiarlo sin confirmar nada.
+    pendingEmail: { type: String, default: null, lowercase: true, trim: true },
+
     passwordHash: { type: String, required: true },
     isEmailVerified: { type: Boolean, default: false },
 

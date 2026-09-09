@@ -22,6 +22,12 @@ export default function AccountSettingsScreen({ navigation }) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
 
+  // ✅ Confirmación de cambio de correo -- el backend ya no aplica el
+  // correo directo, manda un código a la dirección nueva primero.
+  const [pendingEmail, setPendingEmail] = useState(null);
+  const [emailCode, setEmailCode] = useState("");
+  const [confirmingEmail, setConfirmingEmail] = useState(false);
+
   // avatar
   const [avatarConfig, setAvatarConfig] = useState({
     skin: "skin_01",
@@ -44,6 +50,7 @@ export default function AccountSettingsScreen({ navigation }) {
       setFullName(u?.name || "");
       setUsername(u?.username || "");
       setEmail(u?.email || "");
+      setPendingEmail(u?.pendingEmail || null);
       setAvatarConfig(
         u?.avatarConfig || {
           skin: "skin_01",
@@ -71,7 +78,7 @@ export default function AccountSettingsScreen({ navigation }) {
       setSaving(true);
 
       // 1) Perfil
-      await apiFetch("/me", {
+      const r = await apiFetch("/me", {
         method: "PUT",
         headers: authHeaders,
         body: JSON.stringify({ name: fullName, username, email }),
@@ -84,7 +91,15 @@ export default function AccountSettingsScreen({ navigation }) {
         body: JSON.stringify({ avatarConfig }),
       });
 
-      Alert.alert("Listo", "Cambios guardados ✅");
+      if (r?.emailChangePending) {
+        setPendingEmail(r?.user?.pendingEmail || email);
+        Alert.alert(
+          "Confirma tu correo nuevo",
+          `Te enviamos un código a ${r?.user?.pendingEmail || email}. Ingrésalo abajo para terminar el cambio -- mientras tanto sigues usando tu correo anterior.`
+        );
+      } else {
+        Alert.alert("Listo", "Cambios guardados ✅");
+      }
       await loadMe();
     } catch (e) {
       console.log("❌ save:", e?.data || e?.message);
@@ -99,6 +114,51 @@ export default function AccountSettingsScreen({ navigation }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const onConfirmEmailCode = async () => {
+    if (!emailCode.trim() || emailCode.trim().length !== 6) {
+      Alert.alert("Código inválido", "Escribe el código de 6 dígitos que te enviamos.");
+      return;
+    }
+    try {
+      setConfirmingEmail(true);
+      const r = await apiFetch("/me/confirm-email", {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ code: emailCode.trim() }),
+      });
+      setPendingEmail(null);
+      setEmailCode("");
+      setEmail(r?.email || email);
+      Alert.alert("Listo ✅", "Tu correo se actualizó.");
+    } catch (e) {
+      const errCode = e?.data?.error;
+      if (errCode === "OTP_EXPIRED") Alert.alert("Código expirado", "Pide uno nuevo.");
+      else if (errCode === "INVALID_CODE") Alert.alert("Código incorrecto", "Revisa el código e inténtalo de nuevo.");
+      else if (errCode === "TOO_MANY_ATTEMPTS") Alert.alert("Demasiados intentos", "Pide un código nuevo.");
+      else Alert.alert("Error", errCode || e?.message);
+    } finally {
+      setConfirmingEmail(false);
+    }
+  };
+
+  const onResendEmailCode = async () => {
+    try {
+      await apiFetch("/me/resend-email-code", { method: "POST", headers: authHeaders });
+      Alert.alert("Enviado", "Te mandamos un nuevo código. Revisa spam si no lo ves.");
+    } catch (e) {
+      const errCode = e?.data?.error;
+      if (errCode === "RESEND_COOLDOWN") Alert.alert("Espera un momento", "Ya te enviamos un código hace poco.");
+      else Alert.alert("Error", errCode || e?.message);
+    }
+  };
+
+  // No hay endpoint para "cancelar" -- el código simplemente expira solo
+  // en 10 min si no se confirma. Esto solo oculta el aviso en pantalla.
+  const onDismissEmailChange = () => {
+    setEmailCode("");
+    loadMe();
   };
 
   // Step 2 of 2: performs the actual deletion after the user confirms.
@@ -207,6 +267,47 @@ export default function AccountSettingsScreen({ navigation }) {
             style={styles.input}
           />
 
+          {/* ✅ Cambio de correo pendiente de confirmar -- el correo de
+              arriba sigue siendo el real hasta que se confirme este código. */}
+          {pendingEmail ? (
+            <View style={styles.emailConfirmBox}>
+              <Text style={styles.emailConfirmTitle}>Confirma tu correo nuevo</Text>
+              <Text style={styles.emailConfirmText}>
+                Enviamos un código a {pendingEmail}. Tu correo sigue siendo {email} hasta que lo confirmes.
+              </Text>
+
+              <TextInput
+                value={emailCode}
+                onChangeText={setEmailCode}
+                placeholder="Código de 6 dígitos"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
+                maxLength={6}
+                style={[styles.input, { marginTop: 8 }]}
+              />
+
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                <Pressable
+                  onPress={onConfirmEmailCode}
+                  disabled={confirmingEmail}
+                  style={[styles.emailConfirmBtn, confirmingEmail && { opacity: 0.7 }]}
+                >
+                  <Text style={styles.emailConfirmBtnText}>
+                    {confirmingEmail ? "Confirmando..." : "Confirmar"}
+                  </Text>
+                </Pressable>
+
+                <Pressable onPress={onResendEmailCode} style={styles.emailConfirmLinkBtn}>
+                  <Text style={styles.emailConfirmLinkText}>Reenviar</Text>
+                </Pressable>
+
+                <Pressable onPress={onDismissEmailChange} style={styles.emailConfirmLinkBtn}>
+                  <Text style={styles.emailConfirmLinkText}>Ahora no</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
           {/* Preview del avatar */}
           <Pressable
             onPress={() => navigation.navigate("AvatarCustomize", { avatarConfig })}
@@ -287,6 +388,29 @@ const styles = StyleSheet.create({
   cardTitle: { color: colors.text, fontWeight: "900", fontSize: 14, marginBottom: 10 },
 
   label: { color: colors.textMuted, fontSize: 12, marginBottom: 6, marginTop: 8 },
+
+  // ✅ Vive dentro de la tarjeta blanca "Perfil" (igual que el input de
+  // correo arriba), no sobre el fondo oscuro de la pantalla.
+  emailConfirmBox: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(232,207,174,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(232,207,174,0.5)",
+  },
+  emailConfirmTitle: { color: colors.primary, fontWeight: "900", fontSize: 13, marginBottom: 4 },
+  emailConfirmText: { color: colors.text, fontSize: 12, lineHeight: 17 },
+  emailConfirmBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  emailConfirmBtnText: { color: "#fff", fontWeight: "900", fontSize: 12 },
+  emailConfirmLinkBtn: { paddingVertical: 10, paddingHorizontal: 6 },
+  emailConfirmLinkText: { color: colors.primary, fontWeight: "800", fontSize: 12, textDecorationLine: "underline" },
   input: {
     backgroundColor: "#ffffff",
     borderRadius: 12,

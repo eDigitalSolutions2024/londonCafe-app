@@ -7,6 +7,8 @@ const Redemption = require("../models/Redemption");
 const Receipt = require("../models/Receipt");
 const Sale = require("../models/Sale");
 const GiftCard = require("../models/GiftCard");
+const { generateOtp6, hashOtp } = require("../utils/otp");
+const { sendVerificationEmail } = require("../utils/email");
 
 // 👇 agrega esto (ajusta la ruta según dónde lo pusiste)
 const {
@@ -204,7 +206,7 @@ async function getMe(req, res) {
     await user.save();
 
     const sanitizedUser = await User.findById(uid).select(
-      "name gender username email isEmailVerified avatarConfig createdAt buddy points lifetimePoints"
+      "name gender username email pendingEmail isEmailVerified avatarConfig createdAt buddy points lifetimePoints"
     );
 
     const canRecover = calcCanRecover(user);
@@ -228,6 +230,10 @@ async function getMe(req, res) {
   }
 }
 
+const EMAIL_CHANGE_OTP_EXPIRE_MIN = 10;
+const EMAIL_CHANGE_RESEND_COOLDOWN_SEC = 60;
+const EMAIL_CHANGE_MAX_ATTEMPTS = 5;
+
 async function updateMe(req, res) {
   try {
     const uid = getUid(req);
@@ -235,6 +241,7 @@ async function updateMe(req, res) {
 
     const { name, username, email, gender } = req.body || {};
     const patch = {};
+    let emailChangePending = false;
 
     if (typeof name === "string" && name.trim()) patch.name = name.trim();
 
@@ -250,8 +257,38 @@ async function updateMe(req, res) {
       }
     }
 
+    // ✅ El correo YA NO se aplica directo -- queda en pendingEmail hasta
+    // que se confirme con un código mandado a la dirección nueva (POST
+    // /me/confirm-email). Antes cualquiera con la sesión abierta podía
+    // cambiarlo sin probar que era suyo.
     if (typeof email === "string" && email.trim()) {
-      patch.email = email.trim().toLowerCase();
+      const newEmail = email.trim().toLowerCase();
+      const current = await User.findById(uid).select("email");
+      if (!current) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+      if (newEmail !== current.email) {
+        const taken = await User.findOne({ email: newEmail, _id: { $ne: uid } });
+        if (taken) return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
+
+        patch.pendingEmail = newEmail;
+        emailChangePending = true;
+
+        const code = generateOtp6();
+        const codeHash = hashOtp(code);
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + EMAIL_CHANGE_OTP_EXPIRE_MIN * 60 * 1000);
+        const resendAvailableAt = new Date(now.getTime() + EMAIL_CHANGE_RESEND_COOLDOWN_SEC * 1000);
+
+        await EmailVerification.deleteMany({ userId: uid });
+        await EmailVerification.create({ userId: uid, codeHash, expiresAt, attempts: 0, resendAvailableAt });
+
+        const showOtp = process.env.DEV_SHOW_OTP === "true";
+        if (process.env.NODE_ENV === "development" && showOtp) {
+          console.log(`🟣 [DEV OTP - EMAIL CHANGE] Email: ${newEmail} | Code: ${code}`);
+        } else {
+          await sendVerificationEmail({ to: newEmail, code, name: name || undefined });
+        }
+      }
     }
 
     // ✅ NUEVO: actualizar género
@@ -264,13 +301,93 @@ async function updateMe(req, res) {
     }
 
     const updated = await User.findByIdAndUpdate(uid, patch, { new: true }).select(
-      "name gender username email isEmailVerified avatarConfig createdAt"
+      "name gender username email pendingEmail isEmailVerified avatarConfig createdAt"
     );
 
-    return res.json({ ok: true, user: updated });
+    return res.json({ ok: true, user: updated, emailChangePending });
   } catch (err) {
     if (err?.code === 11000) return res.status(409).json({ error: "DUPLICATE" });
     console.log("updateMe error:", err?.message);
+    return res.status(500).json({ error: "SERVER_ERROR" });
+  }
+}
+
+// ✅ Confirma el cambio de correo iniciado en updateMe() -- mismo patrón
+// que verifyEmail() en auth.controller.js, pero contra pendingEmail en
+// vez del email de registro.
+async function confirmEmailChange(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const { code } = req.body || {};
+    if (!code) return res.status(400).json({ error: "MISSING_FIELDS" });
+
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+    if (!user.pendingEmail) return res.status(400).json({ error: "NO_EMAIL_CHANGE_PENDING" });
+
+    const record = await EmailVerification.findOne({ userId: uid }).sort({ createdAt: -1 });
+    if (!record) return res.status(400).json({ error: "NO_EMAIL_CHANGE_PENDING" });
+
+    const now = new Date();
+    if (now > record.expiresAt) return res.status(400).json({ error: "OTP_EXPIRED" });
+    if (record.attempts >= EMAIL_CHANGE_MAX_ATTEMPTS) return res.status(429).json({ error: "TOO_MANY_ATTEMPTS" });
+
+    const incomingHash = hashOtp(String(code));
+    if (incomingHash !== record.codeHash) {
+      record.attempts += 1;
+      await record.save();
+      return res.status(400).json({ error: "INVALID_CODE", attemptsLeft: EMAIL_CHANGE_MAX_ATTEMPTS - record.attempts });
+    }
+
+    user.email = user.pendingEmail;
+    user.pendingEmail = null;
+    await user.save();
+    await EmailVerification.deleteMany({ userId: uid });
+
+    return res.json({ ok: true, email: user.email });
+  } catch (err) {
+    if (err?.code === 11000) return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
+    console.log("confirmEmailChange error:", err?.message);
+    return res.status(500).json({ error: "SERVER_ERROR" });
+  }
+}
+
+async function resendEmailChangeCode(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+    if (!user.pendingEmail) return res.status(400).json({ error: "NO_EMAIL_CHANGE_PENDING" });
+
+    const last = await EmailVerification.findOne({ userId: uid }).sort({ createdAt: -1 });
+    const now = new Date();
+    if (last && now < last.resendAvailableAt) {
+      const secondsLeft = Math.ceil((last.resendAvailableAt.getTime() - now.getTime()) / 1000);
+      return res.status(429).json({ error: "RESEND_COOLDOWN", secondsLeft });
+    }
+
+    const code = generateOtp6();
+    const codeHash = hashOtp(code);
+    const expiresAt = new Date(now.getTime() + EMAIL_CHANGE_OTP_EXPIRE_MIN * 60 * 1000);
+    const resendAvailableAt = new Date(now.getTime() + EMAIL_CHANGE_RESEND_COOLDOWN_SEC * 1000);
+
+    await EmailVerification.deleteMany({ userId: uid });
+    await EmailVerification.create({ userId: uid, codeHash, expiresAt, attempts: 0, resendAvailableAt });
+
+    const showOtp = process.env.DEV_SHOW_OTP === "true";
+    if (process.env.NODE_ENV === "development" && showOtp) {
+      console.log(`🟣 [DEV OTP - EMAIL CHANGE RESEND] Email: ${user.pendingEmail} | Code: ${code}`);
+    } else {
+      await sendVerificationEmail({ to: user.pendingEmail, code, name: user.name });
+    }
+
+    return res.json({ ok: true, cooldown: EMAIL_CHANGE_RESEND_COOLDOWN_SEC });
+  } catch (err) {
+    console.log("resendEmailChangeCode error:", err?.message);
     return res.status(500).json({ error: "SERVER_ERROR" });
   }
 }
@@ -554,6 +671,8 @@ async function deleteMe(req, res) {
 module.exports = {
   getMe,
   updateMe,
+  confirmEmailChange,
+  resendEmailChangeCode,
   updateAvatar,
   claimReward,
   recoverStreak,
