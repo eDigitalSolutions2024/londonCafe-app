@@ -26,7 +26,7 @@ const COLORS = {
   // productos) -- un negro casi puro detrás se sentía demasiado duro contra
   // tanto blanco. Se usa un vino-carbón más cálido, sigue siendo oscuro
   // pero con menos contraste "de golpe".
-  bg: "#2e1b22",
+  bg: "#25161c",
   card: "#FFFFFF",
   ink: "#1B1B1B",
   muted: "rgba(27,27,27,0.55)",
@@ -135,13 +135,17 @@ function CategoryPillsHorizontal({ categories, value, onChange }) {
               paddingHorizontal: 12,
               paddingVertical: 8,
               borderRadius: 999,
-              backgroundColor: active ? COLORS.wineSoft : "#fff",
+              // ✅ antes usaba wineSoft (vino casi transparente) de fondo --
+              // sobre el nuevo fondo vino-carbón se perdía por completo, el
+              // pill "activo" quedaba invisible. Ahora es vino sólido con
+              // texto blanco, mismo contraste que un botón normal.
+              backgroundColor: active ? COLORS.wine : "#fff",
               borderWidth: 1,
               borderColor: active ? COLORS.wine : COLORS.border,
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Text style={{ fontWeight: "900", color: active ? COLORS.wine : COLORS.ink }}>
+            <Text style={{ fontWeight: "900", color: active ? "#fff" : COLORS.ink }}>
               {label}
             </Text>
           </Pressable>
