@@ -41,6 +41,7 @@ import PromosSection from "../components/PromoSection";
 
 // ✅ Modal avatar grande
 import AvatarPreview from "../components/AvatarPreview";
+import PetDioramaCard from "../components/PetDioramaCard";
 
 // ✅ mood por energía (front fallback)
 function moodLabelFromEnergy(energy = 0) {
@@ -1138,21 +1139,13 @@ const moodEmoji = moodEmojiFromEnergy(energy);
               onPress={() => navigation.navigate("Rewards")}
             />
 
-            {/* ✅ Mascota VIP -- acceso rápido tipo Tamagotchi (PetScreen.jsx).
-                El gate VIP y el estado real (hambre/ánimo) se resuelven ahí,
-                esta tarjeta solo es la entrada. */}
-            <Pressable
-              style={styles.petCard}
+            {/* ✅ Mascota VIP -- mini-diorama animado (avatar + mascota) que
+                lleva a PetScreen.jsx, donde vive el gate VIP y el estado
+                real (hambre/ánimo/despensa). */}
+            <PetDioramaCard
+              avatarConfig={avatarConfig}
               onPress={() => navigation.navigate("Pet")}
-              android_ripple={{ color: "rgba(255,255,255,0.08)" }}
-            >
-              <Text style={styles.petCardEmoji}>🐾</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.petCardTitle}>Mascota VIP</Text>
-                <Text style={styles.petCardSub}>Cuídala como un Tamagotchi</Text>
-              </View>
-              <Text style={styles.petCardChevron}>›</Text>
-            </Pressable>
+            />
 
 
             
@@ -1511,24 +1504,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     letterSpacing: -0.2,
   },
-
-  /* ✅ Mascota VIP -- acceso rápido desde Home */
-  petCard: {
-    marginTop: 12,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    backgroundColor: colors.card,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  petCardEmoji: { fontSize: 28 },
-  petCardTitle: { color: "#111", fontSize: 14, fontWeight: "900" },
-  petCardSub: { color: colors.textMuted, fontSize: 11.5, fontWeight: "700", marginTop: 2 },
-  petCardChevron: { color: colors.textMuted, fontSize: 22, fontWeight: "900" },
 
   /* ✅ Streak Card (cabina + botón + texto) */
   duoCard: {
