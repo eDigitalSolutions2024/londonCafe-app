@@ -83,21 +83,31 @@ const buddySchema = new mongoose.Schema(
 );
 
 // ✅ Mascota VIP (tipo Tamagotchi / POU) -- vive junto al `buddy` (el
-// avatar humano). hunger/happiness decaen con el tiempo real (mismo
-// patrón que buddy.energy en utils/buddy.js). Se alimenta con el MISMO
-// inventario que el avatar: user.buddy.coffee / user.buddy.bread (una
-// sola despensa para los dos). Jugar sube el ánimo sin gastar comida,
-// con cooldown. Ver pet.controller.js.
+// avatar humano). hunger/happiness/energy/hygiene decaen con el tiempo
+// real (mismo patrón que buddy.energy en utils/buddy.js). Se alimenta
+// con el MISMO inventario que el avatar: user.buddy.coffee /
+// user.buddy.bread (una sola despensa). Comer ensucia -> aparece `mess`
+// (popó) y baja `hygiene`; se arregla con "Limpiar". "Dormir" recupera
+// `energy`. Cuidarla da `xp` (nivel de amistad). Ver pet.controller.js.
 const petSchema = new mongoose.Schema(
   {
     owned: { type: Boolean, default: false },
     species: { type: String, enum: ["cat", "dog", "hamster", null], default: null },
     name: { type: String, default: null, trim: true, maxlength: 20 },
+
     hunger: { type: Number, default: 100, min: 0, max: 100 },
     happiness: { type: Number, default: 100, min: 0, max: 100 },
+    energy: { type: Number, default: 100, min: 0, max: 100 },
+    hygiene: { type: Number, default: 100, min: 0, max: 100 },
+    mess: { type: Boolean, default: false },
+
+    xp: { type: Number, default: 0, min: 0 },
+
     lastStatsAt: { type: Date, default: Date.now },
     lastFedAt: { type: Date, default: null },
     lastPlayAt: { type: Date, default: null },
+    lastCleanAt: { type: Date, default: null },
+    lastSleepAt: { type: Date, default: null },
     adoptedAt: { type: Date, default: null },
   },
   { _id: false }

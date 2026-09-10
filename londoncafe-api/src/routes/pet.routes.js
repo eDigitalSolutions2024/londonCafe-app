@@ -1,16 +1,27 @@
 const { Router } = require("express");
 const { requireAuth } = require("../middleware/auth.middleware");
-const { getPet, adoptPet, feedPet, playPet } = require("../controllers/pet.controller");
+const {
+  getPet,
+  adoptPet,
+  feedPet,
+  playPet,
+  cleanPet,
+  sleepPet,
+} = require("../controllers/pet.controller");
 
 const router = Router();
 
 // GET /pet
 router.get("/", requireAuth, getPet);
-// POST /pet/adopt
+// POST /pet/adopt   body: { species, name }
 router.post("/adopt", requireAuth, adoptPet);
-// POST /pet/feed   body: { type: "coffee" | "bread" }
+// POST /pet/feed    body: { type: "coffee" | "bread" }
 router.post("/feed", requireAuth, feedPet);
-// POST /pet/play
+// POST /pet/play    body: { score }  (0..1)
 router.post("/play", requireAuth, playPet);
+// POST /pet/clean
+router.post("/clean", requireAuth, cleanPet);
+// POST /pet/sleep
+router.post("/sleep", requireAuth, sleepPet);
 
 module.exports = router;
