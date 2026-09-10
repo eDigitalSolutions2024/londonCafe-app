@@ -159,7 +159,9 @@ async function getPet(req, res) {
     user.markModified("buddy");
     await user.save();
 
-    const vip = await isUserVIP(uid);
+    // Si ya tiene mascota, es VIP por definición (adoptar ya se validó).
+    // Así el POS intermitente no le "quita" el acceso a su propia mascota.
+    const vip = user.pet?.owned ? true : await isUserVIP(uid);
     return res.json(petView(user, { isVIP: vip }));
   } catch (err) {
     console.error("getPet ERROR:", err);
