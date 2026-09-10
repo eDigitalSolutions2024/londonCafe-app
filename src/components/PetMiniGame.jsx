@@ -55,7 +55,7 @@ export default function PetMiniGame({ visible, species = "cat", petName = "tu ma
 
     const chase = (targetX) => {
       const px = Math.max(0, Math.min(AREA_W - PET_SIZE, targetX + TOY_SIZE / 2 - PET_SIZE / 2));
-      Animated.timing(petX, { toValue: px, duration: 520, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
+      Animated.timing(petX, { toValue: px, duration: 520, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
     };
 
     const jump = () => {
@@ -65,7 +65,7 @@ export default function PetMiniGame({ visible, species = "cat", petName = "tu ma
         toValue: { x, y },
         duration: 620,
         easing: Easing.inOut(Easing.quad),
-        useNativeDriver: false,
+        useNativeDriver: true,
       }).start();
       chase(x);
     };
@@ -103,11 +103,11 @@ export default function PetMiniGame({ visible, species = "cat", petName = "tu ma
     // el juguete salta a otro lado
     const x = Math.random() * (AREA_W - TOY_SIZE);
     const y = Math.random() * (AREA_H - TOY_SIZE - 70);
-    Animated.timing(pos, { toValue: { x, y }, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
+    Animated.timing(pos, { toValue: { x, y }, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
     Animated.timing(petX, {
       toValue: Math.max(0, Math.min(AREA_W - PET_SIZE, x + TOY_SIZE / 2 - PET_SIZE / 2)),
       duration: 240,
-      useNativeDriver: false,
+      useNativeDriver: true,
     }).start();
   };
 
