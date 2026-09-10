@@ -282,6 +282,6 @@ const styles = StyleSheet.create({
   barTrack: { height: 10, borderRadius: 999, backgroundColor: colors.primarySoft, overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 999 },
 
-  saveBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
+  saveBtn: { marginTop: 16, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center", alignSelf: "center" },
   saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 });
