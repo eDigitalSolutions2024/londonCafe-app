@@ -302,6 +302,10 @@ export default function PetScreen({ navigation }) {
                 placeholder="Ej. Latte"
                 placeholderTextColor={colors.textMuted}
                 maxLength={20}
+                autoCorrect={false}
+                autoComplete="off"
+                autoCapitalize="words"
+                importantForAutofill="no"
                 style={styles.nameInput}
               />
 

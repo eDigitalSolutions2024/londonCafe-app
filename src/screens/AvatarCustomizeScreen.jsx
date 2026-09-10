@@ -362,6 +362,10 @@ export default function AvatarCustomizeScreen({ navigation }) {
                   placeholder="Nombre de la mascota"
                   placeholderTextColor={colors.textMuted}
                   maxLength={20}
+                  autoCorrect={false}
+                  autoComplete="off"
+                  autoCapitalize="words"
+                  importantForAutofill="no"
                   style={styles.petNameInput}
                 />
 
