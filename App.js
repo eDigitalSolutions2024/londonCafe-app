@@ -24,6 +24,7 @@ import GiftsScreen from "./src/screens/GiftsScreen";
 import AvatarCustomizeScreen from "./src/screens/AvatarCustomizeScreen";
 import AccountSettingsScreen from "./src/screens/AccountSettingsScreen";
 import AvatarPreviewLargeScreen from "./src/screens/AvatarPreviewLargeScreen";
+import PetScreen from "./src/screens/PetScreen";
 
 // Auth
 import LoginScreen from "./src/screens/LoginScreen";
@@ -68,6 +69,7 @@ function HomeStackNav() {
       <HomeStack.Screen name="AccountSettings" component={AccountSettingsScreen} />
       <HomeStack.Screen name="RedeemQR" component={RedeemQRScreen} />
       <HomeStack.Screen name="AvatarPreviewLarge" component={AvatarPreviewLargeScreen} />
+      <HomeStack.Screen name="Pet" component={PetScreen} />
     </HomeStack.Navigator>
   );
 }

@@ -29,15 +29,6 @@ const OPTIONS = {
 const VIP_IDS = new Set(["hair_07", "hair_f_05"]);
 const VIP_THRESHOLD = 200;
 
-// ✅ Puro teaser -- sin ids reales, sin lógica de guardado. La mecánica
-// tipo Tamagotchi (alimentar, ánimo, etc.) llega en una próxima
-// liberación; esto solo anuncia que viene y que será VIP.
-const PET_TEASERS = [
-  { id: "cat", emoji: "🐱", label: "Gato" },
-  { id: "dog", emoji: "🐶", label: "Perro" },
-  { id: "hamster", emoji: "🐹", label: "Hámster" },
-];
-
 // Reemplaza "hair 01, hair 02..." por algo neutral que no revele el nombre
 // interno del archivo -- mismo orden que ya mostraba la UI vieja.
 const DISPLAY_NUMBER = {
@@ -277,36 +268,24 @@ export default function AvatarCustomizeScreen({ navigation }) {
             </View>
           )}
 
-          {/* ✅ Mascotas -- teaser visual nada más, la mecánica real (tipo
-              Tamagotchi) llega en una siguiente liberación. Sin selección
-              real todavía, solo anuncia que viene y a quién le tocará. */}
+          {/* ✅ Mascotas VIP -- ya funcional (PetScreen.jsx / pet.controller.js):
+              adoptar, alimentar, ánimo tipo Tamagotchi. Esta sección solo
+              enlaza a esa pantalla; el gate VIP y el estado real de la
+              mascota viven ahí. */}
           <View style={styles.section}>
             <View style={styles.vipHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: colors.accent }]}>🐾 Mascotas</Text>
-              <Text style={styles.vipHint}>Próximamente · Exclusivo VIP</Text>
+              <Text style={[styles.sectionTitle, { color: colors.accent }]}>🐾 Mascota VIP</Text>
+              <Text style={styles.vipHint}>Exclusivo VIP</Text>
             </View>
 
-            <View style={styles.optionsRow}>
-              {PET_TEASERS.map((p) => (
-                <Pressable
-                  key={p.id}
-                  onPress={() =>
-                    Alert.alert(
-                      "Próximamente 🐾",
-                      `${p.emoji} ${p.label} llegará en una próxima actualización -- tu compañero se cuida como un Tamagotchi.`
-                    )
-                  }
-                  style={[styles.optionBtn, styles.vipBtn, styles.vipBtnLocked]}
-                >
-                  <Text
-                    style={[styles.optionText, styles.vipText, styles.vipTextLocked]}
-                    numberOfLines={1}
-                  >
-                    {p.emoji} {p.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <Pressable
+              onPress={() => navigation.navigate("Pet")}
+              style={[styles.optionBtn, styles.vipBtn, { alignSelf: "flex-start" }]}
+            >
+              <Text style={[styles.optionText, styles.vipText]} numberOfLines={1}>
+                🐾 Ver mi mascota
+              </Text>
+            </Pressable>
           </View>
 
           {/* Guardar */}

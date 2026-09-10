@@ -681,4 +681,5 @@ module.exports = {
   sendLowEnergyPush,
   sendStreakReminderPush,
   deleteMe,
+  isUserVIP, // reusado por pet.controller.js para gatear la adopción
 };

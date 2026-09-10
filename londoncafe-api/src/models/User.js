@@ -82,6 +82,26 @@ const buddySchema = new mongoose.Schema(
   { _id: false }
 );
 
+// ✅ Mascota VIP (tipo Tamagotchi) -- distinta del `buddy` de arriba
+// (buddy es el avatar humano mismo, con su energía/café/pan; pet es un
+// compañero aparte que solo pueden adoptar los VIP, ver
+// pet.controller.js). hunger/happiness decaen con el tiempo real
+// (mismo patrón que buddy.energy en utils/buddy.js), se restauran
+// alimentando.
+const petSchema = new mongoose.Schema(
+  {
+    owned: { type: Boolean, default: false },
+    species: { type: String, enum: ["cat", "dog", "hamster", null], default: null },
+    name: { type: String, default: null, trim: true, maxlength: 20 },
+    hunger: { type: Number, default: 100, min: 0, max: 100 },
+    happiness: { type: Number, default: 100, min: 0, max: 100 },
+    lastStatsAt: { type: Date, default: Date.now },
+    lastFedAt: { type: Date, default: null },
+    adoptedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -148,6 +168,9 @@ const userSchema = new mongoose.Schema(
 
     // ✅ Buddy
     buddy: { type: buddySchema, default: () => ({}) },
+
+    // ✅ Mascota VIP
+    pet: { type: petSchema, default: () => ({}) },
 
      // ✅ Push notifications
     expoPushToken: {
