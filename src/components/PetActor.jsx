@@ -187,7 +187,7 @@ export default function PetActor({
             styles.pet,
             {
               fontSize: size,
-              opacity: sleeping ? 0.72 : 1,
+              opacity: sleeping ? 0.78 : 1,
               transform: [
                 { translateY: Animated.add(bobY, hopY) },
                 { translateX: shakeX },
@@ -200,6 +200,20 @@ export default function PetActor({
         >
           {emoji}
         </Animated.Text>
+
+        {/* Ojos cerrados al dormir: dos "︶" sobre la cara, pegados al bob */}
+        {sleeping && (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.eyelids,
+              { top: size * 0.36, gap: size * 0.14, transform: [{ translateY: bobY }] },
+            ]}
+          >
+            <View style={[styles.lid, { width: size * 0.16, height: size * 0.055, borderRadius: size * 0.03 }]} />
+            <View style={[styles.lid, { width: size * 0.16, height: size * 0.055, borderRadius: size * 0.03 }]} />
+          </Animated.View>
+        )}
       </Pressable>
 
       {/* sombra de piso */}
@@ -234,4 +248,12 @@ const styles = StyleSheet.create({
   particle: { position: "absolute" },
   poop: { position: "absolute", right: "18%", bottom: 14, fontSize: 26 },
   bang: { position: "absolute", top: 6, right: "24%", fontSize: 22 },
+  eyelids: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  lid: { backgroundColor: "#4a3728" },
 });

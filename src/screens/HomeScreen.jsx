@@ -12,6 +12,7 @@ import {
   Easing,
   Image,
   Pressable,
+  AppState,
 } from "react-native";
 import {
   registerForPushNotificationsAsync,
@@ -853,14 +854,35 @@ const prevEnergy = Number.isFinite(Number(buddy?.energy)) ? Number(buddy.energy)
 
 
 
-  // ✅ cada vez que abres Home, refresca puntos + perfil
-   
+  // ✅ Señal que fuerza refresco de tarjetas hijas (PetDioramaCard) sin
+  // pull-to-refresh: sube al enfocar Home, al volver del background y
+  // cada 45s mientras Home está visible.
+  const [refreshTick, setRefreshTick] = useState(0);
 
-useFocusEffect(
-  useCallback(() => {
-    refreshHome();
-  }, [refreshHome])
-);
+  // ✅ cada vez que abres Home (o vuelves a este tab), refresca todo +
+  // arranca un poll suave mientras Home esté enfocado.
+  useFocusEffect(
+    useCallback(() => {
+      refreshHome();
+      setRefreshTick((t) => t + 1);
+      const id = setInterval(() => {
+        refreshHome();
+        setRefreshTick((t) => t + 1);
+      }, 45000);
+      return () => clearInterval(id);
+    }, [refreshHome])
+  );
+
+  // ✅ al volver la app del background, refresca
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        refreshHome();
+        setRefreshTick((t) => t + 1);
+      }
+    });
+    return () => sub.remove();
+  }, [refreshHome]);
 
   const displayName = useMemo(() => {
     const n = (me?.name || user?.name || "London Buddy").trim();
@@ -1144,6 +1166,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
                 real (hambre/ánimo/despensa). */}
             <PetDioramaCard
               avatarConfig={avatarConfig}
+              refreshSignal={refreshTick}
               onPress={() => navigation.navigate("Pet")}
             />
 

@@ -27,7 +27,7 @@ const NEED = {
  * sombras de piso que se encogen al saltar, y rebote/balanceo continuo.
  * Muestra la necesidad más urgente (need) y un ❗ si hay algo que atender.
  */
-export default function PetDioramaCard({ avatarConfig, onPress }) {
+export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 0 }) {
   const [pet, setPet] = useState(null);
   const [mood, setMood] = useState(null);
   const [need, setNeed] = useState(null);
@@ -38,6 +38,9 @@ export default function PetDioramaCard({ avatarConfig, onPress }) {
   const glow = useRef(new Animated.Value(0)).current;
   const alert = useRef(new Animated.Value(0)).current;
 
+  // Se re-consulta cada vez que `refreshSignal` cambia (Home lo sube al
+  // enfocarse, al volver del background y cada 45s) -> se actualiza sin
+  // pull-to-refresh.
   useEffect(() => {
     let alive = true;
     apiFetch("/pet")
@@ -48,11 +51,11 @@ export default function PetDioramaCard({ avatarConfig, onPress }) {
         setNeed(r?.need || null);
         setIsVIP(!!r?.isVIP);
       })
-      .catch(() => alive && setIsVIP(false));
+      .catch(() => alive && setIsVIP((v) => (v == null ? false : v)));
     return () => {
       alive = false;
     };
-  }, []);
+  }, [refreshSignal]);
 
   useEffect(() => {
     const loop = (val, dur, delay = 0) =>
