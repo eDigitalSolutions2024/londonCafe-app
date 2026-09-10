@@ -408,4 +408,16 @@ async function sleepPet(req, res) {
   }
 }
 
-module.exports = { getPet, adoptPet, customizePet, feedPet, playPet, cleanPet, sleepPet };
+module.exports = {
+  getPet,
+  adoptPet,
+  customizePet,
+  feedPet,
+  playPet,
+  cleanPet,
+  sleepPet,
+  // usados por cron/pushJobs.js
+  applyPetDecay,
+  moodFromPet,
+  primaryNeed,
+};

@@ -103,6 +103,16 @@ const petSchema = new mongoose.Schema(
 
     xp: { type: Number, default: 0, min: 0 },
 
+    // ✅ Anti-spam de notificaciones: se marca al avisar y se limpia cuando
+    // la barra correspondiente se recupera (mismo patrón que
+    // buddy.energyAlerts). Ver cron/pushJobs.js.
+    notifyFlags: {
+      mess: { type: Boolean, default: false },
+      hunger: { type: Boolean, default: false },
+      energy: { type: Boolean, default: false },
+      happiness: { type: Boolean, default: false },
+    },
+
     lastStatsAt: { type: Date, default: Date.now },
     lastFedAt: { type: Date, default: null },
     lastPlayAt: { type: Date, default: null },
@@ -194,6 +204,7 @@ const userSchema = new mongoose.Schema(
       promos: { type: Boolean, default: true },
       lowEnergy: { type: Boolean, default: true },
       streak: { type: Boolean, default: true },
+      pet: { type: Boolean, default: true },
     },
   },
   { timestamps: true }
