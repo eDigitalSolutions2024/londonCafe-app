@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useContext, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Alert, ActivityIndicator } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
+import { AuthContext } from "../context/AuthContext";
+import AvatarPreview from "../components/AvatarPreview";
 
 const SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -41,16 +43,20 @@ function Bar({ value, color }) {
 }
 
 export default function PetScreen({ navigation }) {
+  const { user } = useContext(AuthContext);
+  const avatarConfig = user?.avatarConfig || {};
+
   const [loading, setLoading] = useState(true);
   const [pet, setPet] = useState(null);
   const [mood, setMood] = useState(null);
   const [isVIP, setIsVIP] = useState(false);
   const [points, setPoints] = useState(0);
+  const [pantry, setPantry] = useState({ coffee: 0, bread: 0 });
 
   const [species, setSpecies] = useState("cat");
   const [name, setName] = useState("");
   const [adopting, setAdopting] = useState(false);
-  const [feeding, setFeeding] = useState(false);
+  const [busy, setBusy] = useState(null); // "coffee" | "bread" | "play" | null
 
   const load = useCallback(async () => {
     try {
@@ -61,6 +67,7 @@ export default function PetScreen({ navigation }) {
       setPet(petRes?.pet || null);
       setMood(petRes?.mood || null);
       setIsVIP(!!petRes?.isVIP);
+      if (petRes?.pantry) setPantry(petRes.pantry);
       if (walletRes) setPoints(Number(walletRes?.wallet?.balance) || 0);
     } catch (e) {
       console.log("❌ load pet:", e?.data || e?.message);
@@ -75,6 +82,12 @@ export default function PetScreen({ navigation }) {
     }, [load])
   );
 
+  const applyResult = (r) => {
+    setPet(r?.pet || null);
+    setMood(r?.mood || null);
+    if (r?.pantry) setPantry(r.pantry);
+  };
+
   const onAdopt = async () => {
     const cleanName = name.trim();
     if (!cleanName) {
@@ -87,8 +100,7 @@ export default function PetScreen({ navigation }) {
         method: "POST",
         body: JSON.stringify({ species, name: cleanName }),
       });
-      setPet(r?.pet || null);
-      setMood(r?.mood || null);
+      applyResult(r);
     } catch (e) {
       const err = e?.data?.error || e?.message;
       if (err === "VIP_REQUIRED") {
@@ -101,23 +113,111 @@ export default function PetScreen({ navigation }) {
     }
   };
 
-  const onFeed = async () => {
+  const onFeed = async (type) => {
+    if (busy) return;
     try {
-      setFeeding(true);
-      const r = await apiFetch("/pet/feed", { method: "POST" });
-      setPet(r?.pet || null);
-      setMood(r?.mood || null);
+      setBusy(type);
+      const r = await apiFetch("/pet/feed", { method: "POST", body: JSON.stringify({ type }) });
+      applyResult(r);
+    } catch (e) {
+      const err = e?.data?.error || e?.message;
+      if (err === "NO_COFFEE" || err === "NO_BREAD") {
+        Alert.alert(
+          "Despensa vacía",
+          `No te queda ${err === "NO_COFFEE" ? "café" : "pan"}. Se recarga sola cada día, o gánala en la racha diaria.`
+        );
+      } else {
+        Alert.alert("Error", err || "No se pudo alimentar.");
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onPlay = async () => {
+    if (busy) return;
+    try {
+      setBusy("play");
+      const r = await apiFetch("/pet/play", { method: "POST" });
+      applyResult(r);
     } catch (e) {
       if (e?.status === 429) {
         const mins = Math.ceil((e?.data?.secondsLeft || 0) / 60);
-        Alert.alert("Todavía no tiene hambre", `Vuelve en ${mins} min para alimentarla de nuevo.`);
+        Alert.alert("Ya jugaron un rato", `Deja que descanse. Vuelve en ${mins} min.`);
       } else {
-        Alert.alert("Error", e?.data?.error || e?.message || "No se pudo alimentar.");
+        Alert.alert("Error", e?.data?.error || e?.message || "No se pudo jugar.");
       }
     } finally {
-      setFeeding(false);
+      setBusy(null);
     }
   };
+
+  const renderOwned = () => (
+    <View>
+      {/* Escena: el avatar y la mascota, juntos */}
+      <View style={styles.scene}>
+        <View style={styles.sceneChar}>
+          <AvatarPreview config={avatarConfig} size={104} />
+          <Text style={styles.sceneCaption}>Tú</Text>
+        </View>
+        <View style={styles.sceneChar}>
+          <Text style={styles.petEmoji}>{speciesEmoji(pet.species)}</Text>
+          <Text style={styles.sceneCaption} numberOfLines={1}>{pet.name}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.moodText}>
+        {MOOD_FACE[mood] || "🐾"} {MOOD_LABEL[mood] || ""}
+      </Text>
+
+      <View style={{ marginTop: 16 }}>
+        <View style={styles.statRow}>
+          <Text style={styles.statLabel}>Hambre</Text>
+          <Text style={styles.statValue}>{Math.round(pet.hunger)}%</Text>
+        </View>
+        <Bar value={pet.hunger} color={colors.accent} />
+
+        <View style={[styles.statRow, { marginTop: 12 }]}>
+          <Text style={styles.statLabel}>Felicidad</Text>
+          <Text style={styles.statValue}>{Math.round(pet.happiness)}%</Text>
+        </View>
+        <Bar value={pet.happiness} color={colors.primary} />
+      </View>
+
+      {/* Despensa compartida con el avatar */}
+      <Text style={styles.pantryHint}>Despensa (la misma de tu avatar)</Text>
+      <View style={styles.actionRow}>
+        <Pressable
+          style={[styles.foodBtn, (pantry.coffee <= 0 || busy) && styles.foodBtnDisabled]}
+          onPress={() => onFeed("coffee")}
+          disabled={pantry.coffee <= 0 || !!busy}
+        >
+          <Text style={styles.foodEmoji}>☕</Text>
+          <Text style={styles.foodLabel}>{busy === "coffee" ? "..." : `Café · ${pantry.coffee}`}</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.foodBtn, (pantry.bread <= 0 || busy) && styles.foodBtnDisabled]}
+          onPress={() => onFeed("bread")}
+          disabled={pantry.bread <= 0 || !!busy}
+        >
+          <Text style={styles.foodEmoji}>🥐</Text>
+          <Text style={styles.foodLabel}>{busy === "bread" ? "..." : `Pan · ${pantry.bread}`}</Text>
+        </Pressable>
+      </View>
+
+      <Pressable
+        style={[styles.playBtn, busy && { opacity: 0.7 }]}
+        onPress={onPlay}
+        disabled={!!busy}
+      >
+        <Text style={styles.playText}>{busy === "play" ? "..." : "🎾 Jugar"}</Text>
+      </Pressable>
+
+      <Text style={styles.tipText}>
+        El café la anima mucho; el pan la alimenta. Jugar sube el ánimo sin gastar comida.
+      </Text>
+    </View>
+  );
 
   return (
     <Screen safeStyle={styles.safeDark}>
@@ -183,35 +283,7 @@ export default function PetScreen({ navigation }) {
               </Pressable>
             </View>
           ) : (
-            <View style={{ alignItems: "center" }}>
-              <Text style={{ fontSize: 96 }}>{speciesEmoji(pet.species)}</Text>
-              <Text style={styles.petName}>{pet.name}</Text>
-              <Text style={styles.moodText}>
-                {MOOD_FACE[mood] || "🐾"} {MOOD_LABEL[mood] || ""}
-              </Text>
-
-              <View style={{ width: "100%", marginTop: 18 }}>
-                <View style={styles.statRow}>
-                  <Text style={styles.statLabel}>Hambre</Text>
-                  <Text style={styles.statValue}>{Math.round(pet.hunger)}%</Text>
-                </View>
-                <Bar value={pet.hunger} color={colors.accent} />
-
-                <View style={[styles.statRow, { marginTop: 12 }]}>
-                  <Text style={styles.statLabel}>Felicidad</Text>
-                  <Text style={styles.statValue}>{Math.round(pet.happiness)}%</Text>
-                </View>
-                <Bar value={pet.happiness} color={colors.primary} />
-              </View>
-
-              <Pressable
-                style={[styles.saveBtn, { marginTop: 22 }, feeding && { opacity: 0.75 }]}
-                onPress={onFeed}
-                disabled={feeding}
-              >
-                <Text style={styles.saveText}>{feeding ? "..." : "🍽️ Alimentar"}</Text>
-              </Pressable>
-            </View>
+            renderOwned()
           )}
         </View>
 
@@ -272,8 +344,23 @@ const styles = StyleSheet.create({
     color: "#111",
   },
 
-  petName: { marginTop: 10, color: "#111", fontSize: 18, fontWeight: "900" },
-  moodText: { marginTop: 2, color: colors.textMuted, fontSize: 13, fontWeight: "800" },
+  // Escena avatar + mascota
+  scene: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "flex-end",
+    backgroundColor: "#faf3ea",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+  },
+  sceneChar: { alignItems: "center", maxWidth: "46%" },
+  sceneCaption: { marginTop: 4, color: colors.textMuted, fontSize: 11, fontWeight: "800" },
+  petEmoji: { fontSize: 88 },
+
+  moodText: { marginTop: 12, textAlign: "center", color: "#111", fontSize: 15, fontWeight: "900" },
 
   statRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   statLabel: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
@@ -281,6 +368,34 @@ const styles = StyleSheet.create({
 
   barTrack: { height: 10, borderRadius: 999, backgroundColor: colors.primarySoft, overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 999 },
+
+  pantryHint: { marginTop: 18, marginBottom: 8, color: colors.textMuted, fontSize: 11, fontWeight: "800", textAlign: "center" },
+  actionRow: { flexDirection: "row", gap: 10 },
+  foodBtn: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: "#fff",
+  },
+  foodBtnDisabled: { opacity: 0.4 },
+  foodEmoji: { fontSize: 26 },
+  foodLabel: { marginTop: 4, color: "#111", fontSize: 12, fontWeight: "900" },
+
+  playBtn: {
+    marginTop: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    alignSelf: "center",
+  },
+  playText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+
+  tipText: { marginTop: 12, color: colors.textMuted, fontSize: 11, fontWeight: "700", textAlign: "center", lineHeight: 16 },
 
   saveBtn: { marginTop: 16, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center", alignSelf: "center" },
   saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },

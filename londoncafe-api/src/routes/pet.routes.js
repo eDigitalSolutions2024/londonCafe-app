@@ -1,6 +1,6 @@
 const { Router } = require("express");
 const { requireAuth } = require("../middleware/auth.middleware");
-const { getPet, adoptPet, feedPet } = require("../controllers/pet.controller");
+const { getPet, adoptPet, feedPet, playPet } = require("../controllers/pet.controller");
 
 const router = Router();
 
@@ -8,7 +8,9 @@ const router = Router();
 router.get("/", requireAuth, getPet);
 // POST /pet/adopt
 router.post("/adopt", requireAuth, adoptPet);
-// POST /pet/feed
+// POST /pet/feed   body: { type: "coffee" | "bread" }
 router.post("/feed", requireAuth, feedPet);
+// POST /pet/play
+router.post("/play", requireAuth, playPet);
 
 module.exports = router;
