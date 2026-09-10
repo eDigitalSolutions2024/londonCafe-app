@@ -256,7 +256,7 @@ export default function PetScreen({ navigation }) {
           onPress={() => !busy && setMatch3Open(true)}
           disabled={!!busy}
         >
-          <Text style={styles.playText}>🍬 Combo</Text>
+          <Text style={styles.playText}>🧱 Tetris</Text>
         </Pressable>
       </View>
 
