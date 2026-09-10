@@ -3,6 +3,7 @@ const { requireAuth } = require("../middleware/auth.middleware");
 const {
   getPet,
   adoptPet,
+  customizePet,
   feedPet,
   playPet,
   cleanPet,
@@ -15,6 +16,8 @@ const router = Router();
 router.get("/", requireAuth, getPet);
 // POST /pet/adopt   body: { species, name }
 router.post("/adopt", requireAuth, adoptPet);
+// POST /pet/customize   body: { species?, name? }
+router.post("/customize", requireAuth, customizePet);
 // POST /pet/feed    body: { type: "coffee" | "bread" }
 router.post("/feed", requireAuth, feedPet);
 // POST /pet/play    body: { score }  (0..1)

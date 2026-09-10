@@ -215,6 +215,46 @@ async function adoptPet(req, res) {
   }
 }
 
+// POST /pet/customize  body: { species?, name? }
+// Cambiar la especie y/o el nombre sin perder el progreso (xp, edad,
+// barras). Se hace desde "Personalizar personaje".
+async function customizePet(req, res) {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const { species, name } = req.body || {};
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
+    if (!user.pet?.owned) return res.status(400).json({ ok: false, error: "NO_PET" });
+
+    let changed = false;
+    if (typeof species === "string") {
+      if (!SPECIES.has(species)) return res.status(400).json({ ok: false, error: "INVALID_SPECIES" });
+      if (user.pet.species !== species) {
+        user.pet.species = species;
+        changed = true;
+      }
+    }
+    if (typeof name === "string") {
+      const clean = name.trim().slice(0, 20);
+      if (!clean) return res.status(400).json({ ok: false, error: "MISSING_NAME" });
+      if (user.pet.name !== clean) {
+        user.pet.name = clean;
+        changed = true;
+      }
+    }
+    if (!changed) return res.status(400).json({ ok: false, error: "NO_CHANGES" });
+
+    user.markModified("pet");
+    await user.save();
+    return res.json(petView(user, { action: "customize" }));
+  } catch (err) {
+    console.error("customizePet ERROR:", err);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+}
+
 // POST /pet/feed  body: { type: "coffee" | "bread" }
 async function feedPet(req, res) {
   try {
@@ -368,4 +408,4 @@ async function sleepPet(req, res) {
   }
 }
 
-module.exports = { getPet, adoptPet, feedPet, playPet, cleanPet, sleepPet };
+module.exports = { getPet, adoptPet, customizePet, feedPet, playPet, cleanPet, sleepPet };
