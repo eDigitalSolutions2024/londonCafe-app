@@ -6,13 +6,13 @@ import PetActor from "./PetActor";
 
 // --- Tablero estilo Pokémon Puzzle / Tetris Attack -------------------------
 const COLS = 6;
-const ROWS = 11; // filas visibles (torre)
-const TILE = 40;
-const START_FILLED = 5; // filas llenas al empezar (desde abajo)
-const RISE_MS_START = 4200; // cada cuánto sube una fila nueva
-const RISE_MS_MIN = 1900;
-const RISE_SPEEDUP_EVERY = 18000; // -300ms cada 18s
-const TARGET_CLEARED = 70; // fichas para score 1.0
+const ROWS = 12; // filas visibles (torre)
+const TILE = 38;
+const START_FILLED = 4; // filas llenas al empezar (desde abajo)
+const RISE_MS_START = 6500; // cada cuánto sube una fila nueva
+const RISE_MS_MIN = 2600;
+const RISE_SPEEDUP_EVERY = 22000; // -400ms cada 22s
+const TARGET_CLEARED = 60; // fichas para score 1.0
 
 const KINDS = ["☕", "🥐", "🍰", "🍪", "🫖", "🥯"];
 const CLEARING = -2; // marca temporal de ficha explotando
@@ -134,7 +134,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
     scheduleRise();
     speedTimer.current = setInterval(() => {
-      riseMs.current = Math.max(RISE_MS_MIN, riseMs.current - 300);
+      riseMs.current = Math.max(RISE_MS_MIN, riseMs.current - 400);
     }, RISE_SPEEDUP_EVERY);
 
     return () => {
