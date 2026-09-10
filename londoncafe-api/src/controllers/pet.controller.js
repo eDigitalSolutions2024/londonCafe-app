@@ -13,20 +13,23 @@ const HAPPINESS_DECAY_BAD = 5;
 const MESS_HYGIENE_THRESHOLD = 12;
 
 // --- Alimentar: consume del MISMO inventario que el avatar. Café = antojito
-//     (mucho ánimo, poco hambre); pan = comida (llena el hambre). Comer
-//     ensucia un poco. ---
+//     con cafeína -> mucho ánimo y ENERGÍA; pan = comida -> llena el hambre.
+//     Comer ensucia un poco. ---
 const FOOD = {
-  coffee: { hunger: 15, happiness: 30, inv: "coffee", noneError: "NO_COFFEE" },
-  bread: { hunger: 45, happiness: 10, inv: "bread", noneError: "NO_BREAD" },
+  coffee: { hunger: 15, happiness: 30, energy: 22, inv: "coffee", noneError: "NO_COFFEE" },
+  bread: { hunger: 45, happiness: 10, energy: 8, inv: "bread", noneError: "NO_BREAD" },
 };
 const FEED_HYGIENE_COST = 8;
 const FEED_MESS_HYGIENE = 30; // si tras comer la higiene queda por debajo -> desastre
 const FEED_XP = 5;
 
-// --- Jugar: mini-juego, el cliente manda score 0..1. Sube ánimo (escala
-//     con el score) pero cansa. Cooldown para que no sea infinito. ---
-const PLAY_COOLDOWN_MIN = 12;
-const PLAY_ENERGY_COST = 6;
+// --- Jugar: mini-juego, el cliente manda score 0..1. Sube ánimo pero
+//     CANSA fuerte. Ya no hay cooldown de tiempo: se puede jugar libremente
+//     mientras la mascota tenga energía; al bajar de PLAY_MIN_ENERGY hay
+//     que recargarla con café/pan o dejándola dormir. (~4-5 partidas por
+//     carga = ~20 min de juego). ---
+const PLAY_MIN_ENERGY = 22;
+const PLAY_ENERGY_COST = 18;
 
 // --- Limpiar / Dormir ---
 const CLEAN_COOLDOWN_MIN = 2;
@@ -282,6 +285,7 @@ async function feedPet(req, res) {
     const p = user.pet;
     p.hunger = clamp(Number(p.hunger ?? 0) + food.hunger, 0, 100);
     p.happiness = clamp(Number(p.happiness ?? 0) + food.happiness, 0, 100);
+    p.energy = clamp(Number(p.energy ?? 100) + (food.energy || 0), 0, 100);
     p.hygiene = clamp(Number(p.hygiene ?? 100) - FEED_HYGIENE_COST, 0, 100);
     if (p.hygiene < FEED_MESS_HYGIENE) p.mess = true;
     p.xp = Math.max(0, Number(p.xp) || 0) + FEED_XP;
@@ -311,8 +315,12 @@ async function playPet(req, res) {
     const now = new Date();
     applyPetDecay(user, now);
 
-    const left = cooldownLeft(user.pet.lastPlayAt, PLAY_COOLDOWN_MIN, now);
-    if (left > 0) return res.status(429).json({ ok: false, error: "PLAY_COOLDOWN", secondsLeft: left });
+    // Sin cooldown de tiempo: se juega libre mientras tenga energía. Al
+    // bajar del mínimo hay que recargarla (café/pan o dormir) -> gancho
+    // para pasar por el café.
+    if (Number(user.pet.energy ?? 100) < PLAY_MIN_ENERGY) {
+      return res.status(400).json({ ok: false, error: "PET_TIRED", energy: Number(user.pet.energy ?? 0) });
+    }
 
     let score = Number(req.body?.score);
     if (!Number.isFinite(score)) score = 0.5;

@@ -108,9 +108,9 @@ export default function PetScreen({ navigation }) {
     } catch (e) {
       const err = e?.data?.error || e?.message;
       const map = {
-        NO_COFFEE: "Ya no te queda café. Se recarga sola cada día.",
-        NO_BREAD: "Ya no te queda pan. Se recarga solo cada día.",
-        PLAY_COOLDOWN: `Deja que descanse un rato. Vuelve en ${Math.ceil((e?.data?.secondsLeft || 0) / 60)} min.`,
+        NO_COFFEE: "Ya no te queda café. Pásate por London Café y con tu compra recargas su despensa.",
+        NO_BREAD: "Ya no te queda pan. Pásate por London Café y con tu compra recargas su despensa.",
+        PET_TIRED: "Tu mascota está agotada de jugar. Dale un café ☕ o déjala dormir 😴 para seguir.",
         CLEAN_COOLDOWN: "Espera un momento antes de volver a limpiar.",
         SLEEP_COOLDOWN: `Acaba de dormir. Vuelve en ${Math.ceil((e?.data?.secondsLeft || 0) / 60)} min.`,
         NOT_TIRED: "Todavía tiene energía, no quiere dormir.",
@@ -163,6 +163,8 @@ export default function PetScreen({ navigation }) {
   const mood = state?.mood;
   const mess = !!pet?.mess;
   const tired = Number(pet?.energy ?? 100) <= 80;
+  const energy = Number(pet?.energy ?? 100);
+  const canPlay = energy >= 22; // mismo umbral que PLAY_MIN_ENERGY en el backend
 
   const renderOwned = () => (
     <View>
@@ -245,24 +247,35 @@ export default function PetScreen({ navigation }) {
 
       <View style={styles.playRow}>
         <Pressable
-          style={[styles.playBtn, busy && { opacity: 0.6 }]}
-          onPress={() => !busy && setGameOpen(true)}
-          disabled={!!busy}
+          style={[styles.playBtn, (!canPlay || busy) && { opacity: 0.45 }]}
+          onPress={() => canPlay && !busy && setGameOpen(true)}
+          disabled={!canPlay || !!busy}
         >
           <Text style={styles.playText}>🎮 Atrapa</Text>
         </Pressable>
         <Pressable
-          style={[styles.playBtn, busy && { opacity: 0.6 }]}
-          onPress={() => !busy && setMatch3Open(true)}
-          disabled={!!busy}
+          style={[styles.playBtn, (!canPlay || busy) && { opacity: 0.45 }]}
+          onPress={() => canPlay && !busy && setMatch3Open(true)}
+          disabled={!canPlay || !!busy}
         >
           <Text style={styles.playText}>🧱 Tetris</Text>
         </Pressable>
       </View>
 
-      <Text style={styles.tipText}>
-        Comer ensucia un poco → límpialo. Jugar cansa → déjalo dormir. Cuidarla sube el nivel de amistad.
-      </Text>
+      {!canPlay ? (
+        <Text style={styles.nudgeText}>
+          Tu mascota está agotada de jugar. Dale un{" "}
+          <Text style={{ fontWeight: "900", color: colors.primary }}>café ☕</Text> o déjala{" "}
+          <Text style={{ fontWeight: "900", color: colors.primary }}>dormir 😴</Text> para seguir jugando.
+          {pantry.coffee <= 0 && pantry.bread <= 0
+            ? " Pásate por London Café y con tu compra recargas su despensa."
+            : ""}
+        </Text>
+      ) : (
+        <Text style={styles.tipText}>
+          Jugar cansa mucho → recárgala con café/pan o un descanso. Comer ensucia un poco → límpiala.
+        </Text>
+      )}
     </View>
   );
 
@@ -473,6 +486,17 @@ const styles = StyleSheet.create({
   playText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 
   tipText: { marginTop: 12, color: colors.textMuted, fontSize: 11, fontWeight: "700", textAlign: "center", lineHeight: 16 },
+  nudgeText: {
+    marginTop: 12,
+    color: "#111",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+    lineHeight: 17,
+    backgroundColor: "rgba(232,207,174,0.22)",
+    borderRadius: 12,
+    padding: 10,
+  },
 
   saveBtn: { marginTop: 16, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center", alignSelf: "center" },
   saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },
