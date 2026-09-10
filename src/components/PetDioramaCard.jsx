@@ -4,6 +4,7 @@ import Svg, { Defs, RadialGradient, Stop, Rect } from "react-native-svg";
 import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
 import AvatarPreview from "./AvatarPreview";
+import { updatePetWidget } from "../widgets/updatePetWidget";
 
 const SPECIES_EMOJI = { cat: "🐱", dog: "🐶", hamster: "🐹" };
 const MOOD = {
@@ -50,6 +51,10 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
         setMood(r?.mood || null);
         setNeed(r?.need || null);
         setIsVIP(!!r?.isVIP);
+        // empuja el estado al widget de pantalla de inicio (Android)
+        if (r?.pet?.owned) {
+          updatePetWidget({ pet: r.pet, mood: r.mood, need: r.need, ageDays: r.ageDays });
+        }
       })
       .catch(() => alive && setIsVIP((v) => (v == null ? false : v)));
     return () => {
