@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing } from "react-native";
+import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing, PanResponder } from "react-native";
 import { colors } from "../theme/colors";
 import AvatarPreview from "./AvatarPreview";
 import PetActor from "./PetActor";
@@ -8,20 +8,18 @@ import PetActor from "./PetActor";
 const COLS = 6;
 const ROWS = 12; // filas visibles (torre)
 const TILE = 38;
+const CELL = TILE + 2; // + margen
 const START_FILLED = 4; // filas llenas al empezar (desde abajo)
 const RISE_MS_START = 6500; // cada cuánto sube una fila nueva
 const RISE_MS_MIN = 2600;
-const RISE_SPEEDUP_EVERY = 22000; // -400ms cada 22s
+const RISE_SPEEDUP_EVERY = 22000;
 const TARGET_CLEARED = 60; // fichas para score 1.0
 
 const KINDS = ["☕", "🥐", "🍰", "🍪", "🫖", "🥯"];
-const CLEARING = -2; // marca temporal de ficha explotando
+const CLEARING = -2;
 
 const rndKind = () => Math.floor(Math.random() * KINDS.length);
-
-function emptyRow() {
-  return new Array(COLS).fill(null);
-}
+const emptyRow = () => new Array(COLS).fill(null);
 
 function newBottomRow() {
   const row = [];
@@ -90,13 +88,8 @@ function applyGravity(g) {
   return ng;
 }
 
-function areHAdjacent(a, b) {
-  return a.r === b.r && Math.abs(a.c - b.c) === 1;
-}
-
 export default function PetMatch3({ visible, species = "cat", petName = "tu mascota", avatarConfig, onClose, onFinish }) {
   const [grid, setGrid] = useState(makeGrid);
-  const [sel, setSel] = useState(null);
   const [cleared, setCleared] = useState(0);
   const [combo, setCombo] = useState(0);
   const [phase, setPhase] = useState("play"); // play | over
@@ -116,21 +109,27 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   const avatarBounce = useRef(new Animated.Value(0)).current;
   const [petReaction, setPetReaction] = useState({ type: null, id: 0 });
 
-  // --- ciclo de vida ---
+  // --- arrastre de ficha (Panel de Pon: horizontal) ---
+  const dragAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current; // offset visual de la ficha agarrada
+  const slideAnim = useRef(new Animated.Value(0)).current; // desplazado se desliza a su lugar
+  const [dragCell, setDragCell] = useState(null); // {r, c} celda actual de la ficha agarrada
+  const dragRef = useRef({ startR: 0, startC: 0, curC: 0, active: false });
+
   useEffect(() => {
     if (!visible) return;
     const g0 = makeGrid();
     setGrid(g0);
     gridRef.current = g0;
-    setSel(null);
     setCleared(0);
     setCombo(0);
     setPhase("play");
     setDanger(false);
+    setDragCell(null);
     resolving.current = false;
     risePending.current = false;
     overRef.current = false;
     riseMs.current = RISE_MS_START;
+    dragAnim.setValue({ x: 0, y: 0 });
 
     scheduleRise();
     speedTimer.current = setInterval(() => {
@@ -151,7 +150,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
   function onRiseTick() {
     if (overRef.current) return;
-    if (resolving.current) {
+    if (resolving.current || dragRef.current.active) {
       risePending.current = true;
       scheduleRise();
       return;
@@ -172,15 +171,11 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     ng.push(newBottomRow());
     setGrid(ng);
     gridRef.current = ng;
-    setSel(null);
 
-    // desliza visualmente hacia arriba
-    riseAnim.setValue(TILE);
+    riseAnim.setValue(CELL);
     Animated.timing(riseAnim, { toValue: 0, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
 
     setDanger(ng[1].some((x) => x != null) || ng[0].some((x) => x != null));
-
-    // ¿la nueva fila creó matches?
     if (findMatches(ng).size > 0) resolve(ng, 0);
     return false;
   }
@@ -206,7 +201,10 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       setGrid(marking);
       gridRef.current = marking;
 
-      if (chain >= 2) popCombo(chain);
+      if (chain >= 2) {
+        setCombo(chain);
+        popCombo();
+      }
       setPetReaction((x) => ({ type: chain >= 3 ? "play" : "eat", id: x.id + 1 }));
       bounceAvatar();
 
@@ -230,38 +228,77 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     }
   }
 
-  const onTapCell = async (r, c) => {
-    if (phase !== "play" || resolving.current) return;
-    const k = gridRef.current[r][c];
-    if (k == null || k === CLEARING) {
-      setSel(null);
-      return;
-    }
-    if (!sel) {
-      setSel({ r, c });
-      return;
-    }
-    if (sel.r === r && sel.c === c) {
-      setSel(null);
-      return;
-    }
-    if (!areHAdjacent(sel, { r, c })) {
-      setSel({ r, c });
-      return;
-    }
-    // swap libre (estilo Panel de Pon): siempre intercambia
+  // --- Gestos: agarra una ficha y arrástrala de lado ---
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => phaseRef.current === "play" && !resolving.current && !overRef.current,
+      onMoveShouldSetPanResponder: (_e, gs) =>
+        phaseRef.current === "play" && !resolving.current && !overRef.current && Math.abs(gs.dx) > 3,
+      onPanResponderGrant: (e) => {
+        const { locationX, locationY } = e.nativeEvent;
+        const c = Math.floor(locationX / CELL);
+        const r = Math.floor(locationY / CELL);
+        const g = gridRef.current;
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+        const k = g[r][c];
+        if (k == null || k === CLEARING) return;
+        dragRef.current = { startR: r, startC: c, curC: c, active: true };
+        dragAnim.setValue({ x: 0, y: 0 });
+        setDragCell({ r, c });
+      },
+      onPanResponderMove: (_e, gs) => {
+        const d = dragRef.current;
+        if (!d.active) return;
+        const committed = d.curC - d.startC;
+        let visualX = gs.dx - committed * CELL;
+        // límite visual
+        visualX = Math.max(-CELL * 1.15, Math.min(CELL * 1.15, visualX));
+        dragAnim.setValue({ x: visualX, y: 0 });
+
+        // ¿cruzó medio celda? intercambia con el vecino y "recentra"
+        if (visualX > CELL / 2 && d.curC < COLS - 1) {
+          swapInGrid(d.startR, d.curC, d.curC + 1);
+          d.curC += 1;
+          triggerSlide(-1);
+        } else if (visualX < -CELL / 2 && d.curC > 0) {
+          swapInGrid(d.startR, d.curC, d.curC - 1);
+          d.curC -= 1;
+          triggerSlide(1);
+        }
+      },
+      onPanResponderRelease: () => endDrag(),
+      onPanResponderTerminate: () => endDrag(),
+    })
+  ).current;
+
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+
+  function swapInGrid(r, c1, c2) {
     const g = gridRef.current.map((row) => row.slice());
-    const tmp = g[sel.r][sel.c];
-    g[sel.r][sel.c] = g[r][c];
-    g[r][c] = tmp;
-    setSel(null);
+    const t = g[r][c1];
+    g[r][c1] = g[r][c2];
+    g[r][c2] = t;
     setGrid(g);
     gridRef.current = g;
+    setDragCell({ r, c: c2 });
+  }
 
-    if (findMatches(g).size > 0) {
-      await resolve(g, 0);
-    }
-  };
+  function triggerSlide(dir) {
+    slideAnim.setValue(dir * CELL);
+    Animated.spring(slideAnim, { toValue: 0, friction: 6, tension: 120, useNativeDriver: true }).start();
+  }
+
+  function endDrag() {
+    const d = dragRef.current;
+    if (!d.active) return;
+    d.active = false;
+    Animated.spring(dragAnim, { toValue: { x: 0, y: 0 }, friction: 7, tension: 140, useNativeDriver: true }).start(() => {
+      setDragCell(null);
+    });
+    const g = gridRef.current;
+    if (findMatches(g).size > 0) resolve(g, 0);
+  }
 
   function endGame() {
     if (overRef.current) return;
@@ -271,7 +308,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     clearInterval(speedTimer.current);
   }
 
-  function popCombo(n) {
+  function popCombo() {
     comboAnim.setValue(0);
     Animated.sequence([
       Animated.timing(comboAnim, { toValue: 1, duration: 140, useNativeDriver: true }),
@@ -293,7 +330,6 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
   const avatarScale = avatarBounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
   const comboScale = comboAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
-  const comboOpacity = comboAnim;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -307,7 +343,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                   {danger ? "¡Peligro!" : `${cleared} fichas`}
                 </Text>
               </View>
-              <Text style={styles.hdrSub}>Intercambia fichas de lado · junta 3 o más</Text>
+              <Text style={styles.hdrSub}>Arrastra una ficha de lado para acomodarla · junta 3 o más</Text>
 
               <View style={styles.stageRow}>
                 <Animated.View style={{ transform: [{ scale: avatarScale }] }}>
@@ -319,26 +355,32 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
                 <View style={[styles.boardWrap, danger && styles.boardDanger]}>
                   <View style={styles.boardClip}>
-                    <Animated.View style={{ transform: [{ translateY: riseAnim }] }}>
+                    <Animated.View style={{ transform: [{ translateY: riseAnim }] }} {...pan.panHandlers}>
                       {grid.map((row, r) => (
                         <View key={r} style={styles.row}>
                           {row.map((k, c) => {
-                            const isSel = sel && sel.r === r && sel.c === c;
                             const empty = k == null;
                             const clearing = k === CLEARING;
+                            const isDrag = dragCell && dragCell.r === r && dragCell.c === c;
+                            const isNeighbor =
+                              dragCell && dragRef.current.active && dragCell.r === r && Math.abs(dragCell.c - c) === 1;
                             return (
-                              <Pressable
+                              <Animated.View
                                 key={`${r}-${c}`}
-                                onPress={() => onTapCell(r, c)}
                                 style={[
                                   styles.cell,
                                   empty && styles.cellEmpty,
-                                  isSel && styles.cellSel,
                                   clearing && styles.cellClearing,
+                                  isDrag && styles.cellDrag,
+                                  isDrag && {
+                                    transform: [{ translateX: dragAnim.x }, { scale: 1.08 }],
+                                    zIndex: 20,
+                                  },
+                                  isNeighbor && { transform: [{ translateX: slideAnim }] },
                                 ]}
                               >
                                 <Text style={styles.tile}>{empty ? "" : clearing ? "✨" : KINDS[k]}</Text>
-                              </Pressable>
+                              </Animated.View>
                             );
                           })}
                         </View>
@@ -348,7 +390,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
                   <Animated.Text
                     pointerEvents="none"
-                    style={[styles.combo, { opacity: comboOpacity, transform: [{ scale: comboScale }] }]}
+                    style={[styles.combo, { opacity: comboAnim, transform: [{ scale: comboScale }] }]}
                   >
                     ¡Combo x{combo}!
                   </Animated.Text>
@@ -418,8 +460,17 @@ const styles = StyleSheet.create({
     borderColor: "rgba(122,30,58,0.08)",
   },
   cellEmpty: { backgroundColor: "transparent", borderColor: "transparent" },
-  cellSel: { backgroundColor: colors.accent, borderColor: colors.primary, borderWidth: 2 },
   cellClearing: { backgroundColor: "#fff6df" },
+  cellDrag: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+    backgroundColor: "#fff3e0",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 8,
+  },
   tile: { fontSize: 24 },
 
   combo: {
