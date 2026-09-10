@@ -8,6 +8,7 @@ import { AuthContext } from "../context/AuthContext";
 import AvatarPreview from "../components/AvatarPreview";
 import PetActor from "../components/PetActor";
 import PetMiniGame from "../components/PetMiniGame";
+import PetMatch3 from "../components/PetMatch3";
 
 const SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -58,6 +59,7 @@ export default function PetScreen({ navigation }) {
   const [adopting, setAdopting] = useState(false);
   const [busy, setBusy] = useState(null);
   const [gameOpen, setGameOpen] = useState(false);
+  const [match3Open, setMatch3Open] = useState(false);
   const [sleeping, setSleeping] = useState(false);
   const [reaction, setReaction] = useState({ type: null, id: 0 });
   const sleepTimer = useRef(null);
@@ -142,6 +144,11 @@ export default function PetScreen({ navigation }) {
 
   const onGameFinish = async (score) => {
     setGameOpen(false);
+    await call("/pet/play", { score }, "play");
+  };
+
+  const onMatch3Finish = async (score) => {
+    setMatch3Open(false);
     await call("/pet/play", { score }, "play");
   };
 
@@ -236,13 +243,22 @@ export default function PetScreen({ navigation }) {
         />
       </View>
 
-      <Pressable
-        style={[styles.playBtn, busy && { opacity: 0.6 }]}
-        onPress={() => !busy && setGameOpen(true)}
-        disabled={!!busy}
-      >
-        <Text style={styles.playText}>🎮 Jugar</Text>
-      </Pressable>
+      <View style={styles.playRow}>
+        <Pressable
+          style={[styles.playBtn, busy && { opacity: 0.6 }]}
+          onPress={() => !busy && setGameOpen(true)}
+          disabled={!!busy}
+        >
+          <Text style={styles.playText}>🎮 Atrapa</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.playBtn, busy && { opacity: 0.6 }]}
+          onPress={() => !busy && setMatch3Open(true)}
+          disabled={!!busy}
+        >
+          <Text style={styles.playText}>🍬 Combo</Text>
+        </Pressable>
+      </View>
 
       <Text style={styles.tipText}>
         Comer ensucia un poco → límpialo. Jugar cansa → déjalo dormir. Cuidarla sube el nivel de amistad.
@@ -327,6 +343,14 @@ export default function PetScreen({ navigation }) {
         petName={pet?.name || "tu mascota"}
         onClose={() => setGameOpen(false)}
         onFinish={onGameFinish}
+      />
+      <PetMatch3
+        visible={match3Open}
+        species={pet?.species}
+        petName={pet?.name || "tu mascota"}
+        avatarConfig={avatarConfig}
+        onClose={() => setMatch3Open(false)}
+        onFinish={onMatch3Finish}
       />
     </Screen>
   );
@@ -438,14 +462,13 @@ const styles = StyleSheet.create({
   foodLabel: { marginTop: 4, color: "#111", fontSize: 12, fontWeight: "900" },
   badge: { position: "absolute", top: 8, right: 10, width: 9, height: 9, borderRadius: 999, backgroundColor: "#d9534f" },
 
+  playRow: { flexDirection: "row", gap: 10, marginTop: 14 },
   playBtn: {
-    marginTop: 14,
+    flex: 1,
     paddingVertical: 13,
-    paddingHorizontal: 32,
     borderRadius: 999,
     backgroundColor: colors.primary,
     alignItems: "center",
-    alignSelf: "center",
   },
   playText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 
