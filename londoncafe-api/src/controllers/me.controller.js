@@ -401,18 +401,27 @@ const VIP_THRESHOLD = 200;
 // POS_URL ya está declarado arriba (línea 33), reusado aquí.
 
 async function isUserVIP(uid) {
-  try {
-    const posRes = await fetch(`${POS_URL}/wallet/${uid}`, {
-      headers: { "x-api-key": process.env.POS_API_KEY || "" },
-    });
-    if (posRes.status === 404) return false; // sin wallet todavía = saldo $0
-    const data = await posRes.json().catch(() => ({}));
-    if (!posRes.ok) return false;
-    return (Number(data?.wallet?.balance) || 0) >= VIP_THRESHOLD;
-  } catch (err) {
-    console.log("isUserVIP wallet check error:", err?.message);
-    return false; // si el wallet no responde, no se arriesga a dar acceso VIP gratis
+  // Un solo blip de red al POS dejaba fuera a un VIP real (falla cerrado).
+  // Reintentamos una vez antes de rendirnos.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const posRes = await fetch(`${POS_URL}/wallet/${uid}`, {
+        headers: { "x-api-key": process.env.POS_API_KEY || "" },
+      });
+      if (posRes.status === 404) return false; // sin wallet todavía = saldo $0
+      const data = await posRes.json().catch(() => ({}));
+      if (!posRes.ok) {
+        if (attempt === 0) continue;
+        return false;
+      }
+      return (Number(data?.wallet?.balance) || 0) >= VIP_THRESHOLD;
+    } catch (err) {
+      console.log(`isUserVIP wallet check error (try ${attempt + 1}):`, err?.message);
+      if (attempt === 0) continue;
+      return false; // si el wallet no responde tras reintento, no se da acceso VIP
+    }
   }
+  return false;
 }
 
 async function updateAvatar(req, res) {

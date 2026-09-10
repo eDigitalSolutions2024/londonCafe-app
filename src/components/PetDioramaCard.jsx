@@ -7,26 +7,36 @@ import AvatarPreview from "./AvatarPreview";
 
 const SPECIES_EMOJI = { cat: "🐱", dog: "🐶", hamster: "🐹" };
 const MOOD = {
-  happy: { emoji: "😊", label: "Feliz" },
-  meh: { emoji: "😐", label: "Tranquilo" },
-  sad: { emoji: "😢", label: "Necesita cariño" },
-  hungry: { emoji: "🍽️", label: "¡Tiene hambre!" },
+  happy: "Feliz 😊",
+  meh: "Tranquilo 😐",
+  sad: "Necesita cariño 😢",
+  hungry: "¡Tiene hambre! 🍽️",
+  sleepy: "Con sueño 😴",
+  dirty: "Está sucio 🧼",
+};
+const NEED = {
+  feed: "tiene hambre 🍽️",
+  play: "quiere jugar 🎾",
+  sleep: "tiene sueño 😴",
+  clean: "hay que limpiarlo 🧼",
 };
 
 /**
- * Mini-diorama animado del avatar + la mascota, como acceso rápido desde
- * el Home. El "3D" es fingido con: mesa inclinada (perspective + rotateX),
- * sombras de piso que se encogen cuando el personaje sube (pista de
- * profundidad), y un rebote/balanceo continuo para que se sienta vivo.
+ * Mini-diorama animado del avatar + la mascota, acceso rápido desde el
+ * Home. El "3D" es fingido: mesa inclinada (perspective + rotateX),
+ * sombras de piso que se encogen al saltar, y rebote/balanceo continuo.
+ * Muestra la necesidad más urgente (need) y un ❗ si hay algo que atender.
  */
 export default function PetDioramaCard({ avatarConfig, onPress }) {
   const [pet, setPet] = useState(null);
   const [mood, setMood] = useState(null);
-  const [isVIP, setIsVIP] = useState(null); // null = cargando
+  const [need, setNeed] = useState(null);
+  const [isVIP, setIsVIP] = useState(null);
 
-  const bobA = useRef(new Animated.Value(0)).current; // avatar
-  const bobP = useRef(new Animated.Value(0)).current; // mascota
+  const bobA = useRef(new Animated.Value(0)).current;
+  const bobP = useRef(new Animated.Value(0)).current;
   const glow = useRef(new Animated.Value(0)).current;
+  const alert = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let alive = true;
@@ -35,11 +45,10 @@ export default function PetDioramaCard({ avatarConfig, onPress }) {
         if (!alive) return;
         setPet(r?.pet || null);
         setMood(r?.mood || null);
+        setNeed(r?.need || null);
         setIsVIP(!!r?.isVIP);
       })
-      .catch(() => {
-        if (alive) setIsVIP(false);
-      });
+      .catch(() => alive && setIsVIP(false));
     return () => {
       alive = false;
     };
@@ -66,6 +75,21 @@ export default function PetDioramaCard({ avatarConfig, onPress }) {
     };
   }, [bobA, bobP, glow]);
 
+  useEffect(() => {
+    if (!need) {
+      alert.stopAnimation(() => alert.setValue(0));
+      return;
+    }
+    const l = Animated.loop(
+      Animated.sequence([
+        Animated.timing(alert, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(alert, { toValue: 0, duration: 500, useNativeDriver: true }),
+      ])
+    );
+    l.start();
+    return () => l.stop();
+  }, [need, alert]);
+
   const avatarY = bobA.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
   const avatarScale = bobA.interpolate({ inputRange: [0, 1], outputRange: [1, 1.03] });
   const avatarShadowSX = bobA.interpolate({ inputRange: [0, 1], outputRange: [1.9, 1.35] });
@@ -76,6 +100,7 @@ export default function PetDioramaCard({ avatarConfig, onPress }) {
 
   const haloOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.28, 0.6] });
   const haloScale = glow.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.06] });
+  const alertScale = alert.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] });
 
   const owned = !!pet?.owned;
   const speciesEmoji = SPECIES_EMOJI[pet?.species] || "🐾";
@@ -84,8 +109,8 @@ export default function PetDioramaCard({ avatarConfig, onPress }) {
   if (isVIP === false) statusLine = "Exclusivo VIP";
   else if (isVIP && !owned) statusLine = "Adopta a tu compañero";
   else if (owned) {
-    const m = MOOD[mood] || {};
-    statusLine = `${pet.name} · ${m.label || ""} ${m.emoji || ""}`.trim();
+    const tail = need ? NEED[need] : MOOD[mood] || "";
+    statusLine = `${pet.name} · ${tail}`.trim();
   }
 
   return (
@@ -102,12 +127,8 @@ export default function PetDioramaCard({ avatarConfig, onPress }) {
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#petRoom)" />
         </Svg>
 
-        {/* halo cálido que late detrás de los dos */}
-        <Animated.View
-          style={[styles.halo, { opacity: haloOpacity, transform: [{ scale: haloScale }] }]}
-        />
+        <Animated.View style={[styles.halo, { opacity: haloOpacity, transform: [{ scale: haloScale }] }]} />
 
-        {/* "mesa" inclinada */}
         <View style={styles.tilt}>
           <View style={styles.slot}>
             <Animated.View style={[styles.groundShadow, { transform: [{ scaleX: avatarShadowSX }] }]} />
@@ -123,8 +144,13 @@ export default function PetDioramaCard({ avatarConfig, onPress }) {
             <Animated.View style={{ transform: [{ translateY: petY }, { rotateZ: petRot }] }}>
               <Text style={styles.petEmoji}>{speciesEmoji}</Text>
             </Animated.View>
+            {pet?.mess ? <Text style={styles.poop}>💩</Text> : null}
           </View>
         </View>
+
+        {need ? (
+          <Animated.Text style={[styles.alert, { transform: [{ scale: alertScale }] }]}>❗</Animated.Text>
+        ) : null}
       </View>
 
       <View style={styles.meta}>
@@ -154,21 +180,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
-  stage: {
-    width: 150,
-    height: 94,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  halo: {
-    position: "absolute",
-    width: 116,
-    height: 84,
-    borderRadius: 999,
-    backgroundColor: colors.accent,
-    top: 6,
-  },
+  stage: { width: 150, height: 94, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
+  halo: { position: "absolute", width: 116, height: 84, borderRadius: 999, backgroundColor: colors.accent, top: 6 },
   tilt: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -177,26 +190,16 @@ const styles = StyleSheet.create({
     transform: [{ perspective: 600 }, { rotateX: "12deg" }],
   },
   slot: { alignItems: "center", justifyContent: "flex-end", width: 60, height: 64 },
-  groundShadow: {
-    position: "absolute",
-    bottom: 5,
-    width: 26,
-    height: 7,
-    borderRadius: 999,
-    backgroundColor: "rgba(58,20,10,0.30)",
-  },
-  avatarShadow: {
-    shadowColor: "#3a1410",
-    shadowOpacity: 0.32,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 4 },
-  },
+  groundShadow: { position: "absolute", bottom: 5, width: 26, height: 7, borderRadius: 999, backgroundColor: "rgba(58,20,10,0.30)" },
+  avatarShadow: { shadowColor: "#3a1410", shadowOpacity: 0.32, shadowRadius: 4, shadowOffset: { width: 0, height: 4 } },
   petEmoji: {
     fontSize: 40,
     textShadowColor: "rgba(58,20,16,0.4)",
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 5,
   },
+  poop: { position: "absolute", right: 2, bottom: 6, fontSize: 15 },
+  alert: { position: "absolute", top: 6, right: 10, fontSize: 20 },
   meta: { flex: 1, paddingHorizontal: 14, paddingVertical: 12 },
   title: { color: "#111", fontSize: 14, fontWeight: "900" },
   status: { color: colors.textMuted, fontSize: 11.5, fontWeight: "700", marginTop: 3 },

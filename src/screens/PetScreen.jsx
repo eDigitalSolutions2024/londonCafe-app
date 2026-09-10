@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useState } from "react";
+import React, { useCallback, useContext, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Alert, ActivityIndicator } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../components/Screen";
@@ -6,6 +6,8 @@ import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 import AvatarPreview from "../components/AvatarPreview";
+import PetActor from "../components/PetActor";
+import PetMiniGame from "../components/PetMiniGame";
 
 const SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -15,48 +17,50 @@ const SPECIES = [
 
 const VIP_THRESHOLD = 200;
 
-const MOOD_FACE = {
-  happy: "😊",
-  meh: "😐",
-  sad: "😢",
-  hungry: "🍽️",
-};
-
 const MOOD_LABEL = {
-  happy: "¡Feliz!",
-  meh: "Tranquilo",
-  sad: "Necesita cariño",
-  hungry: "¡Tiene hambre!",
+  happy: "😊 ¡Feliz!",
+  meh: "😐 Tranquilo",
+  sad: "😢 Necesita cariño",
+  hungry: "🍽️ ¡Tiene hambre!",
+  sleepy: "😴 Con sueño",
+  dirty: "🧼 Está sucio",
 };
 
-function speciesEmoji(species) {
-  return SPECIES.find((s) => s.id === species)?.emoji || "🐾";
-}
+const STAGE_LABEL = { "bebé": "Bebé", joven: "Joven", adulto: "Adulto" };
 
-function Bar({ value, color }) {
+function Bar({ label, value, color }) {
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
   return (
-    <View style={styles.barTrack}>
-      <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: color }]} />
+    <View style={{ marginTop: 10 }}>
+      <View style={styles.statRow}>
+        <Text style={styles.statLabel}>{label}</Text>
+        <Text style={styles.statValue}>{Math.round(pct)}%</Text>
+      </View>
+      <View style={styles.barTrack}>
+        <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: color }]} />
+      </View>
     </View>
   );
 }
+
+const ACTION_REACTION = { feed: "eat", play: "play", clean: "clean" };
 
 export default function PetScreen({ navigation }) {
   const { user } = useContext(AuthContext);
   const avatarConfig = user?.avatarConfig || {};
 
   const [loading, setLoading] = useState(true);
-  const [pet, setPet] = useState(null);
-  const [mood, setMood] = useState(null);
-  const [isVIP, setIsVIP] = useState(false);
+  const [state, setState] = useState(null); // petView completo
   const [points, setPoints] = useState(0);
-  const [pantry, setPantry] = useState({ coffee: 0, bread: 0 });
 
   const [species, setSpecies] = useState("cat");
   const [name, setName] = useState("");
   const [adopting, setAdopting] = useState(false);
-  const [busy, setBusy] = useState(null); // "coffee" | "bread" | "play" | null
+  const [busy, setBusy] = useState(null);
+  const [gameOpen, setGameOpen] = useState(false);
+  const [sleeping, setSleeping] = useState(false);
+  const [reaction, setReaction] = useState({ type: null, id: 0 });
+  const sleepTimer = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -64,10 +68,7 @@ export default function PetScreen({ navigation }) {
         apiFetch("/pet"),
         apiFetch("/points/wallet").catch(() => null),
       ]);
-      setPet(petRes?.pet || null);
-      setMood(petRes?.mood || null);
-      setIsVIP(!!petRes?.isVIP);
-      if (petRes?.pantry) setPantry(petRes.pantry);
+      setState(petRes || null);
       if (walletRes) setPoints(Number(walletRes?.wallet?.balance) || 0);
     } catch (e) {
       console.log("❌ load pet:", e?.data || e?.message);
@@ -79,13 +80,45 @@ export default function PetScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       load();
+      return () => sleepTimer.current && clearTimeout(sleepTimer.current);
     }, [load])
   );
 
   const applyResult = (r) => {
-    setPet(r?.pet || null);
-    setMood(r?.mood || null);
-    if (r?.pantry) setPantry(r.pantry);
+    setState(r || null);
+    if (r?.action && ACTION_REACTION[r.action]) {
+      setReaction((x) => ({ type: ACTION_REACTION[r.action], id: x.id + 1 }));
+    }
+    if (r?.action === "sleep") {
+      setSleeping(true);
+      sleepTimer.current && clearTimeout(sleepTimer.current);
+      sleepTimer.current = setTimeout(() => setSleeping(false), 2600);
+    }
+  };
+
+  const call = async (path, body, key) => {
+    if (busy) return null;
+    try {
+      setBusy(key);
+      const r = await apiFetch(path, { method: "POST", body: body ? JSON.stringify(body) : undefined });
+      applyResult(r);
+      return r;
+    } catch (e) {
+      const err = e?.data?.error || e?.message;
+      const map = {
+        NO_COFFEE: "Ya no te queda café. Se recarga sola cada día.",
+        NO_BREAD: "Ya no te queda pan. Se recarga solo cada día.",
+        PLAY_COOLDOWN: `Deja que descanse un rato. Vuelve en ${Math.ceil((e?.data?.secondsLeft || 0) / 60)} min.`,
+        CLEAN_COOLDOWN: "Espera un momento antes de volver a limpiar.",
+        SLEEP_COOLDOWN: `Acaba de dormir. Vuelve en ${Math.ceil((e?.data?.secondsLeft || 0) / 60)} min.`,
+        NOT_TIRED: "Todavía tiene energía, no quiere dormir.",
+        ALREADY_CLEAN: "Ya está limpio ✨",
+      };
+      Alert.alert("", map[err] || err || "No se pudo.");
+      return null;
+    } finally {
+      setBusy(null);
+    }
   };
 
   const onAdopt = async () => {
@@ -96,125 +129,123 @@ export default function PetScreen({ navigation }) {
     }
     try {
       setAdopting(true);
-      const r = await apiFetch("/pet/adopt", {
-        method: "POST",
-        body: JSON.stringify({ species, name: cleanName }),
-      });
-      applyResult(r);
+      const r = await apiFetch("/pet/adopt", { method: "POST", body: JSON.stringify({ species, name: cleanName }) });
+      setState(r || null);
     } catch (e) {
       const err = e?.data?.error || e?.message;
-      if (err === "VIP_REQUIRED") {
-        Alert.alert("Exclusivo VIP 🔒", `Necesitas ${VIP_THRESHOLD} Buddy Coins para adoptar una mascota.`);
-      } else {
-        Alert.alert("Error", err || "No se pudo adoptar la mascota.");
-      }
+      if (err === "VIP_REQUIRED") Alert.alert("Exclusivo VIP 🔒", `Necesitas ${VIP_THRESHOLD} Buddy Coins para adoptar una mascota.`);
+      else Alert.alert("Error", err || "No se pudo adoptar.");
     } finally {
       setAdopting(false);
     }
   };
 
-  const onFeed = async (type) => {
-    if (busy) return;
-    try {
-      setBusy(type);
-      const r = await apiFetch("/pet/feed", { method: "POST", body: JSON.stringify({ type }) });
-      applyResult(r);
-    } catch (e) {
-      const err = e?.data?.error || e?.message;
-      if (err === "NO_COFFEE" || err === "NO_BREAD") {
-        Alert.alert(
-          "Despensa vacía",
-          `No te queda ${err === "NO_COFFEE" ? "café" : "pan"}. Se recarga sola cada día, o gánala en la racha diaria.`
-        );
-      } else {
-        Alert.alert("Error", err || "No se pudo alimentar.");
-      }
-    } finally {
-      setBusy(null);
-    }
+  const onGameFinish = async (score) => {
+    setGameOpen(false);
+    await call("/pet/play", { score }, "play");
   };
 
-  const onPlay = async () => {
-    if (busy) return;
-    try {
-      setBusy("play");
-      const r = await apiFetch("/pet/play", { method: "POST" });
-      applyResult(r);
-    } catch (e) {
-      if (e?.status === 429) {
-        const mins = Math.ceil((e?.data?.secondsLeft || 0) / 60);
-        Alert.alert("Ya jugaron un rato", `Deja que descanse. Vuelve en ${mins} min.`);
-      } else {
-        Alert.alert("Error", e?.data?.error || e?.message || "No se pudo jugar.");
-      }
-    } finally {
-      setBusy(null);
-    }
-  };
+  const pet = state?.pet;
+  const owned = !!pet?.owned;
+  // `state.isVIP` viene de isUserVIP() en el backend, que llama al POS y
+  // falla cerrado si hay un blip de red. Como ya tenemos el saldo real
+  // del wallet (points), usamos ese como respaldo -- adoptar igual se
+  // valida server-side, así que no se pierde el gate.
+  const isVIP = owned || (state ? !!state.isVIP : false) || points >= VIP_THRESHOLD;
+  const pantry = state?.pantry || { coffee: 0, bread: 0 };
+  const mood = state?.mood;
+  const mess = !!pet?.mess;
+  const tired = Number(pet?.energy ?? 100) <= 80;
 
   const renderOwned = () => (
     <View>
-      {/* Escena: el avatar y la mascota, juntos */}
+      {/* Escena */}
       <View style={styles.scene}>
         <View style={styles.sceneChar}>
-          <AvatarPreview config={avatarConfig} size={104} />
+          <AvatarPreview config={avatarConfig} size={96} />
           <Text style={styles.sceneCaption}>Tú</Text>
         </View>
         <View style={styles.sceneChar}>
-          <Text style={styles.petEmoji}>{speciesEmoji(pet.species)}</Text>
+          <PetActor
+            species={pet.species}
+            mood={mood}
+            mess={mess}
+            sleeping={sleeping}
+            size={pet && state?.stage === "bebé" ? 78 : 92}
+            reaction={reaction}
+            onTapPet={() => setReaction((x) => ({ type: "tickle", id: x.id + 1 }))}
+          />
           <Text style={styles.sceneCaption} numberOfLines={1}>{pet.name}</Text>
         </View>
       </View>
 
-      <Text style={styles.moodText}>
-        {MOOD_FACE[mood] || "🐾"} {MOOD_LABEL[mood] || ""}
-      </Text>
+      <Text style={styles.moodText}>{MOOD_LABEL[mood] || "🐾"}</Text>
 
-      <View style={{ marginTop: 16 }}>
-        <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Hambre</Text>
-          <Text style={styles.statValue}>{Math.round(pet.hunger)}%</Text>
-        </View>
-        <Bar value={pet.hunger} color={colors.accent} />
-
-        <View style={[styles.statRow, { marginTop: 12 }]}>
-          <Text style={styles.statLabel}>Felicidad</Text>
-          <Text style={styles.statValue}>{Math.round(pet.happiness)}%</Text>
-        </View>
-        <Bar value={pet.happiness} color={colors.primary} />
+      {/* Nivel de amistad */}
+      <View style={styles.lvlRow}>
+        <Text style={styles.lvlLabel}>Nivel {state?.level || 1} · amistad</Text>
+        <Text style={styles.lvlMeta}>
+          Día {state?.ageDays ?? 0} · {STAGE_LABEL[state?.stage] || "Adulto"}
+        </Text>
+      </View>
+      <View style={styles.xpTrack}>
+        <View
+          style={[
+            styles.xpFill,
+            { width: `${Math.min(100, Math.round((100 * (state?.xpInLevel || 0)) / (state?.xpForNext || 1)))}%` },
+          ]}
+        />
       </View>
 
-      {/* Despensa compartida con el avatar */}
+      {/* 4 barras */}
+      <Bar label="Hambre" value={pet.hunger} color={colors.accent} />
+      <Bar label="Felicidad" value={pet.happiness} color={colors.primary} />
+      <Bar label="Energía" value={pet.energy} color="#4f9d69" />
+      <Bar label="Higiene" value={pet.hygiene} color="#4a90c2" />
+
+      {/* Despensa */}
       <Text style={styles.pantryHint}>Despensa (la misma de tu avatar)</Text>
       <View style={styles.actionRow}>
-        <Pressable
-          style={[styles.foodBtn, (pantry.coffee <= 0 || busy) && styles.foodBtnDisabled]}
-          onPress={() => onFeed("coffee")}
+        <ActionBtn
+          emoji="☕"
+          label={busy === "coffee" ? "..." : `Café · ${pantry.coffee}`}
           disabled={pantry.coffee <= 0 || !!busy}
-        >
-          <Text style={styles.foodEmoji}>☕</Text>
-          <Text style={styles.foodLabel}>{busy === "coffee" ? "..." : `Café · ${pantry.coffee}`}</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.foodBtn, (pantry.bread <= 0 || busy) && styles.foodBtnDisabled]}
-          onPress={() => onFeed("bread")}
+          onPress={() => call("/pet/feed", { type: "coffee" }, "coffee")}
+        />
+        <ActionBtn
+          emoji="🥐"
+          label={busy === "bread" ? "..." : `Pan · ${pantry.bread}`}
           disabled={pantry.bread <= 0 || !!busy}
-        >
-          <Text style={styles.foodEmoji}>🥐</Text>
-          <Text style={styles.foodLabel}>{busy === "bread" ? "..." : `Pan · ${pantry.bread}`}</Text>
-        </Pressable>
+          onPress={() => call("/pet/feed", { type: "bread" }, "bread")}
+        />
+      </View>
+
+      <View style={[styles.actionRow, { marginTop: 10 }]}>
+        <ActionBtn
+          emoji="🧼"
+          label={busy === "clean" ? "..." : "Limpiar"}
+          badge={mess}
+          disabled={!!busy}
+          onPress={() => call("/pet/clean", null, "clean")}
+        />
+        <ActionBtn
+          emoji="😴"
+          label={busy === "sleep" ? "..." : "Dormir"}
+          disabled={!tired || !!busy}
+          onPress={() => call("/pet/sleep", null, "sleep")}
+        />
       </View>
 
       <Pressable
-        style={[styles.playBtn, busy && { opacity: 0.7 }]}
-        onPress={onPlay}
+        style={[styles.playBtn, busy && { opacity: 0.6 }]}
+        onPress={() => !busy && setGameOpen(true)}
         disabled={!!busy}
       >
-        <Text style={styles.playText}>{busy === "play" ? "..." : "🎾 Jugar"}</Text>
+        <Text style={styles.playText}>🎮 Jugar</Text>
       </Pressable>
 
       <Text style={styles.tipText}>
-        El café la anima mucho; el pan la alimenta. Jugar sube el ánimo sin gastar comida.
+        Comer ensucia un poco → límpialo. Jugar cansa → déjalo dormir. Cuidarla sube el nivel de amistad.
       </Text>
     </View>
   );
@@ -245,7 +276,7 @@ export default function PetScreen({ navigation }) {
                 Te faltan {Math.max(0, VIP_THRESHOLD - points)} Buddy Coins para adoptar tu mascota.
               </Text>
             </View>
-          ) : !pet?.owned ? (
+          ) : !owned ? (
             <View>
               <Text style={styles.sectionTitle}>Elige a tu compañero</Text>
               <View style={styles.optionsRow}>
@@ -274,11 +305,7 @@ export default function PetScreen({ navigation }) {
                 style={styles.nameInput}
               />
 
-              <Pressable
-                style={[styles.saveBtn, adopting && { opacity: 0.75 }]}
-                onPress={onAdopt}
-                disabled={adopting}
-              >
+              <Pressable style={[styles.saveBtn, adopting && { opacity: 0.75 }]} onPress={onAdopt} disabled={adopting}>
                 <Text style={styles.saveText}>{adopting ? "Adoptando..." : "Adoptar"}</Text>
               </Pressable>
             </View>
@@ -289,7 +316,25 @@ export default function PetScreen({ navigation }) {
 
         <View style={{ height: 18 }} />
       </ScrollView>
+
+      <PetMiniGame
+        visible={gameOpen}
+        species={pet?.species}
+        petName={pet?.name || "tu mascota"}
+        onClose={() => setGameOpen(false)}
+        onFinish={onGameFinish}
+      />
     </Screen>
+  );
+}
+
+function ActionBtn({ emoji, label, onPress, disabled, badge }) {
+  return (
+    <Pressable style={[styles.foodBtn, disabled && styles.foodBtnDisabled]} onPress={onPress} disabled={disabled}>
+      {badge ? <View style={styles.badge} /> : null}
+      <Text style={styles.foodEmoji}>{emoji}</Text>
+      <Text style={styles.foodLabel}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -344,7 +389,6 @@ const styles = StyleSheet.create({
     color: "#111",
   },
 
-  // Escena avatar + mascota
   scene: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -353,19 +397,24 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.primarySoft,
-    paddingVertical: 16,
-    paddingHorizontal: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    minHeight: 150,
   },
-  sceneChar: { alignItems: "center", maxWidth: "46%" },
-  sceneCaption: { marginTop: 4, color: colors.textMuted, fontSize: 11, fontWeight: "800" },
-  petEmoji: { fontSize: 88 },
+  sceneChar: { alignItems: "center", maxWidth: "48%" },
+  sceneCaption: { marginTop: 2, color: colors.textMuted, fontSize: 11, fontWeight: "800" },
 
   moodText: { marginTop: 12, textAlign: "center", color: "#111", fontSize: 15, fontWeight: "900" },
+
+  lvlRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16 },
+  lvlLabel: { color: "#111", fontSize: 12, fontWeight: "900" },
+  lvlMeta: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
+  xpTrack: { height: 8, borderRadius: 999, backgroundColor: colors.primarySoft, overflow: "hidden", marginTop: 6 },
+  xpFill: { height: "100%", borderRadius: 999, backgroundColor: colors.accent },
 
   statRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   statLabel: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
   statValue: { color: "#111", fontSize: 12, fontWeight: "900" },
-
   barTrack: { height: 10, borderRadius: 999, backgroundColor: colors.primarySoft, overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 999 },
 
@@ -381,13 +430,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   foodBtnDisabled: { opacity: 0.4 },
-  foodEmoji: { fontSize: 26 },
+  foodEmoji: { fontSize: 24 },
   foodLabel: { marginTop: 4, color: "#111", fontSize: 12, fontWeight: "900" },
+  badge: { position: "absolute", top: 8, right: 10, width: 9, height: 9, borderRadius: 999, backgroundColor: "#d9534f" },
 
   playBtn: {
-    marginTop: 12,
+    marginTop: 14,
     paddingVertical: 13,
-    paddingHorizontal: 28,
+    paddingHorizontal: 32,
     borderRadius: 999,
     backgroundColor: colors.primary,
     alignItems: "center",
