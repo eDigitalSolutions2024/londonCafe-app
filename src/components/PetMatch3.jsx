@@ -6,14 +6,15 @@ import PetActor from "./PetActor";
 
 // --- Tablero estilo Pokémon Puzzle / Tetris Attack -------------------------
 const COLS = 6;
-const ROWS = 12; // filas visibles (torre)
+const ROWS = 12;
 const TILE = 38;
-const CELL = TILE + 2; // + margen
-const START_FILLED = 4; // filas llenas al empezar (desde abajo)
-const RISE_MS_START = 6500; // cada cuánto sube una fila nueva
+const CELL = TILE + 2;
+const START_FILLED = 4;
+const RISE_MS_START = 6500;
 const RISE_MS_MIN = 2600;
 const RISE_SPEEDUP_EVERY = 22000;
-const TARGET_CLEARED = 60; // fichas para score 1.0
+const TARGET_CLEARED = 60;
+const SWAP_THRESHOLD = CELL * 0.42; // cuánto hay que arrastrar para intercambiar
 
 const KINDS = ["☕", "🥐", "🍰", "🍪", "🫖", "🥯"];
 const CLEARING = -2;
@@ -75,12 +76,12 @@ function applyGravity(g) {
   for (let c = 0; c < COLS; c++) {
     let write = ROWS - 1;
     for (let r = ROWS - 1; r >= 0; r--) {
-      if (ng[r][c] != null && ng[r][c] !== CLEARING) {
-        const v = ng[r][c];
+      const v = ng[r][c];
+      if (v != null && v !== CLEARING) {
         ng[r][c] = null;
         ng[write][c] = v;
         write--;
-      } else if (ng[r][c] === CLEARING) {
+      } else if (v === CLEARING) {
         ng[r][c] = null;
       }
     }
@@ -92,28 +93,31 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   const [grid, setGrid] = useState(makeGrid);
   const [cleared, setCleared] = useState(0);
   const [combo, setCombo] = useState(0);
-  const [phase, setPhase] = useState("play"); // play | over
+  const [phase, setPhase] = useState("play");
   const [danger, setDanger] = useState(false);
+  const [dragCell, setDragCell] = useState(null); // {r, c} celda agarrada (solo para marcar el render)
 
   const resolving = useRef(false);
-  const risePending = useRef(false);
+  const resolvePending = useRef(false);
   const riseTimer = useRef(null);
   const speedTimer = useRef(null);
   const riseMs = useRef(RISE_MS_START);
   const overRef = useRef(false);
+  const phaseRef = useRef("play");
   const gridRef = useRef(grid);
   gridRef.current = grid;
+  phaseRef.current = phase;
 
   const riseAnim = useRef(new Animated.Value(0)).current;
   const comboAnim = useRef(new Animated.Value(0)).current;
   const avatarBounce = useRef(new Animated.Value(0)).current;
   const [petReaction, setPetReaction] = useState({ type: null, id: 0 });
 
-  // --- arrastre de ficha (Panel de Pon: horizontal) ---
-  const dragAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current; // offset visual de la ficha agarrada
-  const slideAnim = useRef(new Animated.Value(0)).current; // desplazado se desliza a su lugar
-  const [dragCell, setDragCell] = useState(null); // {r, c} celda actual de la ficha agarrada
-  const dragRef = useRef({ startR: 0, startC: 0, curC: 0, active: false });
+  // Arrastre: SOLO visual mientras se mueve; el swap se aplica al soltar.
+  const dragX = useRef(new Animated.Value(0)).current; // ficha agarrada sigue el dedo
+  const nbL = useRef(new Animated.Value(0)).current; // vecino izquierdo se desliza
+  const nbR = useRef(new Animated.Value(0)).current; // vecino derecho se desliza
+  const dragRef = useRef({ r: 0, c: 0, active: false, dx: 0 });
 
   useEffect(() => {
     if (!visible) return;
@@ -123,13 +127,16 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     setCleared(0);
     setCombo(0);
     setPhase("play");
+    phaseRef.current = "play";
     setDanger(false);
     setDragCell(null);
     resolving.current = false;
-    risePending.current = false;
+    resolvePending.current = false;
     overRef.current = false;
     riseMs.current = RISE_MS_START;
-    dragAnim.setValue({ x: 0, y: 0 });
+    dragX.setValue(0);
+    nbL.setValue(0);
+    nbR.setValue(0);
 
     scheduleRise();
     speedTimer.current = setInterval(() => {
@@ -151,7 +158,6 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   function onRiseTick() {
     if (overRef.current) return;
     if (resolving.current || dragRef.current.active) {
-      risePending.current = true;
       scheduleRise();
       return;
     }
@@ -162,8 +168,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   function doRise() {
     if (overRef.current) return true;
     const g = gridRef.current;
-    const toppedOut = g[0].some((x) => x != null && x !== CLEARING);
-    if (toppedOut) {
+    if (g[0].some((x) => x != null && x !== CLEARING)) {
       endGame();
       return true;
     }
@@ -176,18 +181,24 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     Animated.timing(riseAnim, { toValue: 0, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
 
     setDanger(ng[1].some((x) => x != null) || ng[0].some((x) => x != null));
-    if (findMatches(ng).size > 0) resolve(ng, 0);
+    if (findMatches(ng).size > 0) runResolve(0);
     return false;
   }
 
-  async function resolve(startGrid, baseCombo) {
+  // Re-entrante: si ya está corriendo, marca pendiente y sale. Lee gridRef
+  // fresco en cada iteración, así ve swaps hechos entre pasos.
+  async function runResolve(baseCombo) {
+    if (resolving.current) {
+      resolvePending.current = true;
+      return;
+    }
     resolving.current = true;
-    let g = startGrid;
     let chain = baseCombo || 0;
     let total = 0;
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      const g = gridRef.current;
       const m = findMatches(g);
       if (m.size === 0) break;
       chain += 1;
@@ -209,101 +220,102 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       bounceAvatar();
 
       await wait(170);
-      g = applyGravity(marking);
-      setGrid(g);
-      gridRef.current = g;
+      const g2 = applyGravity(gridRef.current);
+      setGrid(g2);
+      gridRef.current = g2;
       await wait(140);
     }
 
-    if (total > 0) {
-      setCleared((x) => x + total);
-      setCombo(chain);
-    }
-    setDanger(g[1].some((x) => x != null) || g[0].some((x) => x != null));
+    if (total > 0) setCleared((x) => x + total);
+    setDanger(gridRef.current[1].some((x) => x != null) || gridRef.current[0].some((x) => x != null));
     resolving.current = false;
 
-    if (risePending.current && !overRef.current) {
-      risePending.current = false;
-      doRise();
+    if (resolvePending.current && !overRef.current) {
+      resolvePending.current = false;
+      runResolve(0);
     }
   }
 
-  // --- Gestos: agarra una ficha y arrástrala de lado ---
+  // --- Gestos ---
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => phaseRef.current === "play" && !resolving.current && !overRef.current,
+      onStartShouldSetPanResponder: () =>
+        phaseRef.current === "play" && !resolving.current && !overRef.current,
       onMoveShouldSetPanResponder: (_e, gs) =>
-        phaseRef.current === "play" && !resolving.current && !overRef.current && Math.abs(gs.dx) > 3,
+        phaseRef.current === "play" && !resolving.current && !overRef.current && Math.abs(gs.dx) > 4,
       onPanResponderGrant: (e) => {
+        if (resolving.current || overRef.current) return;
         const { locationX, locationY } = e.nativeEvent;
         const c = Math.floor(locationX / CELL);
         const r = Math.floor(locationY / CELL);
-        const g = gridRef.current;
         if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
-        const k = g[r][c];
+        const k = gridRef.current[r][c];
         if (k == null || k === CLEARING) return;
-        dragRef.current = { startR: r, startC: c, curC: c, active: true };
-        dragAnim.setValue({ x: 0, y: 0 });
+        dragRef.current = { r, c, active: true, dx: 0 };
+        dragX.setValue(0);
+        nbL.setValue(0);
+        nbR.setValue(0);
         setDragCell({ r, c });
       },
       onPanResponderMove: (_e, gs) => {
         const d = dragRef.current;
         if (!d.active) return;
-        const committed = d.curC - d.startC;
-        let visualX = gs.dx - committed * CELL;
-        // límite visual
-        visualX = Math.max(-CELL * 1.15, Math.min(CELL * 1.15, visualX));
-        dragAnim.setValue({ x: visualX, y: 0 });
-
-        // ¿cruzó medio celda? intercambia con el vecino y "recentra"
-        if (visualX > CELL / 2 && d.curC < COLS - 1) {
-          swapInGrid(d.startR, d.curC, d.curC + 1);
-          d.curC += 1;
-          triggerSlide(-1);
-        } else if (visualX < -CELL / 2 && d.curC > 0) {
-          swapInGrid(d.startR, d.curC, d.curC - 1);
-          d.curC -= 1;
-          triggerSlide(1);
-        }
+        if (resolving.current || overRef.current) return;
+        let dx = Math.max(-CELL, Math.min(CELL, gs.dx));
+        // no dejes arrastrar fuera del tablero
+        if (d.c === 0 && dx < 0) dx = 0;
+        if (d.c === COLS - 1 && dx > 0) dx = 0;
+        d.dx = dx;
+        dragX.setValue(dx);
+        nbR.setValue(dx > 0 ? -dx : 0); // vecino derecho se corre a la izq
+        nbL.setValue(dx < 0 ? -dx : 0); // vecino izquierdo se corre a la der
       },
-      onPanResponderRelease: () => endDrag(),
-      onPanResponderTerminate: () => endDrag(),
+      onPanResponderRelease: () => finishDrag(),
+      onPanResponderTerminate: () => finishDrag(),
     })
   ).current;
 
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
-
-  function swapInGrid(r, c1, c2) {
-    const g = gridRef.current.map((row) => row.slice());
-    const t = g[r][c1];
-    g[r][c1] = g[r][c2];
-    g[r][c2] = t;
-    setGrid(g);
-    gridRef.current = g;
-    setDragCell({ r, c: c2 });
-  }
-
-  function triggerSlide(dir) {
-    slideAnim.setValue(dir * CELL);
-    Animated.spring(slideAnim, { toValue: 0, friction: 6, tension: 120, useNativeDriver: true }).start();
-  }
-
-  function endDrag() {
+  function finishDrag() {
     const d = dragRef.current;
-    if (!d.active) return;
-    d.active = false;
-    Animated.spring(dragAnim, { toValue: { x: 0, y: 0 }, friction: 7, tension: 140, useNativeDriver: true }).start(() => {
-      setDragCell(null);
-    });
-    const g = gridRef.current;
-    if (findMatches(g).size > 0) resolve(g, 0);
+    dragRef.current = { ...d, active: false };
+    setDragCell(null);
+
+    const doSnap = () => {
+      Animated.parallel([
+        Animated.spring(dragX, { toValue: 0, friction: 7, tension: 140, useNativeDriver: true }),
+        Animated.spring(nbL, { toValue: 0, friction: 7, tension: 140, useNativeDriver: true }),
+        Animated.spring(nbR, { toValue: 0, friction: 7, tension: 140, useNativeDriver: true }),
+      ]).start();
+    };
+
+    if (resolving.current || overRef.current) {
+      doSnap();
+      return;
+    }
+    const dir = d.dx > SWAP_THRESHOLD ? 1 : d.dx < -SWAP_THRESHOLD ? -1 : 0;
+    const tc = d.c + dir;
+    if (dir !== 0 && tc >= 0 && tc < COLS) {
+      const g = gridRef.current.map((row) => row.slice());
+      const t = g[d.r][d.c];
+      g[d.r][d.c] = g[d.r][tc];
+      g[d.r][tc] = t;
+      setGrid(g);
+      gridRef.current = g;
+      // reset instantáneo de los offsets (el grid ya refleja el swap)
+      dragX.setValue(0);
+      nbL.setValue(0);
+      nbR.setValue(0);
+      if (findMatches(g).size > 0) runResolve(0);
+    } else {
+      doSnap();
+    }
   }
 
   function endGame() {
     if (overRef.current) return;
     overRef.current = true;
     setPhase("over");
+    phaseRef.current = "over";
     clearTimeout(riseTimer.current);
     clearInterval(speedTimer.current);
   }
@@ -362,8 +374,12 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                             const empty = k == null;
                             const clearing = k === CLEARING;
                             const isDrag = dragCell && dragCell.r === r && dragCell.c === c;
-                            const isNeighbor =
-                              dragCell && dragRef.current.active && dragCell.r === r && Math.abs(dragCell.c - c) === 1;
+                            const isNbL = dragCell && dragCell.r === r && c === dragCell.c - 1;
+                            const isNbR = dragCell && dragCell.r === r && c === dragCell.c + 1;
+                            let extra = null;
+                            if (isDrag) extra = { transform: [{ translateX: dragX }, { scale: 1.08 }], zIndex: 20 };
+                            else if (isNbL) extra = { transform: [{ translateX: nbL }] };
+                            else if (isNbR) extra = { transform: [{ translateX: nbR }] };
                             return (
                               <Animated.View
                                 key={`${r}-${c}`}
@@ -372,11 +388,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                                   empty && styles.cellEmpty,
                                   clearing && styles.cellClearing,
                                   isDrag && styles.cellDrag,
-                                  isDrag && {
-                                    transform: [{ translateX: dragAnim.x }, { scale: 1.08 }],
-                                    zIndex: 20,
-                                  },
-                                  isNeighbor && { transform: [{ translateX: slideAnim }] },
+                                  extra,
                                 ]}
                               >
                                 <Text style={styles.tile}>{empty ? "" : clearing ? "✨" : KINDS[k]}</Text>
@@ -438,13 +450,7 @@ const styles = StyleSheet.create({
   sideChar: { width: 46, alignItems: "center", justifyContent: "flex-end" },
   sideCap: { marginTop: 2, color: colors.textMuted, fontSize: 9, fontWeight: "800" },
 
-  boardWrap: {
-    backgroundColor: "#f3e6d3",
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.primarySoft,
-    padding: 3,
-  },
+  boardWrap: { backgroundColor: "#f3e6d3", borderRadius: 12, borderWidth: 2, borderColor: colors.primarySoft, padding: 3 },
   boardDanger: { borderColor: "#d9534f" },
   boardClip: { overflow: "hidden", borderRadius: 8 },
   row: { flexDirection: "row" },
