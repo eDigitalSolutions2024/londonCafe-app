@@ -51,24 +51,6 @@
         }
       ],
       [
-        "react-native-android-widget",
-        {
-          "widgets": [
-            {
-              "name": "PetWidget",
-              "label": "London Café — Mascota",
-              "minWidth": "180dp",
-              "minHeight": "110dp",
-              "targetCellWidth": 3,
-              "targetCellHeight": 2,
-              "description": "Mira cómo está tu mascota VIP",
-              "previewImage": "./assets/icon.png",
-              "updatePeriodMillis": 1800000
-            }
-          ]
-        }
-      ],
-      [
         "expo-build-properties",
         {
           "android": {
