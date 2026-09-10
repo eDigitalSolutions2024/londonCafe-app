@@ -1,5 +1,5 @@
 import React, { useState, useContext, useMemo, useEffect } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, TextInput } from "react-native";
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import AvatarPreview from "../components/AvatarPreview";
@@ -60,6 +60,12 @@ function prettyLabel(v) {
   return `Avatar ${DISPLAY_NUMBER[v] || "??"}`;
 }
 
+const PET_SPECIES = [
+  { id: "cat", emoji: "🐱", label: "Gato" },
+  { id: "dog", emoji: "🐶", label: "Perro" },
+  { id: "hamster", emoji: "🐹", label: "Hámster" },
+];
+
 export default function AvatarCustomizeScreen({ navigation }) {
   const { token, setUser, user } = useContext(AuthContext);
   const [saving, setSaving] = useState(false);
@@ -113,6 +119,60 @@ export default function AvatarCustomizeScreen({ navigation }) {
   }, [user, defaults]);
 
   const [avatarConfig, setAvatarConfig] = useState(initialConfig);
+
+  // ✅ Mascota: se puede cambiar la especie / el nombre desde aquí
+  const [petOwned, setPetOwned] = useState(false);
+  const [petSpecies, setPetSpecies] = useState("cat");
+  const [petName, setPetName] = useState("");
+  const [petOrigName, setPetOrigName] = useState("");
+  const [petOrigSpecies, setPetOrigSpecies] = useState("cat");
+  const [petSaving, setPetSaving] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch("/pet", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => {
+        const p = r?.pet;
+        if (p?.owned) {
+          setPetOwned(true);
+          setPetSpecies(p.species || "cat");
+          setPetName(p.name || "");
+          setPetOrigSpecies(p.species || "cat");
+          setPetOrigName(p.name || "");
+        } else {
+          setPetOwned(false);
+        }
+      })
+      .catch((e) => console.log("❌ AvatarCustomize pet:", e?.data || e?.message));
+  }, [token]);
+
+  const petDirty =
+    petOwned && (petSpecies !== petOrigSpecies || petName.trim() !== petOrigName);
+
+  const savePet = async () => {
+    const clean = petName.trim();
+    if (!clean) {
+      Alert.alert("Falta el nombre", "Ponle un nombre a tu mascota.");
+      return;
+    }
+    try {
+      setPetSaving(true);
+      const r = await apiFetch("/pet/customize", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ species: petSpecies, name: clean }),
+      });
+      const p = r?.pet;
+      setPetOrigSpecies(p?.species || petSpecies);
+      setPetOrigName(p?.name || clean);
+      Alert.alert("Listo", "Mascota actualizada 🐾");
+    } catch (e) {
+      const err = e?.data?.error || e?.message;
+      Alert.alert("Error", err === "NO_CHANGES" ? "No cambiaste nada." : err || "No se pudo.");
+    } finally {
+      setPetSaving(false);
+    }
+  };
 
   // ✅ Fallback: si el hair guardado no corresponde al género, lo ajustamos
     useEffect(() => {
@@ -268,24 +328,66 @@ export default function AvatarCustomizeScreen({ navigation }) {
             </View>
           )}
 
-          {/* ✅ Mascotas VIP -- ya funcional (PetScreen.jsx / pet.controller.js):
-              adoptar, alimentar, ánimo tipo Tamagotchi. Esta sección solo
-              enlaza a esa pantalla; el gate VIP y el estado real de la
-              mascota viven ahí. */}
+          {/* ✅ Mascota VIP -- cambiar especie / nombre aquí; cuidarla
+              (alimentar, jugar, limpiar, dormir) vive en PetScreen. */}
           <View style={styles.section}>
             <View style={styles.vipHeaderRow}>
               <Text style={[styles.sectionTitle, { color: colors.accent }]}>🐾 Mascota VIP</Text>
               <Text style={styles.vipHint}>Exclusivo VIP</Text>
             </View>
 
-            <Pressable
-              onPress={() => navigation.navigate("Pet")}
-              style={[styles.optionBtn, styles.vipBtn, { alignSelf: "flex-start" }]}
-            >
-              <Text style={[styles.optionText, styles.vipText]} numberOfLines={1}>
-                🐾 Ver mi mascota
-              </Text>
-            </Pressable>
+            {petOwned ? (
+              <>
+                <View style={styles.optionsRow}>
+                  {PET_SPECIES.map((s) => {
+                    const active = petSpecies === s.id;
+                    return (
+                      <Pressable
+                        key={s.id}
+                        onPress={() => setPetSpecies(s.id)}
+                        style={[styles.petSpeciesBtn, active && styles.petSpeciesBtnActive]}
+                      >
+                        <Text style={{ fontSize: 26 }}>{s.emoji}</Text>
+                        <Text style={[styles.petSpeciesLabel, active && styles.petSpeciesLabelActive]}>
+                          {s.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <TextInput
+                  value={petName}
+                  onChangeText={setPetName}
+                  placeholder="Nombre de la mascota"
+                  placeholderTextColor={colors.textMuted}
+                  maxLength={20}
+                  style={styles.petNameInput}
+                />
+
+                <View style={styles.petBtnRow}>
+                  <Pressable
+                    onPress={savePet}
+                    disabled={!petDirty || petSaving}
+                    style={[styles.petSaveBtn, (!petDirty || petSaving) && { opacity: 0.5 }]}
+                  >
+                    <Text style={styles.petSaveText}>{petSaving ? "Guardando..." : "Guardar mascota"}</Text>
+                  </Pressable>
+                  <Pressable onPress={() => navigation.navigate("Pet")} style={styles.petLinkBtn}>
+                    <Text style={styles.petLinkText}>Cuidarla 🐾</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <Pressable
+                onPress={() => navigation.navigate("Pet")}
+                style={[styles.optionBtn, styles.vipBtn, { alignSelf: "flex-start" }]}
+              >
+                <Text style={[styles.optionText, styles.vipText]} numberOfLines={1}>
+                  🐾 Adopta tu mascota
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {/* Guardar */}
@@ -371,4 +473,36 @@ const styles = StyleSheet.create({
 
   saveBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
   saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+
+  // Mascota
+  petSpeciesBtn: {
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: "#fff",
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  petSpeciesBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  petSpeciesLabel: { marginTop: 4, color: "#111", fontSize: 11, fontWeight: "900" },
+  petSpeciesLabelActive: { color: "#fff" },
+  petNameInput: {
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111",
+    marginTop: 2,
+  },
+  petBtnRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
+  petSaveBtn: { flex: 1, paddingVertical: 12, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
+  petSaveText: { color: "#fff", fontWeight: "900", fontSize: 13 },
+  petLinkBtn: { paddingVertical: 12, paddingHorizontal: 14 },
+  petLinkText: { color: colors.primary, fontWeight: "900", fontSize: 13 },
 });

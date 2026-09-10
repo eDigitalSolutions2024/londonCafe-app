@@ -3,25 +3,47 @@ import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing } from "reac
 import { colors } from "../theme/colors";
 
 const TOY = { cat: "🧶", dog: "🦴", hamster: "🌰" };
+const PET = { cat: "🐱", dog: "🐶", hamster: "🐹" };
 const DURATION_S = 8;
 const TARGET_HITS = 12; // atrapadas para score 1.0
 const AREA_W = 300;
 const AREA_H = 340;
 const TOY_SIZE = 54;
+const PET_SIZE = 56;
 
 /**
  * Mini-juego tipo POU: un juguete rebota por el área; tócalo cuantas
- * veces puedas en 8s. Al terminar devuelve score 0..1 (aciertos/objetivo).
+ * veces puedas en 8s. La mascota persigue el juguete abajo y brinca
+ * cuando lo atrapas. Al terminar devuelve score 0..1 (aciertos/objetivo).
  */
 export default function PetMiniGame({ visible, species = "cat", petName = "tu mascota", onClose, onFinish }) {
   const toy = TOY[species] || "🎾";
+  const petEmoji = PET[species] || "🐾";
+
   const pos = useRef(new Animated.ValueXY({ x: AREA_W / 2 - TOY_SIZE / 2, y: AREA_H / 2 - TOY_SIZE / 2 })).current;
   const pop = useRef(new Animated.Value(1)).current;
+  const petX = useRef(new Animated.Value(AREA_W / 2 - PET_SIZE / 2)).current;
+  const petHop = useRef(new Animated.Value(0)).current;
+  const petBob = useRef(new Animated.Value(0)).current;
+
   const [hits, setHits] = useState(0);
   const [left, setLeft] = useState(DURATION_S);
   const [phase, setPhase] = useState("play"); // "play" | "done"
   const moveRef = useRef(null);
   const tickRef = useRef(null);
+
+  // Bob suave de la mascota (siempre)
+  useEffect(() => {
+    if (!visible) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(petBob, { toValue: 1, duration: 420, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(petBob, { toValue: 0, duration: 420, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [visible, petBob]);
 
   useEffect(() => {
     if (!visible) return;
@@ -29,16 +51,23 @@ export default function PetMiniGame({ visible, species = "cat", petName = "tu ma
     setLeft(DURATION_S);
     setPhase("play");
     pos.setValue({ x: AREA_W / 2 - TOY_SIZE / 2, y: AREA_H / 2 - TOY_SIZE / 2 });
+    petX.setValue(AREA_W / 2 - PET_SIZE / 2);
+
+    const chase = (targetX) => {
+      const px = Math.max(0, Math.min(AREA_W - PET_SIZE, targetX + TOY_SIZE / 2 - PET_SIZE / 2));
+      Animated.timing(petX, { toValue: px, duration: 520, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
+    };
 
     const jump = () => {
       const x = Math.random() * (AREA_W - TOY_SIZE);
-      const y = Math.random() * (AREA_H - TOY_SIZE);
+      const y = Math.random() * (AREA_H - TOY_SIZE - 70); // deja espacio abajo para la mascota
       Animated.timing(pos, {
         toValue: { x, y },
         duration: 620,
         easing: Easing.inOut(Easing.quad),
         useNativeDriver: false,
       }).start();
+      chase(x);
     };
     moveRef.current = setInterval(jump, 720);
     jump();
@@ -59,24 +88,34 @@ export default function PetMiniGame({ visible, species = "cat", petName = "tu ma
       clearInterval(moveRef.current);
       clearInterval(tickRef.current);
     };
-  }, [visible, pos]);
+  }, [visible, pos, petX]);
 
   const onCatch = () => {
     if (phase !== "play") return;
     setHits((h) => h + 1);
     pop.setValue(0.6);
     Animated.spring(pop, { toValue: 1, friction: 4, tension: 140, useNativeDriver: true }).start();
-    // salto inmediato a otro lado
+    // la mascota brinca de alegría
+    Animated.sequence([
+      Animated.timing(petHop, { toValue: 1, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.spring(petHop, { toValue: 0, friction: 4, tension: 120, useNativeDriver: true }),
+    ]).start();
+    // el juguete salta a otro lado
     const x = Math.random() * (AREA_W - TOY_SIZE);
-    const y = Math.random() * (AREA_H - TOY_SIZE);
+    const y = Math.random() * (AREA_H - TOY_SIZE - 70);
     Animated.timing(pos, { toValue: { x, y }, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
+    Animated.timing(petX, {
+      toValue: Math.max(0, Math.min(AREA_W - PET_SIZE, x + TOY_SIZE / 2 - PET_SIZE / 2)),
+      duration: 240,
+      useNativeDriver: false,
+    }).start();
   };
 
   const score = Math.max(0, Math.min(1, hits / TARGET_HITS));
+  const finish = () => onFinish?.(score, hits);
 
-  const finish = () => {
-    onFinish?.(score, hits);
-  };
+  const petBobY = petBob.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
+  const petHopY = petHop.interpolate({ inputRange: [0, 1], outputRange: [0, -22] });
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -92,10 +131,21 @@ export default function PetMiniGame({ visible, species = "cat", petName = "tu ma
 
               <View style={styles.area}>
                 <Animated.View style={[styles.toyWrap, { transform: pos.getTranslateTransform() }]}>
-                  <Pressable onPress={onCatch} hitSlop={10}>
+                  <Pressable onPress={onCatch} hitSlop={12}>
                     <Animated.Text style={[styles.toy, { transform: [{ scale: pop }] }]}>{toy}</Animated.Text>
                   </Pressable>
                 </Animated.View>
+
+                {/* la mascota persigue abajo */}
+                <Animated.Text
+                  pointerEvents="none"
+                  style={[
+                    styles.pet,
+                    { transform: [{ translateX: petX }, { translateY: Animated.add(petBobY, petHopY) }] },
+                  ]}
+                >
+                  {petEmoji}
+                </Animated.Text>
               </View>
 
               <Pressable style={styles.cancel} onPress={onClose}>
@@ -145,6 +195,7 @@ const styles = StyleSheet.create({
   },
   toyWrap: { position: "absolute", width: TOY_SIZE, height: TOY_SIZE, alignItems: "center", justifyContent: "center" },
   toy: { fontSize: 44 },
+  pet: { position: "absolute", bottom: 8, left: 0, fontSize: PET_SIZE, width: PET_SIZE, textAlign: "center" },
 
   cancel: { alignSelf: "center", marginTop: 12, paddingVertical: 8, paddingHorizontal: 18 },
   cancelText: { color: colors.textMuted, fontWeight: "800", fontSize: 12 },
