@@ -277,18 +277,27 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   // eje X (measureInWindow no se ve afectado por el transform vertical
   // de riseAnim, así que tampoco hace falta esperar a que termine de
   // animar para que la medición sea confiable).
+  // ⚠️ Ya NO se bloquea el arrastre mientras `resolving` está en marcha
+  // (una cadena/combo resolviéndose): antes tapabas la pantalla entera
+  // ~1seg+ por cada combo y no podías seguir jugando durante esa ventana.
+  // runResolve ya es re-entrante (resolvePending), así que un swap hecho
+  // a mitad de una cadena simplemente encola otra pasada -- se pueden
+  // seguir acumulando combos sin esperar a que termine la animación.
+  // Lo único que sigue bloqueando el agarre es que el juego haya
+  // terminado (overRef) o que la celda tocada ya no tenga una ficha
+  // válida en ESE instante (se relee gridRef fresco, así que si la
+  // cadena ya se llevó esa ficha, simplemente no se agarra nada).
   const rowPans = useRef(
     Array.from({ length: ROWS }, (_, r) =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () =>
-          phaseRef.current === "play" && !resolving.current && !overRef.current,
+        onStartShouldSetPanResponder: () => phaseRef.current === "play" && !overRef.current,
         onMoveShouldSetPanResponder: (_e, gs) =>
-          phaseRef.current === "play" && !resolving.current && !overRef.current && Math.abs(gs.dx) > 4,
+          phaseRef.current === "play" && !overRef.current && Math.abs(gs.dx) > 4,
         onPanResponderGrant: (e) => {
-          if (resolving.current || overRef.current) return;
+          if (overRef.current) return;
           const { pageX } = e.nativeEvent;
           rowRefs[r].current?.measureInWindow((bx) => {
-            if (overRef.current || resolving.current) return;
+            if (overRef.current) return;
             const c = Math.floor((pageX - bx) / cellRef.current);
             if (c < 0 || c >= COLS) return;
             const k = gridRef.current[r][c];
@@ -303,7 +312,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
         onPanResponderMove: (_e, gs) => {
           const d = dragRef.current;
           if (!d.active || d.r !== r) return;
-          if (resolving.current || overRef.current) return;
+          if (overRef.current) return;
           const cell = cellRef.current;
           let dx = Math.max(-cell, Math.min(cell, gs.dx));
           // no dejes arrastrar fuera del tablero
@@ -333,7 +342,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       ]).start();
     };
 
-    if (resolving.current || overRef.current) {
+    if (overRef.current) {
       doSnap();
       return;
     }
@@ -348,6 +357,16 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     const g = gridRef.current.map((row) => row.slice());
     const sourceVal = g[d.r][d.c];
     const targetVal = g[d.r][tc];
+
+    // Ahora se puede arrastrar mientras una cadena/combo sigue resolviendo
+    // (ver comentario junto a rowPans) -- eso abre una ventana rara donde,
+    // entre el momento en que agarraste la ficha y el momento en que
+    // sueltas, esa MISMA celda pudo vaciarse (una cadena la limpió y la
+    // gravedad corrió todo). Si ya no hay nada que mover, no hay swap.
+    if (sourceVal == null || sourceVal === CLEARING) {
+      doSnap();
+      return;
+    }
 
     if (targetVal == null) {
       // El destino está vacío -- no es un intercambio entre dos fichas,
@@ -367,13 +386,25 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       return;
     }
 
+    if (targetVal === CLEARING) {
+      // Celda destino a medio desvanecer (chispa ✨) -- no es un lugar
+      // válido para soltar, espera a que termine de limpiarse.
+      doSnap();
+      return;
+    }
+
     // Intercambio normal entre dos fichas. Si no arma ninguna combinación,
     // no tiene "dónde acomodarse" -- vuelve a su lugar en vez de quedarse.
+    // Se pasa por gravedad igual como red de seguridad -- en un tablero
+    // sin huecos esto es un no-op, pero si por la ventana de concurrencia
+    // de arriba algo quedó desalineado, esto lo vuelve a dejar consistente
+    // en vez de dejar una ficha flotando.
     g[d.r][d.c] = targetVal;
     g[d.r][tc] = sourceVal;
-    if (findMatches(g).size > 0) {
-      setGrid(g);
-      gridRef.current = g;
+    const settled = applyGravity(g);
+    if (findMatches(settled).size > 0) {
+      setGrid(settled);
+      gridRef.current = settled;
       dragX.setValue(0);
       nbL.setValue(0);
       nbR.setValue(0);
