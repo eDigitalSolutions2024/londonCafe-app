@@ -341,6 +341,7 @@ async function login(req, res) {
         username: user.username,
         gender: user.gender,
         avatarConfig: user.avatarConfig,
+        avatar3d: user.avatar3d,
         buddy: {
           energy: user.buddy?.energy ?? 80,
           mood: moodFromEnergy(user.buddy?.energy ?? 80),
@@ -459,6 +460,7 @@ async function me(req, res) {
         gender: user.gender,
         isEmailVerified: user.isEmailVerified,
         avatarConfig: user.avatarConfig,
+        avatar3d: user.avatar3d,
         buddy: user.buddy,
         points: user.points,
         lifetimePoints: user.lifetimePoints,

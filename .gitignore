@@ -4,6 +4,10 @@
 node_modules/
 londoncafe-api/node_modules/
 
+# Archivos generados en el servidor (snapshots del avatar 3D, etc.) -- no
+# son código, se generan en runtime en cada instancia del backend.
+londoncafe-api/uploads/
+
 # Expo
 .expo/
 dist/

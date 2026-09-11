@@ -2,6 +2,7 @@
 const dotenv = require("dotenv");
 dotenv.config();
 
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 
@@ -47,6 +48,11 @@ app.post(
 
 // ✅ Ahora sí, JSON para todo lo demás
 app.use(express.json());
+
+// Snapshots del avatar 3D (PNG plano, ver me.controller.js
+// uploadAvatar3DSnapshot) -- almacenamiento local en disco, sin
+// S3/Cloudinary por ahora (ver plan del avatar 3D).
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // health
 app.get("/api/health", (req, res) => {

@@ -7,7 +7,7 @@ const SPECIES_EMOJI = { cat: "🐱", dog: "🐶", hamster: "🐹" };
 const MEDAL = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
 /**
- * Top de Café Tetris: quién ha juntado más fichas en una sola partida.
+ * Top de Café Crush: quién ha juntado más fichas en una sola partida.
  * Siempre muestra al usuario actual (aunque quede fuera del top) para que
  * tenga claro a cuánto está de subir -- "alguien a quien superar".
  */
@@ -42,7 +42,7 @@ export default function PetLeaderboard({ visible, onClose }) {
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.hdr}>
-            <Text style={styles.hdrTitle}>🏆 Top Café Tetris</Text>
+            <Text style={styles.hdrTitle}>🏆 Top Café Crush</Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeText}>Cerrar</Text>
             </Pressable>
@@ -56,7 +56,7 @@ export default function PetLeaderboard({ visible, onClose }) {
           ) : err ? (
             <Text style={styles.emptyText}>No se pudo cargar la tabla. Intenta de nuevo.</Text>
           ) : top.length === 0 ? (
-            <Text style={styles.emptyText}>Todavía nadie ha jugado Café Tetris. ¡Sé el primero! 🎮</Text>
+            <Text style={styles.emptyText}>Todavía nadie ha jugado Café Crush. ¡Sé el primero! 🎮</Text>
           ) : (
             <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
               {top.map((r) => (
@@ -93,7 +93,7 @@ function Row({ r }) {
         <Text style={styles.rowPet} numberOfLines={1}>{r.petName}</Text>
         <Text style={styles.rowOwner} numberOfLines={1}>{r.isMe ? "Tú" : r.ownerName}</Text>
       </View>
-      <Text style={styles.rowScore}>{r.best} 🧱</Text>
+      <Text style={styles.rowScore}>{r.best} 🍰</Text>
     </View>
   );
 }

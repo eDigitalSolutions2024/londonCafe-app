@@ -25,6 +25,7 @@ import AvatarCustomizeScreen from "./src/screens/AvatarCustomizeScreen";
 import AccountSettingsScreen from "./src/screens/AccountSettingsScreen";
 import AvatarPreviewLargeScreen from "./src/screens/AvatarPreviewLargeScreen";
 import PetScreen from "./src/screens/PetScreen";
+import Avatar3DGateScreen from "./src/screens/Avatar3DGateScreen";
 
 // Auth
 import LoginScreen from "./src/screens/LoginScreen";
@@ -167,12 +168,24 @@ function RootNav() {
 
 // Handles loading splash before mounting NavigationContainer
 function AppContent() {
-  const { loading } = useContext(AuthContext);
+  const { loading, user, token } = useContext(AuthContext);
 
   if (loading) {
     return (
       <SafeAreaProvider>
         <BootScreen />
+      </SafeAreaProvider>
+    );
+  }
+
+  // Migración obligatoria: toda cuenta logueada sin avatar3d.owned debe
+  // crear su avatar 3D antes de ver el resto de la app -- se monta acá,
+  // ANTES del NavigationContainer normal, así no hay forma de esquivarlo
+  // navegando a otro lado.
+  if (token && user && !user.avatar3d?.owned) {
+    return (
+      <SafeAreaProvider>
+        <Avatar3DGateScreen />
       </SafeAreaProvider>
     );
   }

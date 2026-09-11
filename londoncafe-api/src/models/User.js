@@ -12,6 +12,37 @@ const avatarSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// ✅ Avatar 3D "de verdad" -- reemplaza en USO (no en schema, para no
+// romper cuentas viejas a medio migrar) al `avatarConfig` plano de solo
+// pelo. Se arma combinando partes 3D prediseñadas (ver
+// src/assets/avatar3dParts.js en el cliente) -- NO es generación por IA
+// desde la foto (esa opción de mercado -- Ready Player Me -- cerró en
+// enero 2026, y las alternativas de pago cobran $800+/mes, desproporcionado
+// para esta app). La foto solo sugiere un tono de piel de partida.
+// `snapshotUrl` es un PNG plano pre-renderizado (captura del canvas de
+// three.js) que se usa en los 11+ lugares chicos de la app en vez de
+// cargar el visor 3D interactivo ahí (ver Avatar3DViewer.jsx).
+const avatar3dSchema = new mongoose.Schema(
+  {
+    owned: { type: Boolean, default: false },
+    parts: {
+      hair: { type: String, default: null },
+      head: { type: String, default: null },
+      body: { type: String, default: null },
+      outfit: { type: String, default: null },
+      accessory: { type: String, default: null },
+    },
+    colors: {
+      skin: { type: String, default: null },
+      hair: { type: String, default: null },
+    },
+    snapshotUrl: { type: String, default: null },
+    createdAt: { type: Date, default: null },
+    updatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 // ✅ Historial de puntos (opcional pero recomendado)
 const pointsHistorySchema = new mongoose.Schema(
   {
@@ -183,8 +214,14 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     isEmailVerified: { type: Boolean, default: false },
 
-    // ✅ Avatar
+    // ✅ Avatar (plano, legado -- se mantiene solo como fallback transitorio
+    // mientras las cuentas migran al avatar 3D)
     avatarConfig: { type: avatarSchema, default: () => ({}) },
+
+    // ✅ Avatar 3D real -- ver avatar3dSchema arriba. Migración OBLIGATORIA:
+    // toda cuenta sin `avatar3d.owned` debe pasar por el flujo de creación
+    // la próxima vez que abra la app (gate en el cliente vía getMe/login).
+    avatar3d: { type: avatar3dSchema, default: () => ({}) },
 
     // ✅ Puntos
     points: { type: Number, default: 0 }, // disponibles para canje

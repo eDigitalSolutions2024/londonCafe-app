@@ -89,6 +89,66 @@ function applyGravity(g) {
   return ng;
 }
 
+// ¿Hay al menos UN movimiento posible (horizontal o vertical, con una
+// celda vecina) que arme una combinación? Si no, el tablero está
+// "trabado" -- puede seguir subiendo para siempre sin que el jugador
+// pueda hacer nada. Se revisa cada intercambio adyacente real (celda
+// llena <-> celda llena) y también mover una ficha a un hueco vecino
+// (celda llena <-> null, que cae por gravedad y puede armar algo).
+function hasAnyMove(g) {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const v = g[r][c];
+      if (v == null || v === CLEARING) continue;
+      if (c + 1 < COLS && tryTestSwap(g, r, c, r, c + 1)) return true;
+      if (r + 1 < ROWS && tryTestSwap(g, r, c, r + 1, c)) return true;
+    }
+  }
+  return false;
+}
+
+function tryTestSwap(g, r1, c1, r2, c2) {
+  const a = g[r1][c1];
+  const b = g[r2][c2];
+  if (b === CLEARING) return false;
+  const g2 = g.map((row) => row.slice());
+  g2[r1][c1] = b;
+  g2[r2][c2] = a;
+  const settled = b == null ? applyGravity(g2) : g2;
+  return findMatches(settled).size > 0;
+}
+
+// Reparte de nuevo los sabores existentes en las mismas posiciones
+// (conserva cuánto ha subido el tablero) hasta encontrar un reparto que
+// SÍ tenga un movimiento posible y no regale un match gratis de una vez.
+function reshuffleBoard(g) {
+  const positions = [];
+  const values = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const v = g[r][c];
+      if (v != null && v !== CLEARING) {
+        positions.push([r, c]);
+        values.push(v);
+      }
+    }
+  }
+  let best = null;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    for (let i = values.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [values[i], values[j]] = [values[j], values[i]];
+    }
+    const ng = g.map((row) => row.slice());
+    positions.forEach(([r, c], idx) => {
+      ng[r][c] = values[idx];
+    });
+    best = ng;
+    if (findMatches(ng).size === 0 && hasAnyMove(ng)) return ng;
+  }
+  return best || g; // tras 40 intentos, lo que haya salido (rarísimo llegar aquí)
+}
+
 export default function PetMatch3({ visible, species = "cat", petName = "tu mascota", avatarConfig, onClose, onFinish }) {
   const [grid, setGrid] = useState(makeGrid);
   const [cleared, setCleared] = useState(0);
@@ -127,10 +187,21 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   const [petReaction, setPetReaction] = useState({ type: null, id: 0 });
 
   // Arrastre: SOLO visual mientras se mueve; el swap se aplica al soltar.
-  const dragX = useRef(new Animated.Value(0)).current; // ficha agarrada sigue el dedo
+  // Movimiento en CRUZ -- horizontal (columna, misma fila) Y vertical
+  // (fila, misma columna). Se traba al eje que domine la distancia
+  // arrastrada en cada frame (igual que cualquier match-3 estándar), así
+  // que un dedo un poco diagonal no queda "a medias" entre los dos ejes.
+  const dragX = useRef(new Animated.Value(0)).current; // ficha agarrada sigue el dedo (X)
+  const dragY = useRef(new Animated.Value(0)).current; // ficha agarrada sigue el dedo (Y)
   const nbL = useRef(new Animated.Value(0)).current; // vecino izquierdo se desliza
   const nbR = useRef(new Animated.Value(0)).current; // vecino derecho se desliza
-  const dragRef = useRef({ r: 0, c: 0, active: false, dx: 0 });
+  const nbUp = useRef(new Animated.Value(0)).current; // vecino de arriba se desliza
+  const nbDown = useRef(new Animated.Value(0)).current; // vecino de abajo se desliza
+  const dragRef = useRef({ r: 0, c: 0, active: false, dx: 0, dy: 0, axis: null });
+  // Aviso breve de "se barajó el tablero" cuando ya no había ningún
+  // movimiento posible (ver hasAnyMove/reshuffleBoard arriba).
+  const shuffleAnim = useRef(new Animated.Value(0)).current;
+  const [shuffled, setShuffled] = useState(false);
   // Un ref por FILA -- así la fila que agarraste nunca se calcula por
   // matemática de coordenadas (que fallaba con offsets verticales según
   // el dispositivo/notch). El sistema táctil de RN ya sabe, de forma
@@ -157,8 +228,12 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     overRef.current = false;
     riseMs.current = RISE_MS_START;
     dragX.setValue(0);
+    dragY.setValue(0);
     nbL.setValue(0);
     nbR.setValue(0);
+    nbUp.setValue(0);
+    nbDown.setValue(0);
+    setShuffled(false);
 
     scheduleRise();
     speedTimer.current = setInterval(() => {
@@ -204,7 +279,27 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
     setDanger(ng[1].some((x) => x != null) || ng[0].some((x) => x != null));
     if (findMatches(ng).size > 0) runResolve(0);
+    else checkDeadlock(ng);
     return false;
+  }
+
+  // Si ya no hay NINGÚN movimiento posible (ver hasAnyMove arriba), el
+  // tablero quedó trabado -- seguiría subiendo para siempre sin que el
+  // jugador pueda hacer nada. Se rebaraja en el lugar (mismas posiciones,
+  // sabores redistribuidos) y se avisa brevemente.
+  function checkDeadlock(g) {
+    if (overRef.current || dragRef.current.active) return;
+    if (hasAnyMove(g)) return;
+    const reshuffled = reshuffleBoard(g);
+    setGrid(reshuffled);
+    gridRef.current = reshuffled;
+    setShuffled(true);
+    shuffleAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(shuffleAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(900),
+      Animated.timing(shuffleAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start(() => setShuffled(false));
   }
 
   // Re-entrante: si ya está corriendo, marca pendiente y sale. Lee gridRef
@@ -259,7 +354,11 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     if (resolvePending.current && !overRef.current) {
       resolvePending.current = false;
       runResolve(0);
+      return;
     }
+    // El tablero ya se asentó del todo (sin cadena pendiente) -- si nadie
+    // tiene ninguna jugada posible desde aquí, se reparte de nuevo.
+    checkDeadlock(gridRef.current);
   }
 
   // --- Gestos ---
@@ -287,12 +386,20 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   // terminado (overRef) o que la celda tocada ya no tenga una ficha
   // válida en ESE instante (se relee gridRef fresco, así que si la
   // cadena ya se llevó esa ficha, simplemente no se agarra nada).
+  // Movimiento en CRUZ: dx manda un swap horizontal (misma fila, columna
+  // vecina), dy manda uno vertical (misma columna, fila vecina). Cada
+  // frame de onPanResponderMove se traba al eje que domine en ESE
+  // momento (como cualquier match-3), así que no hay estado "diagonal a
+  // medias" -- si el dedo se mueve sobre todo a la derecha, es
+  // horizontal; si sobre todo hacia abajo, es vertical.
   const rowPans = useRef(
     Array.from({ length: ROWS }, (_, r) =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => phaseRef.current === "play" && !overRef.current,
         onMoveShouldSetPanResponder: (_e, gs) =>
-          phaseRef.current === "play" && !overRef.current && Math.abs(gs.dx) > 4,
+          phaseRef.current === "play" &&
+          !overRef.current &&
+          (Math.abs(gs.dx) > 4 || Math.abs(gs.dy) > 4),
         onPanResponderGrant: (e) => {
           if (overRef.current) return;
           const { pageX } = e.nativeEvent;
@@ -302,10 +409,13 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
             if (c < 0 || c >= COLS) return;
             const k = gridRef.current[r][c];
             if (k == null || k === CLEARING) return;
-            dragRef.current = { r, c, active: true, dx: 0 };
+            dragRef.current = { r, c, active: true, dx: 0, dy: 0, axis: null };
             dragX.setValue(0);
+            dragY.setValue(0);
             nbL.setValue(0);
             nbR.setValue(0);
+            nbUp.setValue(0);
+            nbDown.setValue(0);
             setDragCell({ r, c });
           });
         },
@@ -314,14 +424,33 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
           if (!d.active || d.r !== r) return;
           if (overRef.current) return;
           const cell = cellRef.current;
-          let dx = Math.max(-cell, Math.min(cell, gs.dx));
-          // no dejes arrastrar fuera del tablero
-          if (d.c === 0 && dx < 0) dx = 0;
-          if (d.c === COLS - 1 && dx > 0) dx = 0;
-          d.dx = dx;
-          dragX.setValue(dx);
-          nbR.setValue(dx > 0 ? -dx : 0); // vecino derecho se corre a la izq
-          nbL.setValue(dx < 0 ? -dx : 0); // vecino izquierdo se corre a la der
+
+          // Traba el eje apenas el arrastre sea claramente más de un lado
+          // que del otro; hasta entonces no se decide (evita "saltar" de
+          // eje con cada micro-temblor del dedo al iniciar el gesto).
+          if (!d.axis) {
+            if (Math.abs(gs.dx) > Math.abs(gs.dy) + 3) d.axis = "x";
+            else if (Math.abs(gs.dy) > Math.abs(gs.dx) + 3) d.axis = "y";
+            else return;
+          }
+
+          if (d.axis === "x") {
+            let dx = Math.max(-cell, Math.min(cell, gs.dx));
+            if (d.c === 0 && dx < 0) dx = 0;
+            if (d.c === COLS - 1 && dx > 0) dx = 0;
+            d.dx = dx;
+            dragX.setValue(dx);
+            nbR.setValue(dx > 0 ? -dx : 0);
+            nbL.setValue(dx < 0 ? -dx : 0);
+          } else {
+            let dy = Math.max(-cell, Math.min(cell, gs.dy));
+            if (d.r === 0 && dy < 0) dy = 0;
+            if (d.r === ROWS - 1 && dy > 0) dy = 0;
+            d.dy = dy;
+            dragY.setValue(dy);
+            nbDown.setValue(dy > 0 ? -dy : 0); // vecino de abajo se corre hacia arriba
+            nbUp.setValue(dy < 0 ? -dy : 0); // vecino de arriba se corre hacia abajo
+          }
         },
         onPanResponderRelease: () => finishDrag(),
         onPanResponderTerminate: () => finishDrag(),
@@ -337,26 +466,43 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     const doSnap = () => {
       Animated.parallel([
         Animated.spring(dragX, { toValue: 0, friction: 7, tension: 140, useNativeDriver: true }),
+        Animated.spring(dragY, { toValue: 0, friction: 7, tension: 140, useNativeDriver: true }),
         Animated.spring(nbL, { toValue: 0, friction: 7, tension: 140, useNativeDriver: true }),
         Animated.spring(nbR, { toValue: 0, friction: 7, tension: 140, useNativeDriver: true }),
+        Animated.spring(nbUp, { toValue: 0, friction: 7, tension: 140, useNativeDriver: true }),
+        Animated.spring(nbDown, { toValue: 0, friction: 7, tension: 140, useNativeDriver: true }),
       ]).start();
+    };
+    const resetOffsets = () => {
+      dragX.setValue(0); dragY.setValue(0);
+      nbL.setValue(0); nbR.setValue(0); nbUp.setValue(0); nbDown.setValue(0);
     };
 
     if (overRef.current) {
       doSnap();
       return;
     }
+
     const swapThreshold = cellRef.current * SWAP_FRACTION;
-    const dir = d.dx > swapThreshold ? 1 : d.dx < -swapThreshold ? -1 : 0;
-    const tc = d.c + dir;
-    if (dir === 0 || tc < 0 || tc >= COLS) {
+    let tr = d.r, tc = d.c;
+    if (d.axis === "x") {
+      const dir = d.dx > swapThreshold ? 1 : d.dx < -swapThreshold ? -1 : 0;
+      if (dir === 0) { doSnap(); return; }
+      tc = d.c + dir;
+      if (tc < 0 || tc >= COLS) { doSnap(); return; }
+    } else if (d.axis === "y") {
+      const dir = d.dy > swapThreshold ? 1 : d.dy < -swapThreshold ? -1 : 0;
+      if (dir === 0) { doSnap(); return; }
+      tr = d.r + dir;
+      if (tr < 0 || tr >= ROWS) { doSnap(); return; }
+    } else {
       doSnap();
       return;
     }
 
     const g = gridRef.current.map((row) => row.slice());
     const sourceVal = g[d.r][d.c];
-    const targetVal = g[d.r][tc];
+    const targetVal = g[tr][tc];
 
     // Ahora se puede arrastrar mientras una cadena/combo sigue resolviendo
     // (ver comentario junto a rowPans) -- eso abre una ventana rara donde,
@@ -375,13 +521,11 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       // Siempre se confirma: no hay "a dónde regresar" que tenga más
       // sentido que dejarla caer.
       g[d.r][d.c] = null;
-      g[d.r][tc] = sourceVal;
+      g[tr][tc] = sourceVal;
       const settled = applyGravity(g);
       setGrid(settled);
       gridRef.current = settled;
-      dragX.setValue(0);
-      nbL.setValue(0);
-      nbR.setValue(0);
+      resetOffsets();
       if (findMatches(settled).size > 0) runResolve(0);
       return;
     }
@@ -400,14 +544,12 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     // de arriba algo quedó desalineado, esto lo vuelve a dejar consistente
     // en vez de dejar una ficha flotando.
     g[d.r][d.c] = targetVal;
-    g[d.r][tc] = sourceVal;
+    g[tr][tc] = sourceVal;
     const settled = applyGravity(g);
     if (findMatches(settled).size > 0) {
       setGrid(settled);
       gridRef.current = settled;
-      dragX.setValue(0);
-      nbL.setValue(0);
-      nbR.setValue(0);
+      resetOffsets();
       runResolve(0);
     } else {
       doSnap();
@@ -492,7 +634,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
           {phase === "play" ? (
             <>
               <View style={styles.hdr}>
-                <Text style={styles.hdrTitle}>Café Tetris 🧱</Text>
+                <Text style={styles.hdrTitle}>Café Crush 🍰</Text>
                 <View style={styles.hdrRight}>
                   <Text style={[styles.hdrMeta, danger && styles.hdrDanger]}>
                     {danger ? "¡Peligro!" : `${cleared} fichas`}
@@ -507,7 +649,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                 </View>
               </View>
               <Text style={styles.hdrSub}>
-                Arrastra una ficha de lado para acomodarla · junta 3 o más
+                Arrastra una ficha (↔ ↕) para acomodarla · junta 3 o más
                 {compact ? "" : " · 🔎 para ver todo el tablero"}
               </Text>
 
@@ -530,10 +672,18 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                             const isDrag = dragCell && dragCell.r === r && dragCell.c === c;
                             const isNbL = dragCell && dragCell.r === r && c === dragCell.c - 1;
                             const isNbR = dragCell && dragCell.r === r && c === dragCell.c + 1;
+                            const isNbUp = dragCell && dragCell.c === c && r === dragCell.r - 1;
+                            const isNbDown = dragCell && dragCell.c === c && r === dragCell.r + 1;
                             let extra = null;
-                            if (isDrag) extra = { transform: [{ translateX: dragX }, { scale: 1.08 }], zIndex: 20 };
-                            else if (isNbL) extra = { transform: [{ translateX: nbL }] };
+                            if (isDrag) {
+                              extra = {
+                                transform: [{ translateX: dragX }, { translateY: dragY }, { scale: 1.08 }],
+                                zIndex: 20,
+                              };
+                            } else if (isNbL) extra = { transform: [{ translateX: nbL }] };
                             else if (isNbR) extra = { transform: [{ translateX: nbR }] };
+                            else if (isNbUp) extra = { transform: [{ translateY: nbUp }] };
+                            else if (isNbDown) extra = { transform: [{ translateY: nbDown }] };
                             return (
                               <Animated.View
                                 key={`${r}-${c}`}
@@ -585,6 +735,12 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                       );
                     })}
                   </View>
+
+                  {shuffled && (
+                    <Animated.View pointerEvents="none" style={[styles.shuffleWrap, { opacity: shuffleAnim }]}>
+                      <Text style={styles.shuffleText}>🔀 ¡Sin movimientos! Se rebarajó el tablero</Text>
+                    </Animated.View>
+                  )}
                 </View>
 
                 <View style={styles.sideChar}>
@@ -693,6 +849,18 @@ const styles = StyleSheet.create({
     position: "absolute",
     fontSize: 18,
   },
+
+  shuffleWrap: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  shuffleText: { color: "#fff", fontSize: 10.5, fontWeight: "800", textAlign: "center" },
 
   endBtn: { alignSelf: "center", marginTop: 12, paddingVertical: 10, paddingHorizontal: 26, borderRadius: 999, borderWidth: 1.5, borderColor: colors.primarySoft },
   endBtnText: { color: colors.primary, fontWeight: "900", fontSize: 13 },

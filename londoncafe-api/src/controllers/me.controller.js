@@ -1,4 +1,6 @@
 // src/controllers/me.controller.js
+const fs = require("fs");
+const path = require("path");
 const User = require("../models/User");
 const EmailVerification = require("../models/EmailVerification");
 const PointsHistory = require("../models/PointsHistory");
@@ -206,7 +208,7 @@ async function getMe(req, res) {
     await user.save();
 
     const sanitizedUser = await User.findById(uid).select(
-      "name gender username email pendingEmail isEmailVerified avatarConfig createdAt buddy points lifetimePoints"
+      "name gender username email pendingEmail isEmailVerified avatarConfig avatar3d createdAt buddy points lifetimePoints"
     );
 
     const canRecover = calcCanRecover(user);
@@ -466,6 +468,125 @@ async function updateAvatar(req, res) {
   }
 }
 
+// --- Avatar 3D real -----------------------------------------------------
+// Catálogo server-side de ids válidos por slot -- mismo motivo que
+// VIP_HAIR_IDS arriba: sin esto, cualquiera podría mandar un id inventado
+// por API directo. Debe reflejar exactamente lo que existe en
+// src/assets/avatar3dParts.js del cliente -- ACTUALIZAR ambos lados juntos
+// cuando se agreguen assets nuevos (ids de ejemplo hasta que el set real de
+// modelos 3D quede elegido/importado -- ver plan).
+const AVATAR3D_PART_IDS = {
+  hair: new Set(["hair3d_01", "hair3d_02", "hair3d_03", "hair3d_04"]),
+  head: new Set(["head3d_01", "head3d_02"]),
+  body: new Set(["body3d_01", "body3d_02"]),
+  outfit: new Set(["outfit3d_01", "outfit3d_02", "outfit3d_03"]),
+  accessory: new Set([null, "acc3d_01", "acc3d_02"]),
+};
+const AVATAR3D_SLOTS = Object.keys(AVATAR3D_PART_IDS);
+const AVATAR3D_SKIN_COLORS = new Set(["#f2d3b3", "#e0ac69", "#c68642", "#8d5524", "#5a3825"]);
+const AVATAR3D_HAIR_COLORS = new Set(["#1c1c1c", "#4a2c14", "#a35b2c", "#d9a441", "#b33951", "#3c3c8c"]);
+
+const SNAPSHOT_DIR = path.join(__dirname, "..", "..", "uploads", "avatars");
+// Mismo dominio que el cliente ya usa como BASE_URL (src/api/client.js) --
+// necesitamos la URL ABSOLUTA porque <Image source={{uri}}> en RN no
+// resuelve rutas relativas como lo haría un navegador.
+const API_PUBLIC_URL = process.env.API_PUBLIC_URL || "https://app.londoncafejrz.com";
+
+// PUT /me/avatar3d   body: { parts: {hair,head,body,outfit,accessory}, colors: {skin,hair} }
+async function updateAvatar3D(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const { parts, colors } = req.body || {};
+    if (!parts || typeof parts !== "object") {
+      return res.status(400).json({ error: "BAD_PARTS" });
+    }
+
+    const $set = { "avatar3d.owned": true, "avatar3d.updatedAt": new Date() };
+
+    for (const slot of AVATAR3D_SLOTS) {
+      if (!(slot in parts)) continue;
+      const val = parts[slot];
+      if (!AVATAR3D_PART_IDS[slot].has(val)) {
+        return res.status(400).json({ error: "INVALID_PART", slot });
+      }
+      $set[`avatar3d.parts.${slot}`] = val;
+    }
+    // hair/head/body son obligatorios para tener un avatar completo -- si
+    // es la primera vez (no estaba `owned`), exige los 3.
+    const user0 = await User.findById(uid).select("avatar3d.owned");
+    if (!user0) return res.status(404).json({ error: "USER_NOT_FOUND" });
+    if (!user0.avatar3d?.owned) {
+      for (const req3 of ["hair", "head", "body"]) {
+        if (!$set[`avatar3d.parts.${req3}`]) {
+          return res.status(400).json({ error: "MISSING_PART", slot: req3 });
+        }
+      }
+    }
+
+    if (colors && typeof colors === "object") {
+      if ("skin" in colors) {
+        if (!AVATAR3D_SKIN_COLORS.has(colors.skin)) return res.status(400).json({ error: "INVALID_COLOR", field: "skin" });
+        $set["avatar3d.colors.skin"] = colors.skin;
+      }
+      if ("hair" in colors) {
+        if (!AVATAR3D_HAIR_COLORS.has(colors.hair)) return res.status(400).json({ error: "INVALID_COLOR", field: "hair" });
+        $set["avatar3d.colors.hair"] = colors.hair;
+      }
+    }
+    if (!$set["avatar3d.createdAt"] && !user0.avatar3d?.owned) {
+      $set["avatar3d.createdAt"] = new Date();
+    }
+
+    const updated = await User.findByIdAndUpdate(uid, { $set }, { new: true }).select("avatar3d");
+    return res.json({ ok: true, avatar3d: updated.avatar3d });
+  } catch (err) {
+    console.log("updateAvatar3D error:", err?.message);
+    return res.status(500).json({ error: "SERVER_ERROR" });
+  }
+}
+
+// POST /me/avatar3d/snapshot   body: { imageBase64: "data:image/png;base64,...." }
+// Guarda la captura del canvas de three.js (mandada por Avatar3DViewer al
+// terminar de personalizar) como PNG en disco local -- sin S3/Cloudinary
+// hoy en este backend (confirmado, ver plan), y a esta escala (~40
+// usuarios) no se justifica agregar ese costo/complejidad todavía.
+async function uploadAvatar3DSnapshot(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const { imageBase64 } = req.body || {};
+    if (typeof imageBase64 !== "string" || !imageBase64.startsWith("data:image/png;base64,")) {
+      return res.status(400).json({ error: "BAD_IMAGE" });
+    }
+    const raw = imageBase64.slice("data:image/png;base64,".length);
+    const buf = Buffer.from(raw, "base64");
+    if (buf.length === 0 || buf.length > 3 * 1024 * 1024) {
+      return res.status(400).json({ error: "IMAGE_TOO_LARGE" });
+    }
+
+    fs.mkdirSync(SNAPSHOT_DIR, { recursive: true });
+    const fileName = `${uid}.png`;
+    fs.writeFileSync(path.join(SNAPSHOT_DIR, fileName), buf);
+
+    // cache-bust con la hora -- el mismo userId reusa el mismo archivo cada
+    // vez que regenera su avatar, así que sin esto <Image> se quedaría con
+    // la versión vieja cacheada en el cliente.
+    const snapshotUrl = `${API_PUBLIC_URL}/uploads/avatars/${fileName}?t=${Date.now()}`;
+    const updated = await User.findByIdAndUpdate(
+      uid,
+      { $set: { "avatar3d.snapshotUrl": snapshotUrl } },
+      { new: true }
+    ).select("avatar3d");
+
+    return res.json({ ok: true, snapshotUrl, avatar3d: updated.avatar3d });
+  } catch (err) {
+    console.log("uploadAvatar3DSnapshot error:", err?.message);
+    return res.status(500).json({ error: "SERVER_ERROR" });
+  }
+}
 
 async function savePushToken(req, res) {
   try {
@@ -683,6 +804,8 @@ module.exports = {
   confirmEmailChange,
   resendEmailChangeCode,
   updateAvatar,
+  updateAvatar3D,
+  uploadAvatar3DSnapshot,
   claimReward,
   recoverStreak,
   savePushToken,

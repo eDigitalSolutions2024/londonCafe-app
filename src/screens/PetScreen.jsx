@@ -260,13 +260,13 @@ export default function PetScreen({ navigation }) {
           onPress={() => canPlay && !busy && setMatch3Open(true)}
           disabled={!canPlay || !!busy}
         >
-          <Text style={styles.playText}>🧱 Tetris</Text>
+          <Text style={styles.playText}>🍰 Café Crush</Text>
         </Pressable>
       </View>
 
       <Pressable style={styles.leaderboardLink} onPress={() => setLeaderboardOpen(true)}>
         <Text style={styles.leaderboardLinkText}>
-          🏆 Top Café Tetris{pet?.tetrisBest ? ` · tu mejor: ${pet.tetrisBest} fichas` : ""}
+          🏆 Top Café Crush{pet?.tetrisBest ? ` · tu mejor: ${pet.tetrisBest} fichas` : ""}
         </Text>
       </Pressable>
 

@@ -1,64 +1,22 @@
-import React, { useState, useContext, useMemo, useEffect } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Alert, TextInput } from "react-native";
+import React, { useState, useContext, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert, TextInput, Image } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { WebView } from "react-native-webview";
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
-import AvatarPreview from "../components/AvatarPreview";
+import Avatar3DViewer from "../components/Avatar3DViewer";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
-
-// ✅ Opciones base (sin filtrar)
-const OPTIONS = {
-  hair: [
-    "hair_01",
-    "hair_02",
-    "hair_03",
-    "hair_04",
-    "hair_05",
-    "hair_07",
-    "hair_f_01",
-    "hair_f_02",
-    "hair_f_03",
-    "hair_f_04",
-    "hair_f_05",
-  ],
-};
-
-// Mismos 2 estilos marcados VIP en el backend (me.controller.js) -- si se
-// agrega uno nuevo aquí, hay que agregarlo también allá o el guardado lo
-// rechazará con VIP_REQUIRED.
-const VIP_IDS = new Set(["hair_07", "hair_f_05"]);
-const VIP_THRESHOLD = 200;
-
-// Reemplaza "hair 01, hair 02..." por algo neutral que no revele el nombre
-// interno del archivo -- mismo orden que ya mostraba la UI vieja.
-const DISPLAY_NUMBER = {
-  hair_01: "01",
-  hair_02: "02",
-  hair_03: "03",
-  hair_04: "04",
-  hair_05: "05",
-  hair_f_01: "06",
-  hair_07: "07",
-  hair_f_02: "08",
-  hair_f_03: "09",
-  hair_f_04: "10",
-  hair_f_05: "11",
-};
-
-function isFemaleId(id) {
-  return String(id || "").includes("_f_");
-}
-
-function filterByGender(values, gender) {
-  const g = gender || "other";
-  if (g === "male") return values.filter((v) => !isFemaleId(v));
-  if (g === "female") return values.filter((v) => isFemaleId(v));
-  return values; // other => todo
-}
-
-function prettyLabel(v) {
-  return `Avatar ${DISPLAY_NUMBER[v] || "??"}`;
-}
+import {
+  HAIR_OPTIONS,
+  HEAD_OPTIONS,
+  BODY_OPTIONS,
+  OUTFIT_OPTIONS,
+  ACCESSORY_OPTIONS,
+  SKIN_COLORS,
+  HAIR_COLORS,
+  nearestSkinColor,
+} from "../assets/avatar3dParts";
 
 const PET_SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -66,61 +24,147 @@ const PET_SPECIES = [
   { id: "hamster", emoji: "🐹", label: "Hámster" },
 ];
 
-export default function AvatarCustomizeScreen({ navigation }) {
+// Muestrea el tono de piel promedio del centro de una foto -- corre 100%
+// en el cliente (WebView + canvas, la imagen nunca sale del teléfono ni se
+// sube al backend). Se monta solo mientras hay una foto pendiente de
+// analizar y se desmonta al terminar.
+function PhotoSkinSampler({ base64, onSample }) {
+  const html = `<!DOCTYPE html><html><body style="margin:0">
+<canvas id="c" width="40" height="40"></canvas>
+<script>
+  var img = new Image();
+  img.onload = function () {
+    var c = document.getElementById("c");
+    var ctx = c.getContext("2d");
+    var side = Math.min(img.width, img.height) * 0.5;
+    var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+    ctx.drawImage(img, sx, sy, side, side, 0, 0, 40, 40);
+    var data = ctx.getImageData(0, 0, 40, 40).data;
+    var r = 0, g = 0, b = 0, n = 0;
+    for (var i = 0; i < data.length; i += 4) { r += data[i]; g += data[i+1]; b += data[i+2]; n++; }
+    var result = { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
+    window.ReactNativeWebView.postMessage(JSON.stringify(result));
+  };
+  img.onerror = function () { window.ReactNativeWebView.postMessage(JSON.stringify({ error: true })); };
+  img.src = "data:image/jpeg;base64,${base64}";
+</script>
+</body></html>`;
+
+  return (
+    <View style={{ width: 1, height: 1, opacity: 0, position: "absolute" }}>
+      <WebView
+        originWhitelist={["*"]}
+        source={{ html }}
+        onMessage={(e) => {
+          try {
+            const d = JSON.parse(e.nativeEvent.data);
+            onSample(d.error ? null : d);
+          } catch {
+            onSample(null);
+          }
+        }}
+      />
+    </View>
+  );
+}
+
+function PartRow({ title, options, value, onChange }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
+        {options.map((opt) => {
+          const active = value === opt.id;
+          return (
+            <Pressable
+              key={String(opt.id)}
+              onPress={() => onChange(opt.id)}
+              style={[styles.partBtn, active && styles.partBtnActive]}
+            >
+              <Text style={styles.partEmoji}>{opt.emoji}</Text>
+              <Text style={[styles.partLabel, active && styles.partLabelActive]}>{opt.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+function ColorRow({ title, colors: opts, value, onChange }) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.colorRow}>
+        {opts.map((hex) => {
+          const active = value === hex;
+          return (
+            <Pressable
+              key={hex}
+              onPress={() => onChange(hex)}
+              style={[styles.swatch, { backgroundColor: hex }, active && styles.swatchActive]}
+            />
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// `forced`: usado por Avatar3DGateScreen (migración obligatoria post-login)
+// -- oculta "Cerrar" y la sección de mascota (no aplica en ese momento) y
+// llama `onDone` en vez de navigation.goBack() al terminar de guardar.
+export default function AvatarCustomizeScreen({ navigation, forced = false, onDone }) {
   const { token, setUser, user } = useContext(AuthContext);
   const [saving, setSaving] = useState(false);
-  const [points, setPoints] = useState(0);
 
-  const gender = user?.gender || "other";
-  const isVIP = points >= VIP_THRESHOLD;
+  const existing = user?.avatar3d;
+  const [parts, setParts] = useState({
+    hair: existing?.parts?.hair || HAIR_OPTIONS[0].id,
+    head: existing?.parts?.head || HEAD_OPTIONS[0].id,
+    body: existing?.parts?.body || BODY_OPTIONS[0].id,
+    outfit: existing?.parts?.outfit || OUTFIT_OPTIONS[0].id,
+    accessory: existing?.parts?.accessory ?? null,
+  });
+  const [avColors, setAvColors] = useState({
+    skin: existing?.colors?.skin || SKIN_COLORS[1],
+    hair: existing?.colors?.hair || HAIR_COLORS[0],
+  });
 
-  // ✅ Mismo balance de Buddy Coins (Wallet V2) que ya usa RewardsScreen
-  // para decidir VIP -- mismo umbral, misma fuente de verdad.
-  useEffect(() => {
-    if (!token) return;
-    apiFetch("/points/wallet", { headers: { Authorization: `Bearer ${token}` } })
-      .then((w) => setPoints(Number(w?.wallet?.balance) || 0))
-      .catch((e) => console.log("❌ AvatarCustomize wallet:", e?.data || e?.message));
-  }, [token]);
+  const [pendingPhoto, setPendingPhoto] = useState(null); // {base64}
+  const viewerRef = useRef(null);
 
-  // ✅ Opciones filtradas por género (other ve todo), separadas en Gratis / VIP
-  const filteredOptions = useMemo(() => {
-    return {
-      hair: filterByGender(OPTIONS.hair, gender),
-    };
-  }, [gender]);
+  const setPart = (slot, val) => setParts((p) => ({ ...p, [slot]: val }));
+  const setColor = (key, val) => setAvColors((c) => ({ ...c, [key]: val }));
 
-  const freeHair = useMemo(
-    () => filteredOptions.hair.filter((v) => !VIP_IDS.has(v)),
-    [filteredOptions]
-  );
-  const vipHair = useMemo(
-    () => filteredOptions.hair.filter((v) => VIP_IDS.has(v)),
-    [filteredOptions]
-  );
+  const pickPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permiso necesario", "Necesitamos acceso a tus fotos para sugerir un tono de piel.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (result.canceled) return;
+    const asset = result.assets?.[0];
+    if (asset?.base64) setPendingPhoto({ base64: asset.base64, uri: asset.uri });
+  };
 
-  const defaults = useMemo(
-    () => ({
-      skin: "skin_01",
-      eyes: "eyes_01",
-      hair: null,
-      hairColor: "hairColor_01",
-      top: "top_01",
-      bottom: "bottom_01",
-      shoes: "shoes_01",
-      accessory: null,
-    }),
-    []
-  );
+  const onSkinSampled = (rgb) => {
+    setPendingPhoto(null);
+    if (!rgb) {
+      Alert.alert("No se pudo leer la foto", "Elige tu tono de piel manualmente abajo.");
+      return;
+    }
+    setColor("skin", nearestSkinColor(rgb));
+  };
 
-  const initialConfig = useMemo(() => {
-    const fromUser = user?.avatarConfig || {};
-    return { ...defaults, ...fromUser };
-  }, [user, defaults]);
-
-  const [avatarConfig, setAvatarConfig] = useState(initialConfig);
-
-  // ✅ Mascota: se puede cambiar la especie / el nombre desde aquí
+  // Mascota (sin cambios -- especie/nombre; cuidarla vive en PetScreen)
   const [petOwned, setPetOwned] = useState(false);
   const [petSpecies, setPetSpecies] = useState("cat");
   const [petName, setPetName] = useState("");
@@ -146,8 +190,7 @@ export default function AvatarCustomizeScreen({ navigation }) {
       .catch((e) => console.log("❌ AvatarCustomize pet:", e?.data || e?.message));
   }, [token]);
 
-  const petDirty =
-    petOwned && (petSpecies !== petOrigSpecies || petName.trim() !== petOrigName);
+  const petDirty = petOwned && (petSpecies !== petOrigSpecies || petName.trim() !== petOrigName);
 
   const savePet = async () => {
     const clean = petName.trim();
@@ -174,57 +217,43 @@ export default function AvatarCustomizeScreen({ navigation }) {
     }
   };
 
-  // ✅ Fallback: si el hair guardado no corresponde al género, lo ajustamos
-    useEffect(() => {
-      const allowed = filteredOptions?.hair || [];
-      if (!allowed.length) return;
-
-      const current = avatarConfig?.hair || "hair_01";
-      if (!allowed.includes(current)) {
-        setAvatarConfig((prev) => ({ ...prev, hair: allowed[0] }));
-      }
-    }, [gender, filteredOptions]);
-
-  // ✅ Tocar un estilo VIP sin ser VIP SÍ actualiza la vista previa -- así
-  // la persona ve cómo se vería con ese estilo ("si llego, tendría
-  // acceso"). Lo que se bloquea es guardarlo (ver onSave), no verlo.
-  const setPart = (key, value) => {
-    setAvatarConfig((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const previewingLockedVIP = VIP_IDS.has(avatarConfig.hair) && !isVIP;
-
   const onSave = async () => {
+    if (!token) {
+      Alert.alert("Sesión", "No hay token. Vuelve a iniciar sesión.");
+      return;
+    }
     try {
-      if (!token) {
-        Alert.alert("Sesión", "No hay token. Vuelve a iniciar sesión.");
-        return;
-      }
-
-      if (VIP_IDS.has(avatarConfig.hair) && !isVIP) {
-        Alert.alert("Estilo VIP 🔒", `Necesitas ${VIP_THRESHOLD} Buddy Coins para usar este estilo.`);
-        return;
-      }
-
       setSaving(true);
 
-      const r = await apiFetch("/me/avatar", {
+      const r = await apiFetch("/me/avatar3d", {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ avatarConfig }),
+        body: JSON.stringify({ parts, colors: avColors }),
       });
 
-      if (setUser) {
-        setUser((prev) => ({
-          ...(prev || {}),
-          avatarConfig: r?.avatarConfig || avatarConfig,
-        }));
+      const dataUrl = await viewerRef.current?.capture();
+      let avatar3d = r?.avatar3d;
+      if (dataUrl) {
+        const snapRes = await apiFetch("/me/avatar3d/snapshot", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ imageBase64: dataUrl }),
+        });
+        avatar3d = snapRes?.avatar3d || avatar3d;
       }
 
-      Alert.alert("Listo", "Avatar actualizado ✅");
-      navigation.goBack();
+      if (setUser) {
+        setUser((prev) => ({ ...(prev || {}), avatar3d }));
+      }
+
+      if (forced) {
+        onDone?.(avatar3d);
+      } else {
+        Alert.alert("Listo", "Tu avatar 3D quedó guardado ✅");
+        if (navigation?.canGoBack?.()) navigation.goBack();
+      }
     } catch (e) {
-      console.log("❌ save avatar:", e?.data || e?.message);
+      console.log("❌ save avatar3d:", e?.data || e?.message);
       Alert.alert("Error", e?.data?.error || e?.message || "REQUEST_FAILED");
     } finally {
       setSaving(false);
@@ -234,102 +263,45 @@ export default function AvatarCustomizeScreen({ navigation }) {
   return (
     <Screen safeStyle={styles.safeDark}>
       <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Personalizar personaje</Text>
+            <Text style={styles.title}>{forced ? "¡Crea tu avatar 3D! 🎉" : "Tu avatar 3D"}</Text>
             <Text style={styles.sub}>
-              {isVIP ? "Eres miembro VIP ⚡" : `Te faltan ${Math.max(0, VIP_THRESHOLD - points)} Buddy Coins para VIP`}
+              {forced
+                ? "Arrástralo para girarlo, elige tus partes abajo y guarda para continuar"
+                : "Arrastra para girarlo · elige tus partes abajo"}
             </Text>
           </View>
-
-          <Pressable onPress={() => navigation.goBack()} style={styles.closeBtn}>
-            <Text style={styles.closeText}>Cerrar</Text>
-          </Pressable>
+          {!forced && navigation?.canGoBack?.() && (
+            <Pressable onPress={() => navigation.goBack()} style={styles.closeBtn}>
+              <Text style={styles.closeText}>Cerrar</Text>
+            </Pressable>
+          )}
         </View>
 
-        {/* Card */}
         <View style={styles.card}>
-          {/* Preview */}
           <View style={styles.previewWrap}>
-            <View style={styles.previewCircle}>
-              <AvatarPreview config={avatarConfig} size={150} />
-            </View>
+            <Avatar3DViewer ref={viewerRef} parts={parts} colors={avColors} interactive size={240} />
           </View>
 
-          {/* Gratis */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Gratis</Text>
-            <View style={styles.optionsRow}>
-              {freeHair.map((v) => {
-                const active = avatarConfig.hair === v;
-                return (
-                  <Pressable
-                    key={`hair-${v}`}
-                    onPress={() => setPart("hair", v)}
-                    style={[styles.optionBtn, active && styles.optionBtnActive]}
-                  >
-                    <Text style={[styles.optionText, active && styles.optionTextActive]}>
-                      {prettyLabel(v)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* VIP exclusivo */}
-          {vipHair.length > 0 && (
-            <View style={styles.section}>
-              <View style={styles.vipHeaderRow}>
-                <Text style={[styles.sectionTitle, { color: colors.accent }]}>★ VIP exclusivo</Text>
-                {!isVIP && <Text style={styles.vipHint}>Desbloquea con {VIP_THRESHOLD} Buddy Coins</Text>}
-              </View>
-              <View style={styles.optionsRow}>
-                {vipHair.map((v) => {
-                  const active = avatarConfig.hair === v;
-                  const locked = !isVIP;
-                  // ✅ Si está bloqueado pero es el que se está previsualizando,
-                  // se ve "activo" igual que cualquier otro seleccionado (no
-                  // atenuado) -- el candado en el texto sigue avisando que
-                  // falta desbloquearlo para poder guardarlo.
-                  return (
-                    <Pressable
-                      key={`hair-${v}`}
-                      onPress={() => setPart("hair", v)}
-                      style={[
-                        styles.optionBtn,
-                        styles.vipBtn,
-                        locked && !active && styles.vipBtnLocked,
-                        active && styles.optionBtnActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.optionText,
-                          styles.vipText,
-                          locked && !active && styles.vipTextLocked,
-                          active && styles.optionTextActive,
-                        ]}
-                      >
-                        {locked ? "🔒 " : "★ "}
-                        {prettyLabel(v)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {previewingLockedVIP && (
-                <Text style={styles.previewHint}>
-                  👁 Vista previa -- necesitas {VIP_THRESHOLD} Buddy Coins para guardar este estilo
-                </Text>
-              )}
-            </View>
+          <Pressable onPress={pickPhoto} style={styles.photoBtn}>
+            <Text style={styles.photoBtnText}>📷 Sugerir tono de piel con una foto</Text>
+          </Pressable>
+          {pendingPhoto && (
+            <PhotoSkinSampler base64={pendingPhoto.base64} onSample={onSkinSampled} />
           )}
 
-          {/* ✅ Mascota VIP -- cambiar especie / nombre aquí; cuidarla
-              (alimentar, jugar, limpiar, dormir) vive en PetScreen. */}
+          <ColorRow title="Tono de piel" colors={SKIN_COLORS} value={avColors.skin} onChange={(v) => setColor("skin", v)} />
+          <PartRow title="Pelo" options={HAIR_OPTIONS} value={parts.hair} onChange={(v) => setPart("hair", v)} />
+          <ColorRow title="Color de pelo" colors={HAIR_COLORS} value={avColors.hair} onChange={(v) => setColor("hair", v)} />
+          <PartRow title="Cara" options={HEAD_OPTIONS} value={parts.head} onChange={(v) => setPart("head", v)} />
+          <PartRow title="Cuerpo" options={BODY_OPTIONS} value={parts.body} onChange={(v) => setPart("body", v)} />
+          <PartRow title="Atuendo" options={OUTFIT_OPTIONS} value={parts.outfit} onChange={(v) => setPart("outfit", v)} />
+          <PartRow title="Accesorio" options={ACCESSORY_OPTIONS} value={parts.accessory} onChange={(v) => setPart("accessory", v)} />
+
+          {/* Mascota VIP -- especie/nombre; cuidarla vive en PetScreen.
+              No aplica todavía en el gate obligatorio post-login. */}
+          {!forced && (
           <View style={styles.section}>
             <View style={styles.vipHeaderRow}>
               <Text style={[styles.sectionTitle, { color: colors.accent }]}>🐾 Mascota VIP</Text>
@@ -385,18 +357,18 @@ export default function AvatarCustomizeScreen({ navigation }) {
             ) : (
               <Pressable
                 onPress={() => navigation.navigate("Pet")}
-                style={[styles.optionBtn, styles.vipBtn, { alignSelf: "flex-start" }]}
+                style={[styles.partBtn, { alignSelf: "flex-start" }]}
               >
-                <Text style={[styles.optionText, styles.vipText]} numberOfLines={1}>
+                <Text style={styles.partLabel} numberOfLines={1}>
                   🐾 Adopta tu mascota
                 </Text>
               </Pressable>
             )}
           </View>
+          )}
 
-          {/* Guardar */}
           <Pressable style={[styles.saveBtn, saving && { opacity: 0.75 }]} onPress={onSave} disabled={saving}>
-            <Text style={styles.saveText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
+            <Text style={styles.saveText}>{saving ? "Guardando..." : "Guardar avatar"}</Text>
           </Pressable>
         </View>
 
@@ -427,58 +399,49 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.primarySoft },
 
-  previewWrap: { alignItems: "center", marginBottom: 8 },
-  previewCircle: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "#fff",
+  previewWrap: { alignItems: "center", marginBottom: 10 },
+
+  photoBtn: {
+    alignSelf: "center",
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
+    marginBottom: 6,
   },
+  photoBtnText: { color: colors.primary, fontWeight: "900", fontSize: 12 },
 
   section: { marginTop: 14 },
   sectionTitle: { color: colors.textMuted, fontSize: 12, fontWeight: "900", letterSpacing: 0.3, marginBottom: 10 },
 
   vipHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   vipHint: { color: colors.textMuted, fontSize: 10.5, fontWeight: "700" },
-  previewHint: { marginTop: 6, color: colors.accent, fontSize: 11, fontWeight: "700" },
 
   optionsRow: { flexDirection: "row", flexWrap: "wrap" },
 
-  optionBtn: {
+  partBtn: {
+    alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 999,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: "#fff",
     marginRight: 10,
-    marginBottom: 10,
   },
-  optionBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  partBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  partEmoji: { fontSize: 22 },
+  partLabel: { marginTop: 4, color: "#111", fontSize: 11, fontWeight: "900" },
+  partLabelActive: { color: "#fff" },
 
-  optionText: { color: "#111", fontSize: 12, fontWeight: "900" },
-  optionTextActive: { color: "#fff" },
-
-  // ✅ VIP: fondo dorado suave con borde dorado -- se distingue de un
-  // vistazo de los pills gratis (blancos). Cuando está bloqueado, se
-  // atenúa y el candado en el texto ya comunica "no disponible".
-  vipBtn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  vipText: { color: "#2A0E18" },
-  vipBtnLocked: { backgroundColor: "rgba(232,207,174,0.18)", borderColor: "rgba(232,207,174,0.35)" },
-  // ✅ Esta pantalla vive sobre una tarjeta BLANCA (colors.card), no un
-  // fondo oscuro -- texto blanco translúcido aquí queda casi invisible.
-  // Vino apagado sí lee bien sobre el dorado suave del pill bloqueado.
-  vipTextLocked: { color: "rgba(122,30,58,0.55)" },
+  colorRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "transparent" },
+  swatchActive: { borderColor: colors.primary },
 
   saveBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
   saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 
-  // Mascota
   petSpeciesBtn: {
     alignItems: "center",
     paddingVertical: 10,
