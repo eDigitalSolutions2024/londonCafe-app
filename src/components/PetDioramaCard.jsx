@@ -158,7 +158,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
 
       <View style={styles.meta}>
         <Text style={styles.title}>Mascota VIP</Text>
-        <Text style={styles.status} numberOfLines={1}>
+        <Text style={styles.status} numberOfLines={2}>
           {statusLine}
         </Text>
       </View>
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
-  stage: { width: 150, height: 94, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
+  stage: { width: 128, height: 94, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
   halo: { position: "absolute", width: 116, height: 84, borderRadius: 999, backgroundColor: colors.accent, top: 6 },
   tilt: {
     flexDirection: "row",
@@ -205,6 +205,6 @@ const styles = StyleSheet.create({
   alert: { position: "absolute", top: 6, right: 10, fontSize: 20 },
   meta: { flex: 1, paddingHorizontal: 14, paddingVertical: 12 },
   title: { color: "#111", fontSize: 14, fontWeight: "900" },
-  status: { color: colors.textMuted, fontSize: 11.5, fontWeight: "700", marginTop: 3 },
+  status: { color: colors.textMuted, fontSize: 11.5, fontWeight: "700", marginTop: 3, lineHeight: 15 },
   chevron: { color: colors.textMuted, fontSize: 22, fontWeight: "900", paddingRight: 14 },
 });

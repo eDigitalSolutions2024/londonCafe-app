@@ -118,6 +118,8 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   const nbL = useRef(new Animated.Value(0)).current; // vecino izquierdo se desliza
   const nbR = useRef(new Animated.Value(0)).current; // vecino derecho se desliza
   const dragRef = useRef({ r: 0, c: 0, active: false, dx: 0 });
+  const boardRef = useRef(null);
+  const boardOrigin = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (!visible) return;
@@ -245,9 +247,16 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
         phaseRef.current === "play" && !resolving.current && !overRef.current && Math.abs(gs.dx) > 4,
       onPanResponderGrant: (e) => {
         if (resolving.current || overRef.current) return;
-        const { locationX, locationY } = e.nativeEvent;
-        const c = Math.floor(locationX / CELL);
-        const r = Math.floor(locationY / CELL);
+        // ⚠️ nativeEvent.locationX/Y es relativo a la vista TOCADA en iOS,
+        // pero relativo a la vista con el responder en Android -- con la
+        // rejilla de celdas eso daba un valor ~0..TILE en iOS sin importar
+        // dónde tocaras, y el arrastre nunca ubicaba la celda correcta.
+        // pageX/Y (coords absolutas de pantalla) sí es consistente en
+        // ambos, así que ubicamos la celda contra el origen medido del
+        // tablero en pantalla.
+        const { pageX, pageY } = e.nativeEvent;
+        const c = Math.floor((pageX - boardOrigin.current.x) / CELL);
+        const r = Math.floor((pageY - boardOrigin.current.y) / CELL);
         if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
         const k = gridRef.current[r][c];
         if (k == null || k === CLEARING) return;
@@ -367,7 +376,21 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
                 <View style={[styles.boardWrap, danger && styles.boardDanger]}>
                   <View style={styles.boardClip}>
-                    <Animated.View style={{ transform: [{ translateY: riseAnim }] }} {...pan.panHandlers}>
+                    <Animated.View
+                      ref={boardRef}
+                      collapsable={false}
+                      onLayout={() => {
+                        // measureInWindow es async -- lo cacheamos al montar/
+                        // cambiar de layout, se usa como origen para pageX/Y.
+                        requestAnimationFrame(() => {
+                          boardRef.current?.measureInWindow((x, y) => {
+                            boardOrigin.current = { x, y };
+                          });
+                        });
+                      }}
+                      style={{ transform: [{ translateY: riseAnim }] }}
+                      {...pan.panHandlers}
+                    >
                       {grid.map((row, r) => (
                         <View key={r} style={styles.row}>
                           {row.map((k, c) => {
