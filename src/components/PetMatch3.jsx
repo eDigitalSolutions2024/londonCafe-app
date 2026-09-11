@@ -7,14 +7,14 @@ import PetActor from "./PetActor";
 // --- Tablero estilo Pokémon Puzzle / Tetris Attack -------------------------
 const COLS = 6;
 const ROWS = 12;
-const TILE = 38;
-const CELL = TILE + 2;
+const TILE_NORMAL = 38;
+const TILE_COMPACT = 24; // modo "ver todo el tablero" -- las 12 filas caben en pantalla
 const START_FILLED = 4;
 const RISE_MS_START = 6500;
 const RISE_MS_MIN = 2600;
 const RISE_SPEEDUP_EVERY = 22000;
 const TARGET_CLEARED = 60;
-const SWAP_THRESHOLD = CELL * 0.42; // cuánto hay que arrastrar para intercambiar
+const SWAP_FRACTION = 0.42; // fracción de una celda que hay que arrastrar para intercambiar
 
 const KINDS = ["☕", "🥐", "🍰", "🍪", "🫖", "🥯"];
 const CLEARING = -2;
@@ -96,6 +96,15 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   const [phase, setPhase] = useState("play");
   const [danger, setDanger] = useState(false);
   const [dragCell, setDragCell] = useState(null); // {r, c} celda agarrada (solo para marcar el render)
+  const [compact, setCompact] = useState(false); // "ver tablero completo" -- fichas más chicas, se ven las 12 filas
+
+  const tileSize = compact ? TILE_COMPACT : TILE_NORMAL;
+  const cellSize = tileSize + 2;
+  // Los PanResponder de abajo se crean UNA sola vez (useRef) y sus
+  // closures no ven el `cellSize` de renders posteriores -- por eso la
+  // lógica de gestos lee siempre este ref, no la constante/local de arriba.
+  const cellRef = useRef(cellSize);
+  cellRef.current = cellSize;
 
   const resolving = useRef(false);
   const resolvePending = useRef(false);
@@ -185,7 +194,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     setGrid(ng);
     gridRef.current = ng;
 
-    riseAnim.setValue(CELL);
+    riseAnim.setValue(cellRef.current);
     Animated.timing(riseAnim, { toValue: 0, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
 
     setDanger(ng[1].some((x) => x != null) || ng[0].some((x) => x != null));
@@ -271,7 +280,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
           const { pageX } = e.nativeEvent;
           rowRefs[r].current?.measureInWindow((bx) => {
             if (overRef.current || resolving.current) return;
-            const c = Math.floor((pageX - bx) / CELL);
+            const c = Math.floor((pageX - bx) / cellRef.current);
             if (c < 0 || c >= COLS) return;
             const k = gridRef.current[r][c];
             if (k == null || k === CLEARING) return;
@@ -286,7 +295,8 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
           const d = dragRef.current;
           if (!d.active || d.r !== r) return;
           if (resolving.current || overRef.current) return;
-          let dx = Math.max(-CELL, Math.min(CELL, gs.dx));
+          const cell = cellRef.current;
+          let dx = Math.max(-cell, Math.min(cell, gs.dx));
           // no dejes arrastrar fuera del tablero
           if (d.c === 0 && dx < 0) dx = 0;
           if (d.c === COLS - 1 && dx > 0) dx = 0;
@@ -318,26 +328,47 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       doSnap();
       return;
     }
-    const dir = d.dx > SWAP_THRESHOLD ? 1 : d.dx < -SWAP_THRESHOLD ? -1 : 0;
+    const swapThreshold = cellRef.current * SWAP_FRACTION;
+    const dir = d.dx > swapThreshold ? 1 : d.dx < -swapThreshold ? -1 : 0;
     const tc = d.c + dir;
-    if (dir !== 0 && tc >= 0 && tc < COLS) {
-      const g = gridRef.current.map((row) => row.slice());
-      const t = g[d.r][d.c];
-      g[d.r][d.c] = g[d.r][tc];
-      g[d.r][tc] = t;
-      // Si el intercambio no arma ninguna combinación, la ficha no tiene
-      // "dónde acomodarse" -- vuelve a su lugar en vez de quedarse movida.
-      if (findMatches(g).size > 0) {
-        setGrid(g);
-        gridRef.current = g;
-        // reset instantáneo de los offsets (el grid ya refleja el swap)
-        dragX.setValue(0);
-        nbL.setValue(0);
-        nbR.setValue(0);
-        runResolve(0);
-      } else {
-        doSnap();
-      }
+    if (dir === 0 || tc < 0 || tc >= COLS) {
+      doSnap();
+      return;
+    }
+
+    const g = gridRef.current.map((row) => row.slice());
+    const sourceVal = g[d.r][d.c];
+    const targetVal = g[d.r][tc];
+
+    if (targetVal == null) {
+      // El destino está vacío -- no es un intercambio entre dos fichas,
+      // es "mover la ficha ahí". Debe CAER por gravedad hasta apoyarse en
+      // lo que haya debajo en esa columna (si no hay nada, llega al fondo).
+      // Siempre se confirma: no hay "a dónde regresar" que tenga más
+      // sentido que dejarla caer.
+      g[d.r][d.c] = null;
+      g[d.r][tc] = sourceVal;
+      const settled = applyGravity(g);
+      setGrid(settled);
+      gridRef.current = settled;
+      dragX.setValue(0);
+      nbL.setValue(0);
+      nbR.setValue(0);
+      if (findMatches(settled).size > 0) runResolve(0);
+      return;
+    }
+
+    // Intercambio normal entre dos fichas. Si no arma ninguna combinación,
+    // no tiene "dónde acomodarse" -- vuelve a su lugar en vez de quedarse.
+    g[d.r][d.c] = targetVal;
+    g[d.r][tc] = sourceVal;
+    if (findMatches(g).size > 0) {
+      setGrid(g);
+      gridRef.current = g;
+      dragX.setValue(0);
+      nbL.setValue(0);
+      nbR.setValue(0);
+      runResolve(0);
     } else {
       doSnap();
     }
@@ -383,11 +414,23 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
             <>
               <View style={styles.hdr}>
                 <Text style={styles.hdrTitle}>Café Tetris 🧱</Text>
-                <Text style={[styles.hdrMeta, danger && styles.hdrDanger]}>
-                  {danger ? "¡Peligro!" : `${cleared} fichas`}
-                </Text>
+                <View style={styles.hdrRight}>
+                  <Text style={[styles.hdrMeta, danger && styles.hdrDanger]}>
+                    {danger ? "¡Peligro!" : `${cleared} fichas`}
+                  </Text>
+                  <Pressable
+                    onPress={() => setCompact((v) => !v)}
+                    style={styles.zoomBtn}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.zoomBtnText}>{compact ? "🔍" : "🔎"}</Text>
+                  </Pressable>
+                </View>
               </View>
-              <Text style={styles.hdrSub}>Arrastra una ficha de lado para acomodarla · junta 3 o más</Text>
+              <Text style={styles.hdrSub}>
+                Arrastra una ficha de lado para acomodarla · junta 3 o más
+                {compact ? "" : " · 🔎 para ver todo el tablero"}
+              </Text>
 
               <View style={styles.stageRow}>
                 <Animated.View style={{ transform: [{ scale: avatarScale }] }}>
@@ -417,13 +460,16 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                                 key={`${r}-${c}`}
                                 style={[
                                   styles.cell,
+                                  { width: tileSize, height: tileSize },
                                   empty && styles.cellEmpty,
                                   clearing && styles.cellClearing,
                                   isDrag && styles.cellDrag,
                                   extra,
                                 ]}
                               >
-                                <Text style={styles.tile}>{empty ? "" : clearing ? "✨" : KINDS[k]}</Text>
+                                <Text style={[styles.tile, { fontSize: tileSize * 0.63 }]}>
+                                  {empty ? "" : clearing ? "✨" : KINDS[k]}
+                                </Text>
                               </Animated.View>
                             );
                           })}
@@ -474,8 +520,19 @@ const styles = StyleSheet.create({
 
   hdr: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   hdrTitle: { color: "#111", fontSize: 17, fontWeight: "900" },
+  hdrRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   hdrMeta: { color: colors.primary, fontSize: 15, fontWeight: "900" },
   hdrDanger: { color: "#d9534f" },
+  zoomBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  zoomBtnText: { fontSize: 13 },
   hdrSub: { color: colors.textMuted, fontSize: 11.5, fontWeight: "800", marginTop: 2, marginBottom: 8 },
 
   stageRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
@@ -487,8 +544,6 @@ const styles = StyleSheet.create({
   boardClip: { overflow: "hidden", borderRadius: 8 },
   row: { flexDirection: "row" },
   cell: {
-    width: TILE,
-    height: TILE,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,

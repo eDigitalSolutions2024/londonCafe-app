@@ -428,7 +428,7 @@ async function sleepPet(req, res) {
   }
 }
 
-const LEADERBOARD_LIMIT = 20;
+const LEADERBOARD_LIMIT = 10; // top 10 por lo pronto
 
 // GET /pet/leaderboard -- top mascotas por fichas en Café Tetris (mejor
 // partida). Incluye la posición del usuario que pregunta aunque no esté

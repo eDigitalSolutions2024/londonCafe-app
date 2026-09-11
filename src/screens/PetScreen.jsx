@@ -391,7 +391,10 @@ function ActionBtn({ emoji, label, onPress, disabled, badge }) {
 const styles = StyleSheet.create({
   safeDark: { backgroundColor: "#0b0709" },
   wrap: { flex: 1, backgroundColor: "#0b0709" },
-  content: { padding: 20, paddingBottom: 28 },
+  // paddingBottom generoso: esta pantalla se monta sobre la barra de tabs
+  // (no la reemplaza), así que sin esto el último elemento (el link del
+  // leaderboard) queda tapado por la barra.
+  content: { padding: 20, paddingBottom: 110 },
 
   header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
   title: { color: "#fff", fontSize: 20, fontWeight: "900" },
