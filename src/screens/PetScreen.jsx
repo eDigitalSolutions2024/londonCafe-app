@@ -9,6 +9,7 @@ import AvatarPreview from "../components/AvatarPreview";
 import PetActor from "../components/PetActor";
 import PetMiniGame from "../components/PetMiniGame";
 import PetMatch3 from "../components/PetMatch3";
+import PetLeaderboard from "../components/PetLeaderboard";
 
 const SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -60,6 +61,7 @@ export default function PetScreen({ navigation }) {
   const [busy, setBusy] = useState(null);
   const [gameOpen, setGameOpen] = useState(false);
   const [match3Open, setMatch3Open] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [sleeping, setSleeping] = useState(false);
   const [reaction, setReaction] = useState({ type: null, id: 0 });
   const sleepTimer = useRef(null);
@@ -147,9 +149,9 @@ export default function PetScreen({ navigation }) {
     await call("/pet/play", { score }, "play");
   };
 
-  const onMatch3Finish = async (score) => {
+  const onMatch3Finish = async (score, cleared) => {
     setMatch3Open(false);
-    await call("/pet/play", { score }, "play");
+    await call("/pet/play", { score, cleared, game: "tetris" }, "play");
   };
 
   const pet = state?.pet;
@@ -262,6 +264,12 @@ export default function PetScreen({ navigation }) {
         </Pressable>
       </View>
 
+      <Pressable style={styles.leaderboardLink} onPress={() => setLeaderboardOpen(true)}>
+        <Text style={styles.leaderboardLinkText}>
+          🏆 Top Café Tetris{pet?.tetrisBest ? ` · tu mejor: ${pet.tetrisBest} fichas` : ""}
+        </Text>
+      </Pressable>
+
       {!canPlay ? (
         <Text style={styles.nudgeText}>
           Tu mascota está agotada de jugar. Dale un{" "}
@@ -365,6 +373,7 @@ export default function PetScreen({ navigation }) {
         onClose={() => setMatch3Open(false)}
         onFinish={onMatch3Finish}
       />
+      <PetLeaderboard visible={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} />
     </Screen>
   );
 }
@@ -484,6 +493,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   playText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+
+  leaderboardLink: {
+    marginTop: 12,
+    alignSelf: "center",
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+  },
+  leaderboardLinkText: { color: colors.primary, fontSize: 11.5, fontWeight: "900" },
 
   tipText: { marginTop: 12, color: colors.textMuted, fontSize: 11, fontWeight: "700", textAlign: "center", lineHeight: 16 },
   nudgeText: {

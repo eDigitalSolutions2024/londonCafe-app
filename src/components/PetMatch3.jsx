@@ -118,8 +118,14 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   const nbL = useRef(new Animated.Value(0)).current; // vecino izquierdo se desliza
   const nbR = useRef(new Animated.Value(0)).current; // vecino derecho se desliza
   const dragRef = useRef({ r: 0, c: 0, active: false, dx: 0 });
-  const boardRef = useRef(null);
-  const boardOrigin = useRef({ x: 0, y: 0 });
+  // Un ref por FILA -- así la fila que agarraste nunca se calcula por
+  // matemática de coordenadas (que fallaba con offsets verticales según
+  // el dispositivo/notch). El sistema táctil de RN ya sabe, de forma
+  // nativa, qué fila tocaste con solo repartir el responder por fila; acá
+  // solo queda resolver la COLUMNA, midiendo esa fila en el eje X.
+  const rowRefs = useRef(
+    Array.from({ length: ROWS }, () => React.createRef())
+  ).current;
 
   useEffect(() => {
     if (!visible) return;
@@ -239,49 +245,60 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   }
 
   // --- Gestos ---
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () =>
-        phaseRef.current === "play" && !resolving.current && !overRef.current,
-      onMoveShouldSetPanResponder: (_e, gs) =>
-        phaseRef.current === "play" && !resolving.current && !overRef.current && Math.abs(gs.dx) > 4,
-      onPanResponderGrant: (e) => {
-        if (resolving.current || overRef.current) return;
-        // ⚠️ nativeEvent.locationX/Y es relativo a la vista TOCADA en iOS,
-        // pero relativo a la vista con el responder en Android -- con la
-        // rejilla de celdas eso daba un valor ~0..TILE en iOS sin importar
-        // dónde tocaras, y el arrastre nunca ubicaba la celda correcta.
-        // pageX/Y (coords absolutas de pantalla) sí es consistente en
-        // ambos, así que ubicamos la celda contra el origen medido del
-        // tablero en pantalla.
-        const { pageX, pageY } = e.nativeEvent;
-        const c = Math.floor((pageX - boardOrigin.current.x) / CELL);
-        const r = Math.floor((pageY - boardOrigin.current.y) / CELL);
-        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
-        const k = gridRef.current[r][c];
-        if (k == null || k === CLEARING) return;
-        dragRef.current = { r, c, active: true, dx: 0 };
-        dragX.setValue(0);
-        nbL.setValue(0);
-        nbR.setValue(0);
-        setDragCell({ r, c });
-      },
-      onPanResponderMove: (_e, gs) => {
-        const d = dragRef.current;
-        if (!d.active) return;
-        if (resolving.current || overRef.current) return;
-        let dx = Math.max(-CELL, Math.min(CELL, gs.dx));
-        // no dejes arrastrar fuera del tablero
-        if (d.c === 0 && dx < 0) dx = 0;
-        if (d.c === COLS - 1 && dx > 0) dx = 0;
-        d.dx = dx;
-        dragX.setValue(dx);
-        nbR.setValue(dx > 0 ? -dx : 0); // vecino derecho se corre a la izq
-        nbL.setValue(dx < 0 ? -dx : 0); // vecino izquierdo se corre a la der
-      },
-      onPanResponderRelease: () => finishDrag(),
-      onPanResponderTerminate: () => finishDrag(),
-    })
+  // Antes había UN solo PanResponder en todo el tablero, y la fila se
+  // calculaba con (toqueY - origenTableroY) / CELL. Ese cálculo dependía
+  // de que measureInWindow() del tablero completo coincidiera EXACTO con
+  // el sistema de coordenadas del toque -- en iOS eso quedaba desfasado
+  // (había que tocar más arriba de la ficha real para agarrarla) y
+  // ocasionalmente no agarraba nada.
+  //
+  // Ahora hay un PanResponder POR FILA. La fila ya no se calcula: el
+  // propio sistema táctil de RN decide, por dónde tocaste, cuál fila
+  // recibe el gesto -- cero matemática, cero desfase vertical posible.
+  // Solo queda resolver la COLUMNA, y para eso basta medir esa fila en el
+  // eje X (measureInWindow no se ve afectado por el transform vertical
+  // de riseAnim, así que tampoco hace falta esperar a que termine de
+  // animar para que la medición sea confiable).
+  const rowPans = useRef(
+    Array.from({ length: ROWS }, (_, r) =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () =>
+          phaseRef.current === "play" && !resolving.current && !overRef.current,
+        onMoveShouldSetPanResponder: (_e, gs) =>
+          phaseRef.current === "play" && !resolving.current && !overRef.current && Math.abs(gs.dx) > 4,
+        onPanResponderGrant: (e) => {
+          if (resolving.current || overRef.current) return;
+          const { pageX } = e.nativeEvent;
+          rowRefs[r].current?.measureInWindow((bx) => {
+            if (overRef.current || resolving.current) return;
+            const c = Math.floor((pageX - bx) / CELL);
+            if (c < 0 || c >= COLS) return;
+            const k = gridRef.current[r][c];
+            if (k == null || k === CLEARING) return;
+            dragRef.current = { r, c, active: true, dx: 0 };
+            dragX.setValue(0);
+            nbL.setValue(0);
+            nbR.setValue(0);
+            setDragCell({ r, c });
+          });
+        },
+        onPanResponderMove: (_e, gs) => {
+          const d = dragRef.current;
+          if (!d.active || d.r !== r) return;
+          if (resolving.current || overRef.current) return;
+          let dx = Math.max(-CELL, Math.min(CELL, gs.dx));
+          // no dejes arrastrar fuera del tablero
+          if (d.c === 0 && dx < 0) dx = 0;
+          if (d.c === COLS - 1 && dx > 0) dx = 0;
+          d.dx = dx;
+          dragX.setValue(dx);
+          nbR.setValue(dx > 0 ? -dx : 0); // vecino derecho se corre a la izq
+          nbL.setValue(dx < 0 ? -dx : 0); // vecino izquierdo se corre a la der
+        },
+        onPanResponderRelease: () => finishDrag(),
+        onPanResponderTerminate: () => finishDrag(),
+      })
+    )
   ).current;
 
   function finishDrag() {
@@ -308,13 +325,19 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       const t = g[d.r][d.c];
       g[d.r][d.c] = g[d.r][tc];
       g[d.r][tc] = t;
-      setGrid(g);
-      gridRef.current = g;
-      // reset instantáneo de los offsets (el grid ya refleja el swap)
-      dragX.setValue(0);
-      nbL.setValue(0);
-      nbR.setValue(0);
-      if (findMatches(g).size > 0) runResolve(0);
+      // Si el intercambio no arma ninguna combinación, la ficha no tiene
+      // "dónde acomodarse" -- vuelve a su lugar en vez de quedarse movida.
+      if (findMatches(g).size > 0) {
+        setGrid(g);
+        gridRef.current = g;
+        // reset instantáneo de los offsets (el grid ya refleja el swap)
+        dragX.setValue(0);
+        nbL.setValue(0);
+        nbR.setValue(0);
+        runResolve(0);
+      } else {
+        doSnap();
+      }
     } else {
       doSnap();
     }
@@ -376,23 +399,9 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
                 <View style={[styles.boardWrap, danger && styles.boardDanger]}>
                   <View style={styles.boardClip}>
-                    <Animated.View
-                      ref={boardRef}
-                      collapsable={false}
-                      onLayout={() => {
-                        // measureInWindow es async -- lo cacheamos al montar/
-                        // cambiar de layout, se usa como origen para pageX/Y.
-                        requestAnimationFrame(() => {
-                          boardRef.current?.measureInWindow((x, y) => {
-                            boardOrigin.current = { x, y };
-                          });
-                        });
-                      }}
-                      style={{ transform: [{ translateY: riseAnim }] }}
-                      {...pan.panHandlers}
-                    >
+                    <Animated.View style={{ transform: [{ translateY: riseAnim }] }}>
                       {grid.map((row, r) => (
-                        <View key={r} style={styles.row}>
+                        <View key={r} ref={rowRefs[r]} collapsable={false} style={styles.row} {...rowPans[r].panHandlers}>
                           {row.map((k, c) => {
                             const empty = k == null;
                             const clearing = k === CLEARING;

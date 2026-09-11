@@ -103,6 +103,10 @@ const petSchema = new mongoose.Schema(
 
     xp: { type: Number, default: 0, min: 0 },
 
+    // Mejor puntaje (fichas juntadas en una sola partida) del Café Tetris.
+    // Alimenta el leaderboard -- ver GET /pet/leaderboard.
+    tetrisBest: { type: Number, default: 0, min: 0 },
+
     // ✅ Anti-spam de notificaciones: se marca al avisar y se limpia cuando
     // la barra correspondiente se recupera (mismo patrón que
     // buddy.energyAlerts). Ver cron/pushJobs.js.

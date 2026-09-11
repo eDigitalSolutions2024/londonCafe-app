@@ -326,6 +326,18 @@ async function playPet(req, res) {
     if (!Number.isFinite(score)) score = 0.5;
     score = clamp(score, 0, 1);
 
+    // El Café Tetris manda además `cleared` (fichas juntadas, número crudo)
+    // y `game:"tetris"` -- alimenta el leaderboard (GET /pet/leaderboard).
+    // El mini-juego de atrapar no manda esto y no toca tetrisBest.
+    let tetrisRecord = false;
+    if (req.body?.game === "tetris") {
+      const cleared = Math.max(0, Math.floor(Number(req.body?.cleared) || 0));
+      if (cleared > Number(user.pet.tetrisBest ?? 0)) {
+        user.pet.tetrisBest = cleared;
+        tetrisRecord = true;
+      }
+    }
+
     const p = user.pet;
     const happyGain = Math.round(12 + score * 20); // 12..32
     const xpGain = Math.round(8 + score * 14); // 8..22
@@ -338,7 +350,7 @@ async function playPet(req, res) {
     user.markModified("pet");
     await user.save();
 
-    return res.json(petView(user, { action: "play", happyGain, xpGain }));
+    return res.json(petView(user, { action: "play", happyGain, xpGain, tetrisRecord }));
   } catch (err) {
     console.error("playPet ERROR:", err);
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
@@ -416,6 +428,58 @@ async function sleepPet(req, res) {
   }
 }
 
+const LEADERBOARD_LIMIT = 20;
+
+// GET /pet/leaderboard -- top mascotas por fichas en Café Tetris (mejor
+// partida). Incluye la posición del usuario que pregunta aunque no esté
+// en el top, así siempre tiene "alguien a quien superar" a la vista.
+async function getLeaderboard(req, res) {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const top = await User.find({ "pet.owned": true, "pet.tetrisBest": { $gt: 0 } })
+      .sort({ "pet.tetrisBest": -1 })
+      .limit(LEADERBOARD_LIMIT)
+      .select("name username pet.species pet.name pet.tetrisBest")
+      .lean();
+
+    const rows = top.map((u, i) => ({
+      rank: i + 1,
+      userId: String(u._id),
+      isMe: String(u._id) === String(uid),
+      ownerName: u.username || u.name || "Alguien",
+      species: u.pet?.species || "cat",
+      petName: u.pet?.name || "Mascota",
+      best: Number(u.pet?.tetrisBest) || 0,
+    }));
+
+    let me = rows.find((r) => r.isMe) || null;
+    if (!me) {
+      // No está en el top -- calculamos su posición real igual, para que
+      // siempre tenga una meta clara ("te faltan N fichas para el top").
+      const meUser = await User.findById(uid).select("name username pet.species pet.name pet.tetrisBest").lean();
+      const myBest = Number(meUser?.pet?.tetrisBest) || 0;
+      const ahead = await User.countDocuments({ "pet.owned": true, "pet.tetrisBest": { $gt: myBest } });
+      me = {
+        rank: ahead + 1,
+        userId: String(uid),
+        isMe: true,
+        ownerName: meUser?.username || meUser?.name || "Tú",
+        species: meUser?.pet?.species || "cat",
+        petName: meUser?.pet?.name || "Mascota",
+        best: myBest,
+        outsideTop: true,
+      };
+    }
+
+    return res.json({ ok: true, top: rows, me });
+  } catch (err) {
+    console.error("getLeaderboard ERROR:", err);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+}
+
 module.exports = {
   getPet,
   adoptPet,
@@ -424,6 +488,7 @@ module.exports = {
   playPet,
   cleanPet,
   sleepPet,
+  getLeaderboard,
   // usados por cron/pushJobs.js
   applyPetDecay,
   moodFromPet,
