@@ -119,6 +119,9 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
   const riseAnim = useRef(new Animated.Value(0)).current;
   const comboAnim = useRef(new Animated.Value(0)).current;
+  const comboSpin = useRef(new Animated.Value(0)).current;
+  const [comboBurst, setComboBurst] = useState([]); // chispas que salen disparadas del "¡Combo!"
+  const comboPid = useRef(0);
   const avatarBounce = useRef(new Animated.Value(0)).current;
   const [petReaction, setPetReaction] = useState({ type: null, id: 0 });
 
@@ -231,7 +234,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
       if (chain >= 2) {
         setCombo(chain);
-        popCombo();
+        popCombo(chain);
       }
       setPetReaction((x) => ({ type: chain >= 3 ? "play" : "eat", id: x.id + 1 }));
       bounceAvatar();
@@ -383,13 +386,42 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     clearInterval(speedTimer.current);
   }
 
-  function popCombo() {
+  // Combo "deslumbrante": punch con rebote (overshoot), un pequeño giro de
+  // celebración, y chispas ✨🎉 que salen disparadas en todas direcciones.
+  // Entre más grande el combo, más chispas y más dura el brillo.
+  function popCombo(chain) {
     comboAnim.setValue(0);
+    comboSpin.setValue(0);
     Animated.sequence([
-      Animated.timing(comboAnim, { toValue: 1, duration: 140, useNativeDriver: true }),
-      Animated.delay(500),
-      Animated.timing(comboAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.spring(comboAnim, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
+      Animated.delay(420 + Math.min(chain, 5) * 60),
+      Animated.timing(comboAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
     ]).start();
+    Animated.sequence([
+      Animated.timing(comboSpin, { toValue: 1, duration: 260, easing: Easing.out(Easing.back(2)), useNativeDriver: true }),
+      Animated.timing(comboSpin, { toValue: 0, duration: 160, useNativeDriver: true }),
+    ]).start();
+
+    const glyphs = chain >= 4 ? ["🎉", "✨", "⭐"] : ["✨", "⭐"];
+    const count = Math.min(4 + chain, 10);
+    const born = [];
+    for (let i = 0; i < count; i++) {
+      const id = ++comboPid.current;
+      const v = new Animated.Value(0);
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const dist = 34 + Math.random() * 22 + chain * 3;
+      born.push({
+        id,
+        v,
+        glyph: glyphs[i % glyphs.length],
+        dx: Math.cos(angle) * dist,
+        dy: Math.sin(angle) * dist,
+      });
+      Animated.timing(v, { toValue: 1, duration: 620, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(() => {
+        setComboBurst((cur) => cur.filter((p) => p.id !== id));
+      });
+    }
+    setComboBurst((cur) => [...cur, ...born]);
   }
   function bounceAvatar() {
     avatarBounce.setValue(0);
@@ -404,7 +436,9 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   const finish = () => onFinish?.(score, cleared);
 
   const avatarScale = avatarBounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
-  const comboScale = comboAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+  const comboScale = comboAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.22] });
+  const comboRot = comboSpin.interpolate({ inputRange: [0, 1], outputRange: ["-8deg", "6deg"] });
+  const comboColor = combo >= 4 ? "#e0a800" : colors.primary;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -478,12 +512,34 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                     </Animated.View>
                   </View>
 
-                  <Animated.Text
-                    pointerEvents="none"
-                    style={[styles.combo, { opacity: comboAnim, transform: [{ scale: comboScale }] }]}
-                  >
-                    ¡Combo x{combo}!
-                  </Animated.Text>
+                  <View pointerEvents="none" style={styles.comboWrap}>
+                    <Animated.View style={[styles.comboHalo, { opacity: comboAnim, transform: [{ scale: comboScale }] }]} />
+                    <Animated.Text
+                      style={[
+                        styles.combo,
+                        { color: comboColor, opacity: comboAnim, transform: [{ scale: comboScale }, { rotate: comboRot }] },
+                      ]}
+                    >
+                      ¡Combo x{combo}! {combo >= 4 ? "🔥" : ""}
+                    </Animated.Text>
+                    {comboBurst.map((p) => {
+                      const tx = p.v.interpolate({ inputRange: [0, 1], outputRange: [0, p.dx] });
+                      const ty = p.v.interpolate({ inputRange: [0, 1], outputRange: [0, p.dy] });
+                      const op = p.v.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 0] });
+                      const sc = p.v.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1.1, 0.7] });
+                      return (
+                        <Animated.Text
+                          key={p.id}
+                          style={[
+                            styles.comboSpark,
+                            { opacity: op, transform: [{ translateX: tx }, { translateY: ty }, { scale: sc }] },
+                          ]}
+                        >
+                          {p.glyph}
+                        </Animated.Text>
+                      );
+                    })}
+                  </View>
                 </View>
 
                 <View style={styles.sideChar}>
@@ -566,15 +622,31 @@ const styles = StyleSheet.create({
   },
   tile: { fontSize: 24 },
 
-  combo: {
+  comboWrap: {
     position: "absolute",
-    alignSelf: "center",
-    top: "42%",
-    color: colors.primary,
-    fontSize: 20,
+    top: "38%",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  comboHalo: {
+    position: "absolute",
+    width: 130,
+    height: 60,
+    borderRadius: 999,
+    backgroundColor: "#ffe9b0",
+  },
+  combo: {
+    fontSize: 24,
     fontWeight: "900",
     textShadowColor: "#fff",
-    textShadowRadius: 6,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  comboSpark: {
+    position: "absolute",
+    fontSize: 18,
   },
 
   endBtn: { alignSelf: "center", marginTop: 12, paddingVertical: 10, paddingHorizontal: 26, borderRadius: 999, borderWidth: 1.5, borderColor: colors.primarySoft },
