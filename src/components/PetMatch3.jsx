@@ -93,6 +93,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   const [grid, setGrid] = useState(makeGrid);
   const [cleared, setCleared] = useState(0);
   const [combo, setCombo] = useState(0);
+  const [comboSize, setComboSize] = useState(0); // fichas juntadas en ESE golpe (no el chain)
   const [phase, setPhase] = useState("play");
   const [danger, setDanger] = useState(false);
   const [dragCell, setDragCell] = useState(null); // {r, c} celda agarrada (solo para marcar el render)
@@ -146,6 +147,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     gridRef.current = g0;
     setCleared(0);
     setCombo(0);
+    setComboSize(0);
     setPhase("play");
     phaseRef.current = "play";
     setDanger(false);
@@ -232,9 +234,13 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       setGrid(marking);
       gridRef.current = marking;
 
-      if (chain >= 2) {
+      // Llamativo cuando hay CADENA (chain>=2) o cuando el golpe junta 4+
+      // fichas de una sola vez (aunque sea la primera y única jugada) --
+      // eso también merece celebración, no solo los combos encadenados.
+      if (chain >= 2 || m.size >= 4) {
         setCombo(chain);
-        popCombo(chain);
+        setComboSize(m.size);
+        popCombo(chain, m.size);
       }
       setPetReaction((x) => ({ type: chain >= 3 ? "play" : "eat", id: x.id + 1 }));
       bounceAvatar();
@@ -388,13 +394,17 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
   // Combo "deslumbrante": punch con rebote (overshoot), un pequeño giro de
   // celebración, y chispas ✨🎉 que salen disparadas en todas direcciones.
-  // Entre más grande el combo, más chispas y más dura el brillo.
-  function popCombo(chain) {
+  // `power` combina DOS cosas distintas que ambas merecen celebración:
+  // el chain (varias cadenas seguidas) Y el tamaño de un solo golpe (4+
+  // fichas de un tirón, aunque sea la primera y única jugada). Entre más
+  // grande, más chispas, más dura el brillo y más grande el texto.
+  function popCombo(chain, size) {
+    const power = Math.max(chain, size - 2);
     comboAnim.setValue(0);
     comboSpin.setValue(0);
     Animated.sequence([
       Animated.spring(comboAnim, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
-      Animated.delay(420 + Math.min(chain, 5) * 60),
+      Animated.delay(420 + Math.min(power, 5) * 60),
       Animated.timing(comboAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
     ]).start();
     Animated.sequence([
@@ -402,14 +412,14 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       Animated.timing(comboSpin, { toValue: 0, duration: 160, useNativeDriver: true }),
     ]).start();
 
-    const glyphs = chain >= 4 ? ["🎉", "✨", "⭐"] : ["✨", "⭐"];
-    const count = Math.min(4 + chain, 10);
+    const glyphs = power >= 3 ? ["🎉", "✨", "⭐"] : ["✨", "⭐"];
+    const count = Math.min(4 + power * 2, 14);
     const born = [];
     for (let i = 0; i < count; i++) {
       const id = ++comboPid.current;
       const v = new Animated.Value(0);
       const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
-      const dist = 34 + Math.random() * 22 + chain * 3;
+      const dist = 34 + Math.random() * 22 + power * 4;
       born.push({
         id,
         v,
@@ -438,7 +448,11 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   const avatarScale = avatarBounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
   const comboScale = comboAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.22] });
   const comboRot = comboSpin.interpolate({ inputRange: [0, 1], outputRange: ["-8deg", "6deg"] });
-  const comboColor = combo >= 4 ? "#e0a800" : colors.primary;
+  const comboPower = Math.max(combo, comboSize - 2);
+  const comboColor = comboPower >= 4 ? "#e0a800" : colors.primary;
+  // Si hubo cadena de verdad (2+ pasos) se destaca eso; si no, pero el
+  // golpe fue grande (4+ fichas de un tirón), se celebra el tamaño.
+  const comboLabel = combo >= 2 ? `¡Combo x${combo}!` : `¡${comboSize} de un tirón!`;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -520,7 +534,7 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                         { color: comboColor, opacity: comboAnim, transform: [{ scale: comboScale }, { rotate: comboRot }] },
                       ]}
                     >
-                      ¡Combo x{combo}! {combo >= 4 ? "🔥" : ""}
+                      {comboLabel} {comboPower >= 4 ? "🔥" : ""}
                     </Animated.Text>
                     {comboBurst.map((p) => {
                       const tx = p.v.interpolate({ inputRange: [0, 1], outputRange: [0, p.dx] });
