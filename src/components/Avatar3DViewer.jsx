@@ -199,21 +199,34 @@ function buildHtml(interactive) {
     // torso (y=0.68 contra un centro de torso en 0.62), casi del
     // estómago. armX queda un poco DENTRO del radio del torso a esa
     // altura para que se vean pegados, no flotando separados.
-    var armY = 0.92;
-    var armX = torsoRadius - 0.02;
-    var armGeo = new THREE.CapsuleGeometry(0.085, 0.48, 4, 8);
-    var armL = new THREE.Mesh(armGeo, mat); armL.position.set(-armX, armY, 0); armL.rotation.z = 0.24; g.add(armL);
-    var armR = new THREE.Mesh(armGeo, mat); armR.position.set(armX, armY, 0); armR.rotation.z = -0.24; g.add(armR);
+    // v3: los brazos quedaban cortos y muy abiertos (rotación de 0.24 rad
+    // + solo 0.48 de largo) -- se veían como aletitas saliendo del
+    // hombro en vez de brazos colgando a los lados. Ahora son más largos
+    // (bajan a la altura de la cadera, como brazos de verdad colgando) y
+    // casi verticales (rotación chica, solo un poco abiertos).
+    // v4: con la camisa (radio fijo 0.49, ver buildOutfit) el brazo
+    // quedaba METIDO dentro de su silueta -- solo se asomaban la mano y
+    // la punta del hombro, con el resto del brazo tapado por la tela,
+    // así que se veían como dos piezas flotando sueltas en vez de un
+    // brazo completo. armX ahora se mide contra el radio de la CAMISA
+    // (no del torso desnudo) para que el brazo quede afuera de verdad.
+    var armY = 0.9;
+    var armRot = 0.12;
+    var armLen = 0.62;
+    var armX = 0.44;
+    var armGeo = new THREE.CapsuleGeometry(0.08, armLen, 4, 8);
+    var armL = new THREE.Mesh(armGeo, mat); armL.position.set(-armX, armY, 0); armL.rotation.z = armRot; g.add(armL);
+    var armR = new THREE.Mesh(armGeo, mat); armR.position.set(armX, armY, 0); armR.rotation.z = -armRot; g.add(armR);
 
     // Manos: al final de cada brazo (mitad del largo + radio, corrido
     // por la misma rotación del brazo).
-    var handDrop = 0.48 / 2 + 0.085;
-    var handGeo = new THREE.SphereGeometry(0.1, 10, 10);
+    var handDrop = armLen / 2 + 0.08;
+    var handGeo = new THREE.SphereGeometry(0.095, 10, 10);
     var handL = new THREE.Mesh(handGeo, mat);
-    handL.position.set(-armX - Math.sin(0.24) * handDrop, armY - Math.cos(0.24) * handDrop, 0.01);
+    handL.position.set(-armX - Math.sin(armRot) * handDrop, armY - Math.cos(armRot) * handDrop, 0.01);
     g.add(handL);
     var handR = new THREE.Mesh(handGeo, mat);
-    handR.position.set(armX + Math.sin(0.24) * handDrop, armY - Math.cos(0.24) * handDrop, 0.01);
+    handR.position.set(armX + Math.sin(armRot) * handDrop, armY - Math.cos(armRot) * handDrop, 0.01);
     g.add(handR);
 
     var legGeo = new THREE.CapsuleGeometry(0.12, 0.46, 4, 8);
@@ -363,14 +376,15 @@ function buildHtml(interactive) {
     shirt.position.y = 0.58;
     g.add(shirt);
 
-    // Mangas: mismo origen/rotación que armL/armR (buildBody v2, hombro a
-    // y=0.92), pero con radio mayor -- así se ven como tela encima del
+    // Mangas: mismo origen/rotación que armL/armR (buildBody v3, hombro a
+    // y=0.9, brazo casi vertical), pero con radio mayor y solo cubriendo
+    // la parte de arriba del brazo -- así se ven como tela encima del
     // brazo, no como el brazo repintado.
-    var sleeveGeo = new THREE.CapsuleGeometry(0.11, 0.18, 4, 8);
+    var sleeveGeo = new THREE.CapsuleGeometry(0.105, 0.2, 4, 8);
     var sleeveL = new THREE.Mesh(sleeveGeo, shirtMat);
-    sleeveL.position.set(-0.4, 0.92, 0); sleeveL.rotation.z = 0.24; g.add(sleeveL);
+    sleeveL.position.set(-0.44, 1.0, 0); sleeveL.rotation.z = 0.12; g.add(sleeveL);
     var sleeveR = new THREE.Mesh(sleeveGeo, shirtMat);
-    sleeveR.position.set(0.4, 0.92, 0); sleeveR.rotation.z = -0.24; g.add(sleeveR);
+    sleeveR.position.set(0.44, 1.0, 0); sleeveR.rotation.z = -0.12; g.add(sleeveR);
 
     // Cuello de la camisa: a la altura de la base del cuello (buildBody
     // v2 pone el cuello en y=1.3, radio inferior 0.15).
