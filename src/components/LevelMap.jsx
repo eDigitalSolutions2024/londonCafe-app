@@ -1,20 +1,19 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, Modal } from "react-native";
 import { colors } from "../theme/colors";
-import { MATCH3_LEVELS } from "../assets/matchLevels";
 
-// Mapa de niveles del Café Crush -- progresión SECUENCIAL: solo se puede
-// jugar hasta `unlockedLevel` (el backend lo sube al ganar el nivel
-// actual, ver pet.controller.js `playPet`). Los niveles por debajo de
-// `unlockedLevel` ya se pasaron (⭐); el actual está abierto; el resto
-// sigue con 🔒 hasta llegar ahí.
-export default function Match3LevelMap({ visible, unlockedLevel = 1, onSelect, onClose }) {
+// Mapa de niveles genérico -- lo usan tanto Café Crush como Salto Café.
+// Progresión SECUENCIAL: solo se puede jugar hasta `unlockedLevel` (el
+// backend lo sube al ganar el nivel actual, ver pet.controller.js
+// `playPet`). Los niveles por debajo de `unlockedLevel` ya se pasaron
+// (⭐); el actual está abierto; el resto sigue con 🔒 hasta llegar ahí.
+export default function LevelMap({ visible, title, levels, unlockedLevel = 1, badge, onSelect, onClose }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.hdr}>
-            <Text style={styles.title}>Café Crush 🍰</Text>
+            <Text style={styles.title}>{title}</Text>
             <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
               <Text style={styles.closeText}>✕</Text>
             </Pressable>
@@ -22,7 +21,7 @@ export default function Match3LevelMap({ visible, unlockedLevel = 1, onSelect, o
           <Text style={styles.sub}>Elige un nivel</Text>
 
           <View style={styles.grid}>
-            {MATCH3_LEVELS.map((l) => {
+            {levels.map((l) => {
               const locked = l.level > unlockedLevel;
               const done = l.level < unlockedLevel;
               return (
@@ -35,7 +34,7 @@ export default function Match3LevelMap({ visible, unlockedLevel = 1, onSelect, o
                   <Text style={[styles.tileNum, locked && styles.tileNumLocked]}>
                     {locked ? "🔒" : done ? "⭐" : l.level}
                   </Text>
-                  {!locked && <Text style={styles.tileGoal}>{l.target} 🍰</Text>}
+                  {!locked && <Text style={styles.tileGoal}>{badge ? badge(l) : ""}</Text>}
                 </Pressable>
               );
             })}

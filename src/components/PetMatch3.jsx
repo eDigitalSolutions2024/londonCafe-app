@@ -161,6 +161,8 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
   const [comboSize, setComboSize] = useState(0); // fichas juntadas en ESE golpe (no el chain)
   const [phase, setPhase] = useState("play");
   const [won, setWon] = useState(false);
+  const [loseReason, setLoseReason] = useState("moves"); // "moves" | "time"
+  const [timeLeft, setTimeLeft] = useState(levelDef.timeLimit);
   const [dragCell, setDragCell] = useState(null); // {r, c} celda agarrada (solo para marcar el render)
   const [compact, setCompact] = useState(false); // "ver tablero completo" -- fichas más chicas, se ven las 12 filas
 
@@ -184,6 +186,7 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
   // arrancar la función.
   const clearedRef = useRef(0);
   const movesLeftRef = useRef(levelDef.moves);
+  const timeLeftRef = useRef(levelDef.timeLimit);
   gridRef.current = grid;
   phaseRef.current = phase;
 
@@ -227,9 +230,12 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
     clearedRef.current = 0;
     setMovesLeft(levelDef.moves);
     movesLeftRef.current = levelDef.moves;
+    setTimeLeft(levelDef.timeLimit);
+    timeLeftRef.current = levelDef.timeLimit;
     setCombo(0);
     setComboSize(0);
     setWon(false);
+    setLoseReason("moves");
     setPhase("play");
     phaseRef.current = "play";
     setDragCell(null);
@@ -248,6 +254,21 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
   useEffect(() => {
     if (!visible) return;
     resetLevel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, level]);
+
+  // Cronómetro del nivel -- corre en paralelo al límite de movimientos
+  // (lo que se acabe primero corta el nivel). Se salta mientras no esté
+  // en juego (resuelto/ganado/perdido) o el modal esté cerrado.
+  useEffect(() => {
+    if (!visible) return;
+    const t = setInterval(() => {
+      if (phaseRef.current !== "play" || overRef.current) return;
+      timeLeftRef.current = Math.max(0, timeLeftRef.current - 1);
+      setTimeLeft(timeLeftRef.current);
+      if (timeLeftRef.current <= 0) endGame(false, "time");
+    }, 1000);
+    return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, level]);
 
@@ -310,12 +331,12 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
       setPetReaction((x) => ({ type: chain >= 3 ? "play" : "eat", id: x.id + 1 }));
       bounceAvatar();
 
-      await wait(170);
+      await wait(120);
       const g2 = applyGravity(gridRef.current);
       const g3 = refillTop(g2, levelDef.kinds);
       setGrid(g3);
       gridRef.current = g3;
-      await wait(140);
+      await wait(100);
     }
 
     if (total > 0) {
@@ -336,7 +357,7 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
     // Ya no queda nada pendiente: revisa si el nivel se ganó o se perdió.
     if (!overRef.current) {
       if (clearedRef.current >= levelDef.target) endGame(true);
-      else if (movesLeftRef.current <= 0) endGame(false);
+      else if (movesLeftRef.current <= 0) endGame(false, "moves");
     }
   }
 
@@ -515,28 +536,32 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
     }
   }
 
-  function endGame(didWin) {
+  function endGame(didWin, reason) {
     if (overRef.current) return;
     overRef.current = true;
     setWon(!!didWin);
+    if (!didWin) setLoseReason(reason || "moves");
     setPhase("over");
     phaseRef.current = "over";
   }
 
   // Combo "deslumbrante": punch con rebote (overshoot), un pequeño giro de
   // celebración, y chispas ✨🎉 que salen disparadas en todas direcciones.
+  // Acortado a propósito (antes se quedaba ~0.7-1s+ tapando el tablero) --
+  // el arrastre nunca estuvo bloqueado durante esto, pero la alerta grande
+  // en medio de la pantalla estorbaba para seguir jugando a tiempo.
   function popCombo(chain, size) {
     const power = Math.max(chain, size - 2);
     comboAnim.setValue(0);
     comboSpin.setValue(0);
     Animated.sequence([
-      Animated.spring(comboAnim, { toValue: 1, friction: 4, tension: 160, useNativeDriver: true }),
-      Animated.delay(420 + Math.min(power, 5) * 60),
-      Animated.timing(comboAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.spring(comboAnim, { toValue: 1, friction: 5, tension: 220, useNativeDriver: true }),
+      Animated.delay(180 + Math.min(power, 5) * 30),
+      Animated.timing(comboAnim, { toValue: 0, duration: 140, useNativeDriver: true }),
     ]).start();
     Animated.sequence([
-      Animated.timing(comboSpin, { toValue: 1, duration: 260, easing: Easing.out(Easing.back(2)), useNativeDriver: true }),
-      Animated.timing(comboSpin, { toValue: 0, duration: 160, useNativeDriver: true }),
+      Animated.timing(comboSpin, { toValue: 1, duration: 180, easing: Easing.out(Easing.back(2)), useNativeDriver: true }),
+      Animated.timing(comboSpin, { toValue: 0, duration: 110, useNativeDriver: true }),
     ]).start();
 
     const glyphs = power >= 3 ? ["🎉", "✨", "⭐"] : ["✨", "⭐"];
@@ -600,7 +625,10 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
               <View style={styles.goalRow}>
                 <Text style={styles.goalText}>🎯 {cleared}/{levelDef.target}</Text>
                 <Text style={[styles.goalText, movesLeft <= 3 && styles.goalDanger]}>
-                  🔁 {movesLeft} {movesLeft === 1 ? "movimiento" : "movimientos"}
+                  🔁 {movesLeft}
+                </Text>
+                <Text style={[styles.goalText, timeLeft <= 10 && styles.goalDanger]}>
+                  ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
                 </Text>
               </View>
               <Text style={styles.hdrSub}>
@@ -715,7 +743,9 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
               <Text style={styles.doneSub}>
                 {won
                   ? `¡${petName} está feliz! 🎉${level < MAX_MATCH3_LEVEL ? " Ya se abrió el siguiente nivel." : " ¡Completaste todos los niveles!"}`
-                  : `Te faltaron ${Math.max(0, levelDef.target - cleared)} -- ¡inténtalo de nuevo!`}
+                  : `Te faltaron ${Math.max(0, levelDef.target - cleared)} -- ${
+                      loseReason === "time" ? "se acabó el tiempo" : "sin movimientos"
+                    }. ¡Inténtalo de nuevo!`}
               </Text>
               {!won && (
                 <Pressable style={styles.doneBtn} onPress={resetLevel}>

@@ -9,7 +9,10 @@ import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
 import PetActor from "../components/PetActor";
 import PetMiniGame from "../components/PetMiniGame";
 import PetMatch3 from "../components/PetMatch3";
-import Match3LevelMap from "../components/Match3LevelMap";
+import PetDoodleJump from "../components/PetDoodleJump";
+import LevelMap from "../components/LevelMap";
+import { MATCH3_LEVELS } from "../assets/matchLevels";
+import { DOODLE_LEVELS } from "../assets/doodleLevels";
 import PetLeaderboard from "../components/PetLeaderboard";
 
 const SPECIES = [
@@ -73,6 +76,9 @@ export default function PetScreen({ navigation }) {
   // jugando ahora mismo -- null = mostrando el mapa, número = jugando.
   const [match3Open, setMatch3Open] = useState(false);
   const [match3Level, setMatch3Level] = useState(null);
+  // Mismo patrón exacto para "Salto Café" (Doodle Jump).
+  const [doodleOpen, setDoodleOpen] = useState(false);
+  const [doodleLevel, setDoodleLevel] = useState(null);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   // ✅ El sueño ya no es una animación cosmética de 2.6s -- el backend
   // devuelve `sleepSecondsLeft` (tiempo real restante del freeze, ver
@@ -185,6 +191,11 @@ export default function PetScreen({ navigation }) {
   const onMatch3Finish = async (score, cleared, level, won) => {
     setMatch3Level(null); // vuelve al mapa de niveles (match3Open sigue true)
     await call("/pet/play", { score, cleared, game: "tetris", level, won }, "play");
+  };
+
+  const onDoodleFinish = async (score, height, level, won) => {
+    setDoodleLevel(null); // vuelve al mapa de niveles (doodleOpen sigue true)
+    await call("/pet/play", { score, height, game: "doodle", level, won }, "play");
   };
 
   const pet = state?.pet;
@@ -306,6 +317,16 @@ export default function PetScreen({ navigation }) {
         </Pressable>
       </View>
 
+      <View style={[styles.playRow, { marginTop: 10 }]}>
+        <Pressable
+          style={[styles.playBtn, (!canPlay || busy || sleeping) && { opacity: 0.45 }]}
+          onPress={() => canPlay && !busy && !sleeping && setDoodleOpen(true)}
+          disabled={!canPlay || !!busy || sleeping}
+        >
+          <Text style={styles.playText}>🦘 Salto Café</Text>
+        </Pressable>
+      </View>
+
       <Pressable style={styles.leaderboardLink} onPress={() => setLeaderboardOpen(true)}>
         <Text style={styles.leaderboardLinkText}>
           🏆 Top Café Crush{pet?.tetrisBest ? ` · tu mejor: ${pet.tetrisBest} fichas` : ""}
@@ -407,9 +428,12 @@ export default function PetScreen({ navigation }) {
         onClose={() => setGameOpen(false)}
         onFinish={onGameFinish}
       />
-      <Match3LevelMap
+      <LevelMap
+        title="Café Crush 🍰"
         visible={match3Open && match3Level == null}
+        levels={MATCH3_LEVELS}
         unlockedLevel={Number(pet?.match3Level) || 1}
+        badge={(l) => `${l.target} 🍰`}
         onSelect={(lvl) => setMatch3Level(lvl)}
         onClose={() => setMatch3Open(false)}
       />
@@ -421,6 +445,23 @@ export default function PetScreen({ navigation }) {
         avatarConfig={avatarConfig}
         onClose={() => setMatch3Level(null)}
         onFinish={onMatch3Finish}
+      />
+      <LevelMap
+        title="Salto Café 🦘"
+        visible={doodleOpen && doodleLevel == null}
+        levels={DOODLE_LEVELS}
+        unlockedLevel={Number(pet?.doodleLevel) || 1}
+        badge={(l) => `${l.targetHeight}`}
+        onSelect={(lvl) => setDoodleLevel(lvl)}
+        onClose={() => setDoodleOpen(false)}
+      />
+      <PetDoodleJump
+        visible={doodleOpen && doodleLevel != null}
+        level={doodleLevel || 1}
+        species={pet?.species}
+        petName={pet?.name || "tu mascota"}
+        onClose={() => setDoodleLevel(null)}
+        onFinish={onDoodleFinish}
       />
       <PetLeaderboard visible={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} />
     </Screen>

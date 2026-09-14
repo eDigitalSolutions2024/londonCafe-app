@@ -374,6 +374,28 @@ async function playPet(req, res) {
       }
     }
 
+    // "Salto Café" (Doodle Jump) manda `height` (unidades subidas) y
+    // `game:"doodle"` -- mismo patrón exacto que el Café Tetris de arriba,
+    // con sus propios campos (doodleBest/doodleLevel) para no mezclar
+    // records/progresión entre los dos juegos.
+    let doodleRecord = false;
+    let doodleLevelUp = false;
+    if (req.body?.game === "doodle") {
+      const height = Math.max(0, Math.floor(Number(req.body?.height) || 0));
+      if (height > Number(user.pet.doodleBest ?? 0)) {
+        user.pet.doodleBest = height;
+        doodleRecord = true;
+      }
+
+      const won = req.body?.won === true;
+      const level = Math.floor(Number(req.body?.level));
+      const current = Number(user.pet.doodleLevel) || 1;
+      if (won && Number.isFinite(level) && level === current && current < 10) {
+        user.pet.doodleLevel = current + 1;
+        doodleLevelUp = true;
+      }
+    }
+
     const p = user.pet;
     const happyGain = Math.round(12 + score * 20); // 12..32
     const xpGain = Math.round(8 + score * 14); // 8..22
@@ -386,7 +408,7 @@ async function playPet(req, res) {
     user.markModified("pet");
     await user.save();
 
-    return res.json(petView(user, { action: "play", happyGain, xpGain, tetrisRecord, levelUp }));
+    return res.json(petView(user, { action: "play", happyGain, xpGain, tetrisRecord, levelUp, doodleRecord, doodleLevelUp }));
   } catch (err) {
     console.error("playPet ERROR:", err);
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });

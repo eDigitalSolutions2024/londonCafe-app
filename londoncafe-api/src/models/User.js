@@ -143,6 +143,11 @@ const petSchema = new mongoose.Schema(
     // < match3Level ya se pasó, match3Level mismo es el actual abierto.
     match3Level: { type: Number, default: 1, min: 1, max: 10 },
 
+    // Mismo patrón que match3Level/tetrisBest, pero para "Salto Café"
+    // (estilo Doodle Jump) -- ver doodleLevels.js en el cliente.
+    doodleBest: { type: Number, default: 0, min: 0 },
+    doodleLevel: { type: Number, default: 1, min: 1, max: 10 },
+
     // ✅ Anti-spam de notificaciones: se marca al avisar y se limpia cuando
     // la barra correspondiente se recupera (mismo patrón que
     // buddy.energyAlerts). Ver cron/pushJobs.js.
