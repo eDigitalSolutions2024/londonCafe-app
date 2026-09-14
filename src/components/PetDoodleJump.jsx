@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Modal, Animated, PanResponder } from "react-native";
+import { Accelerometer } from "expo-sensors";
 import { colors } from "../theme/colors";
 import { getDoodleLevel, MAX_DOODLE_LEVEL } from "../assets/doodleLevels";
 
@@ -48,6 +49,16 @@ const CAMERA_ANCHOR = BOARD_HEIGHT * 0.38; // altura de pantalla donde se "clava
 const FRAME_MS = 16;
 const ITEM_SPAWN_CHANCE = 0.22; // fracción de plataformas nuevas que traen un ☕/🥐 flotando encima
 
+// Control por inclinación: solo se aplica cuando el dedo NO está tocando
+// el tablero (arrastrar con el dedo manda siempre que esté activo). El
+// acelerómetro da G's (típicamente -1..1 al inclinar el celular a los
+// lados) -- se suaviza con un filtro simple para que no tiemble, y se
+// ignora un rango chico cerca de 0 para que sostenerlo "derecho" no haga
+// que la mascota se resbale sola.
+const TILT_SENSITIVITY = 16; // px/frame por cada 1.0 de inclinación
+const TILT_DEADZONE = 0.06;
+const TILT_SMOOTHING = 0.25; // 0..1, más alto = responde más rápido/tiembla más
+
 export default function PetDoodleJump({ visible, level = 1, species = "cat", petName = "tu mascota", onClose, onFinish }) {
   const levelDef = getDoodleLevel(level);
   const emoji = SPECIES_EMOJI[species] || "🐾";
@@ -70,7 +81,8 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
   const topmostYRef = useRef(0);
   const platformPid = useRef(0);
   const itemPid = useRef(0);
-  const dragStartXRef = useRef(0);
+  const draggingRef = useRef(false);
+  const tiltRef = useRef(0);
   const coffeeRef = useRef(0);
   const breadRef = useRef(0);
 
@@ -165,6 +177,13 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
     if (phaseRef.current !== "play") return;
     const ch = charRef.current;
 
+    // Inclinación: solo mueve si el dedo no está tocando el tablero ahora
+    // mismo (el arrastre manda). Zona muerta chica para que "derecho" no
+    // resbale solo por el ruido del sensor.
+    if (!draggingRef.current && Math.abs(tiltRef.current) > TILT_DEADZONE) {
+      ch.x += tiltRef.current * TILT_SENSITIVITY;
+    }
+
     vyRef.current += GRAVITY;
     const prevY = ch.y;
     ch.y += vyRef.current;
@@ -238,19 +257,48 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, phase]);
 
+  // Arrastre ABSOLUTO -- el personaje salta directo a donde está el dedo
+  // (locationX ya viene relativo al propio boardWrap, en las mismas
+  // coordenadas 0..BOARD_WIDTH que usa toda la física) en vez de mover un
+  // delta relativo a dónde empezó el toque. Se siente como agarrar y
+  // arrastrar a la mascota de verdad, no como "empujarla" desde donde
+  // tocaste. Mientras el dedo está abajo, manda sobre la inclinación
+  // (ver tiltRef/TILT_* arriba y su aplicación en tick()).
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => phaseRef.current === "play",
       onMoveShouldSetPanResponder: () => phaseRef.current === "play",
-      onPanResponderGrant: () => {
-        dragStartXRef.current = charRef.current.x;
+      onPanResponderGrant: (e) => {
+        draggingRef.current = true;
+        charRef.current.x = e.nativeEvent.locationX;
       },
-      onPanResponderMove: (_e, gs) => {
+      onPanResponderMove: (e) => {
         if (phaseRef.current !== "play") return;
-        charRef.current.x = dragStartXRef.current + gs.dx;
+        charRef.current.x = e.nativeEvent.locationX;
+      },
+      onPanResponderRelease: () => {
+        draggingRef.current = false;
+      },
+      onPanResponderTerminate: () => {
+        draggingRef.current = false;
       },
     })
   ).current;
+
+  // Inclinación: se suscribe solo mientras el modal está visible y en
+  // juego -- se desuscribe al cerrar/perder/ganar para no seguir leyendo
+  // el sensor (batería) ni mover al personaje fuera de esta pantalla.
+  useEffect(() => {
+    if (!visible || phase !== "play") return;
+    Accelerometer.setUpdateInterval(FRAME_MS);
+    const sub = Accelerometer.addListener(({ x }) => {
+      tiltRef.current = tiltRef.current * (1 - TILT_SMOOTHING) + x * TILT_SMOOTHING;
+    });
+    return () => {
+      sub.remove();
+      tiltRef.current = 0;
+    };
+  }, [visible, phase]);
 
   // Los ítems dan un empujoncito extra al puntaje (además de la altura),
   // con tope en 1 -- una recompensa chica, no el objetivo principal.
@@ -284,7 +332,7 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
                   </Text>
                 )}
               </View>
-              <Text style={styles.hdrSub}>Arrastra a los lados para moverte -- la mascota rebota sola</Text>
+              <Text style={styles.hdrSub}>Arrastra a la mascota o inclina el celular a los lados -- rebota sola</Text>
 
               <View style={styles.boardWrap} {...panResponder.panHandlers}>
                 {platformsRef.current.map((p) => {
