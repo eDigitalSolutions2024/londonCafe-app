@@ -262,7 +262,10 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
 
   return (
     <Screen safeStyle={styles.safeDark}>
-      <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {/* Fuera del ScrollView a propósito: el avatar se queda fijo
+          arriba mientras el resto (partes/colores) hace scroll abajo,
+          en vez de perderse de vista al bajar a elegir algo. */}
+      <View style={styles.fixedTop}>
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{forced ? "¡Crea tu avatar 3D! 🎉" : "Tu avatar 3D"}</Text>
@@ -279,11 +282,13 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
           )}
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.previewWrap}>
-            <Avatar3DViewer ref={viewerRef} parts={parts} colors={avColors} interactive size={240} />
-          </View>
+        <View style={styles.stickyCard}>
+          <Avatar3DViewer ref={viewerRef} parts={parts} colors={avColors} interactive size={240} />
+        </View>
+      </View>
 
+      <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.card}>
           <Pressable onPress={pickPhoto} style={styles.photoBtn}>
             <Text style={styles.photoBtnText}>📷 Sugerir tono de piel con una foto</Text>
           </Pressable>
@@ -381,7 +386,9 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
 const styles = StyleSheet.create({
   safeDark: { backgroundColor: "#0b0709" },
   wrap: { flex: 1, backgroundColor: "#0b0709" },
-  content: { padding: 20, paddingBottom: 28 },
+  content: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 28 },
+
+  fixedTop: { paddingHorizontal: 20, paddingTop: 20 },
 
   header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
   title: { color: "#fff", fontSize: 20, fontWeight: "900" },
@@ -399,7 +406,15 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: colors.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.primarySoft },
 
-  previewWrap: { alignItems: "center", marginBottom: 10 },
+  stickyCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    marginBottom: 4,
+  },
 
   photoBtn: {
     alignSelf: "center",

@@ -6,6 +6,7 @@ import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
+import Avatar3DViewer from "../components/Avatar3DViewer";
 import PetActor from "../components/PetActor";
 import PetMiniGame from "../components/PetMiniGame";
 import PetMatch3 from "../components/PetMatch3";
@@ -217,7 +218,15 @@ export default function PetScreen({ navigation }) {
       {/* Escena */}
       <View style={styles.scene}>
         <View style={styles.sceneChar}>
-          <AvatarPreview config={avatarConfig} size={96} />
+          {user?.avatar3d?.owned ? (
+            <Avatar3DViewer
+              parts={user.avatar3d.parts}
+              colors={user.avatar3d.colors}
+              size={150}
+            />
+          ) : (
+            <AvatarPreview config={avatarConfig} size={96} />
+          )}
           <Text style={styles.sceneCaption}>Tú</Text>
         </View>
         <View style={styles.sceneChar}>
@@ -542,9 +551,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primarySoft,
     paddingVertical: 12,
     paddingHorizontal: 4,
-    minHeight: 150,
+    minHeight: 190,
   },
-  sceneChar: { alignItems: "center", maxWidth: "48%" },
+  sceneChar: { alignItems: "center", maxWidth: "50%" },
   sceneCaption: { marginTop: 2, color: colors.textMuted, fontSize: 11, fontWeight: "800" },
 
   moodText: { marginTop: 12, textAlign: "center", color: "#111", fontSize: 15, fontWeight: "900" },

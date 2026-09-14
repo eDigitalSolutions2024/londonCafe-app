@@ -201,17 +201,23 @@ export default function PetActor({
           {emoji}
         </Animated.Text>
 
-        {/* Ojos cerrados al dormir: dos "︶" sobre la cara, pegados al bob */}
+        {/* Ojos cerrados al dormir -- posición/tamaño calibrados a mano
+            renderizando 🐱🐶🐹 en un navegador (mismo tamaño ~92px que acá)
+            para encontrar dónde caen los ojos de verdad en cada emoji: el
+            valor viejo (top 0.36, más chicos) los dejaba tapando la frente,
+            arriba de los ojos reales -- no se veían "cerrados", solo se
+            asomaba una rayita random. Ahora quedan más abajo y más grandes
+            para cubrir los tres bichos con margen, no solo alinear preciso. */}
         {sleeping && (
           <Animated.View
             pointerEvents="none"
             style={[
               styles.eyelids,
-              { top: size * 0.36, gap: size * 0.14, transform: [{ translateY: bobY }] },
+              { top: size * 0.51, gap: size * 0.1, transform: [{ translateY: bobY }] },
             ]}
           >
-            <View style={[styles.lid, { width: size * 0.16, height: size * 0.055, borderRadius: size * 0.03 }]} />
-            <View style={[styles.lid, { width: size * 0.16, height: size * 0.055, borderRadius: size * 0.03 }]} />
+            <View style={[styles.lid, { width: size * 0.125, height: size * 0.082, borderRadius: size * 0.041 }]} />
+            <View style={[styles.lid, { width: size * 0.125, height: size * 0.082, borderRadius: size * 0.041 }]} />
           </Animated.View>
         )}
       </Pressable>
