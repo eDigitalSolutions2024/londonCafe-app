@@ -42,7 +42,7 @@ const SLEEP_XP = 10;
 // cerrados, ver PetActor.jsx) -- en vez del cooldown viejo de 20 min que
 // solo bloqueaba volver a apachurrar "Dormir". La idea es que la gente
 // salga de la app y regrese cuando le llegue el push de "ya despertó".
-const SLEEP_FREEZE_MIN = 5;
+const SLEEP_FREEZE_MIN = 2;
 
 const SPECIES = new Set(["cat", "dog", "hamster"]);
 

@@ -155,10 +155,13 @@ export default function AccountSettingsScreen({ navigation }) {
   };
 
   // No hay endpoint para "cancelar" -- el código simplemente expira solo
-  // en 10 min si no se confirma. Esto solo oculta el aviso en pantalla.
+  // en 10 min si no se confirma. Esto solo oculta el aviso en pantalla,
+  // por eso NO se puede volver a pedir /me acá: el server sigue teniendo
+  // el mismo pendingEmail hasta que expire, así que un loadMe() lo
+  // traía de vuelta al toque y el aviso nunca se ocultaba de verdad.
   const onDismissEmailChange = () => {
     setEmailCode("");
-    loadMe();
+    setPendingEmail(null);
   };
 
   // Step 2 of 2: performs the actual deletion after the user confirms.
