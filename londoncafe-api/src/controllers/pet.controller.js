@@ -35,10 +35,14 @@ const PLAY_ENERGY_COST = 18;
 const CLEAN_COOLDOWN_MIN = 2;
 const CLEAN_HAPPINESS = 6;
 const CLEAN_XP = 8;
-const SLEEP_COOLDOWN_MIN = 20;
 const SLEEP_MAX_ENERGY_TO_ALLOW = 80; // si tiene >80 de energía, "no tiene sueño"
 const SLEEP_HAPPINESS = 4;
 const SLEEP_XP = 10;
+// "Dormir" congela al resto de las acciones por este rato real (ojos
+// cerrados, ver PetActor.jsx) -- en vez del cooldown viejo de 20 min que
+// solo bloqueaba volver a apachurrar "Dormir". La idea es que la gente
+// salga de la app y regrese cuando le llegue el push de "ya despertó".
+const SLEEP_FREEZE_MIN = 5;
 
 const SPECIES = new Set(["cat", "dog", "hamster"]);
 
@@ -102,6 +106,7 @@ function petView(user, extra = {}) {
   const pet = user.pet;
   const li = levelInfo(pet.xp);
   const ai = ageInfo(pet);
+  const now = new Date();
   return {
     ok: true,
     pet,
@@ -113,6 +118,8 @@ function petView(user, extra = {}) {
     ageDays: ai.ageDays,
     stage: ai.stage,
     pantry: pantryOf(user),
+    sleeping: isAsleep(pet, now),
+    sleepSecondsLeft: sleepSecondsLeft(pet, now),
     ...extra,
   };
 }
@@ -144,6 +151,17 @@ function cooldownLeft(lastAt, minutes, now) {
   if (!lastAt) return 0;
   const mins = Math.floor((now.getTime() - new Date(lastAt).getTime()) / (1000 * 60));
   return mins < minutes ? (minutes - mins) * 60 : 0;
+}
+
+// Segundos que faltan para que despierte (0 si no está dormida).
+function sleepSecondsLeft(pet, now) {
+  if (!pet?.sleepUntil) return 0;
+  const left = Math.ceil((new Date(pet.sleepUntil).getTime() - now.getTime()) / 1000);
+  return left > 0 ? left : 0;
+}
+
+function isAsleep(pet, now) {
+  return sleepSecondsLeft(pet, now) > 0;
 }
 
 // GET /pet
@@ -276,6 +294,9 @@ async function feedPet(req, res) {
     applyPetDecay(user, now);
     applyDailyRefillOnAppOpen(user, now);
 
+    const sleepLeft = sleepSecondsLeft(user.pet, now);
+    if (sleepLeft > 0) return res.status(423).json({ ok: false, error: "PET_SLEEPING", secondsLeft: sleepLeft });
+
     if (!user.buddy) user.buddy = {};
     const have = Math.max(0, Number(user.buddy[food.inv]) || 0);
     if (have <= 0) return res.status(400).json({ ok: false, error: food.noneError });
@@ -314,6 +335,9 @@ async function playPet(req, res) {
 
     const now = new Date();
     applyPetDecay(user, now);
+
+    const sleepLeftPlay = sleepSecondsLeft(user.pet, now);
+    if (sleepLeftPlay > 0) return res.status(423).json({ ok: false, error: "PET_SLEEPING", secondsLeft: sleepLeftPlay });
 
     // Sin cooldown de tiempo: se juega libre mientras tenga energía. Al
     // bajar del mínimo hay que recargarla (café/pan o dormir) -> gancho
@@ -371,6 +395,9 @@ async function cleanPet(req, res) {
     applyPetDecay(user, now);
 
     const p = user.pet;
+    const sleepLeftClean = sleepSecondsLeft(p, now);
+    if (sleepLeftClean > 0) return res.status(423).json({ ok: false, error: "PET_SLEEPING", secondsLeft: sleepLeftClean });
+
     if (!p.mess && Number(p.hygiene ?? 100) >= 95) {
       return res.status(400).json({ ok: false, error: "ALREADY_CLEAN" });
     }
@@ -410,13 +437,15 @@ async function sleepPet(req, res) {
     if (Number(p.energy ?? 100) > SLEEP_MAX_ENERGY_TO_ALLOW) {
       return res.status(400).json({ ok: false, error: "NOT_TIRED" });
     }
-    const left = cooldownLeft(p.lastSleepAt, SLEEP_COOLDOWN_MIN, now);
-    if (left > 0) return res.status(429).json({ ok: false, error: "SLEEP_COOLDOWN", secondsLeft: left });
+    const already = sleepSecondsLeft(p, now);
+    if (already > 0) return res.status(423).json({ ok: false, error: "PET_SLEEPING", secondsLeft: already });
 
     p.energy = 100;
     p.happiness = clamp(Number(p.happiness ?? 0) + SLEEP_HAPPINESS, 0, 100);
     p.xp = Math.max(0, Number(p.xp) || 0) + SLEEP_XP;
     p.lastSleepAt = now;
+    p.sleepUntil = new Date(now.getTime() + SLEEP_FREEZE_MIN * 60 * 1000);
+    p.sleepNotified = false; // el cron de push avisa una vez cuando pase sleepUntil
 
     user.markModified("pet");
     await user.save();

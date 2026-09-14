@@ -32,6 +32,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
   const [mood, setMood] = useState(null);
   const [need, setNeed] = useState(null);
   const [isVIP, setIsVIP] = useState(null);
+  const [sleeping, setSleeping] = useState(false);
 
   const bobA = useRef(new Animated.Value(0)).current;
   const bobP = useRef(new Animated.Value(0)).current;
@@ -50,6 +51,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
         setMood(r?.mood || null);
         setNeed(r?.need || null);
         setIsVIP(!!r?.isVIP);
+        setSleeping(!!r?.sleeping);
       })
       .catch(() => alive && setIsVIP((v) => (v == null ? false : v)));
     return () => {
@@ -79,7 +81,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
   }, [bobA, bobP, glow]);
 
   useEffect(() => {
-    if (!need) {
+    if (!need || sleeping) {
       alert.stopAnimation(() => alert.setValue(0));
       return;
     }
@@ -91,7 +93,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
     );
     l.start();
     return () => l.stop();
-  }, [need, alert]);
+  }, [need, sleeping, alert]);
 
   const avatarY = bobA.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
   const avatarScale = bobA.interpolate({ inputRange: [0, 1], outputRange: [1, 1.03] });
@@ -112,7 +114,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
   if (isVIP === false) statusLine = "Exclusivo VIP";
   else if (isVIP && !owned) statusLine = "Adopta a tu compañero";
   else if (owned) {
-    const tail = need ? NEED[need] : MOOD[mood] || "";
+    const tail = sleeping ? "durmiendo 😴 -- te avisamos" : need ? NEED[need] : MOOD[mood] || "";
     statusLine = `${pet.name} · ${tail}`.trim();
   }
 
@@ -151,7 +153,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
           </View>
         </View>
 
-        {need ? (
+        {need && !sleeping ? (
           <Animated.Text style={[styles.alert, { transform: [{ scale: alertScale }] }]}>❗</Animated.Text>
         ) : null}
       </View>

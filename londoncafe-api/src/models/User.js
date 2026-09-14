@@ -154,6 +154,14 @@ const petSchema = new mongoose.Schema(
     lastCleanAt: { type: Date, default: null },
     lastSleepAt: { type: Date, default: null },
     adoptedAt: { type: Date, default: null },
+
+    // ✅ "Dormir" ya no es instantáneo: pone a la mascota a dormir por
+    // SLEEP_FREEZE_MIN minutos reales (ojos cerrados + resto de acciones
+    // bloqueadas, ver isAsleep() en pet.controller.js) para que la gente
+    // salga de la app y vuelva -- sleepNotified controla el push de
+    // "ya despertó" (una sola vez por sueño, ver cron/pushJobs.js).
+    sleepUntil: { type: Date, default: null },
+    sleepNotified: { type: Boolean, default: true },
   },
   { _id: false }
 );

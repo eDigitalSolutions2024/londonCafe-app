@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Alert, ActivityIndicator } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../components/Screen";
@@ -29,6 +29,13 @@ const MOOD_LABEL = {
 };
 
 const STAGE_LABEL = { "bebé": "Bebé", joven: "Joven", adulto: "Adulto" };
+
+function formatMMSS(totalSeconds) {
+  const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
 
 function Bar({ label, value, color }) {
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
@@ -62,9 +69,13 @@ export default function PetScreen({ navigation }) {
   const [gameOpen, setGameOpen] = useState(false);
   const [match3Open, setMatch3Open] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
-  const [sleeping, setSleeping] = useState(false);
+  // ✅ El sueño ya no es una animación cosmética de 2.6s -- el backend
+  // devuelve `sleepSecondsLeft` (tiempo real restante del freeze, ver
+  // pet.controller.js) y aquí solo lo hacemos "tickear" cada segundo en
+  // el cliente para el contador visual.
+  const [sleepLeft, setSleepLeft] = useState(0);
   const [reaction, setReaction] = useState({ type: null, id: 0 });
-  const sleepTimer = useRef(null);
+  const sleeping = sleepLeft > 0;
 
   const load = useCallback(async () => {
     try {
@@ -73,6 +84,7 @@ export default function PetScreen({ navigation }) {
         apiFetch("/points/wallet").catch(() => null),
       ]);
       setState(petRes || null);
+      setSleepLeft(Math.max(0, Number(petRes?.sleepSecondsLeft) || 0));
       if (walletRes) setPoints(Number(walletRes?.wallet?.balance) || 0);
     } catch (e) {
       console.log("❌ load pet:", e?.data || e?.message);
@@ -84,19 +96,30 @@ export default function PetScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       load();
-      return () => sleepTimer.current && clearTimeout(sleepTimer.current);
     }, [load])
   );
 
+  // Cuenta regresiva de 1 en 1 segundo mientras está dormida; al llegar a
+  // 0 se refresca /pet una vez para sincronizar el estado real del server.
+  useEffect(() => {
+    if (sleepLeft <= 0) return;
+    const t = setInterval(() => {
+      setSleepLeft((s) => {
+        if (s <= 1) {
+          load();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [sleepLeft > 0, load]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const applyResult = (r) => {
     setState(r || null);
+    setSleepLeft(Math.max(0, Number(r?.sleepSecondsLeft) || 0));
     if (r?.action && ACTION_REACTION[r.action]) {
       setReaction((x) => ({ type: ACTION_REACTION[r.action], id: x.id + 1 }));
-    }
-    if (r?.action === "sleep") {
-      setSleeping(true);
-      sleepTimer.current && clearTimeout(sleepTimer.current);
-      sleepTimer.current = setTimeout(() => setSleeping(false), 2600);
     }
   };
 
@@ -109,12 +132,17 @@ export default function PetScreen({ navigation }) {
       return r;
     } catch (e) {
       const err = e?.data?.error || e?.message;
+      if (err === "PET_SLEEPING") {
+        // El server dice que sigue dormida (pudo pasar si el conteo local
+        // se desincronizó) -- se re-sincroniza el contador con el real.
+        setSleepLeft(Math.max(0, Number(e?.data?.secondsLeft) || 0));
+      }
       const map = {
         NO_COFFEE: "Ya no te queda café. Pásate por London Café y con tu compra recargas su despensa.",
         NO_BREAD: "Ya no te queda pan. Pásate por London Café y con tu compra recargas su despensa.",
         PET_TIRED: "Tu mascota está agotada de jugar. Dale un café ☕ o déjala dormir 😴 para seguir.",
         CLEAN_COOLDOWN: "Espera un momento antes de volver a limpiar.",
-        SLEEP_COOLDOWN: `Acaba de dormir. Vuelve en ${Math.ceil((e?.data?.secondsLeft || 0) / 60)} min.`,
+        PET_SLEEPING: `Está durmiendo 😴 Vuelve en ${Math.ceil((e?.data?.secondsLeft || 0) / 60)} min.`,
         NOT_TIRED: "Todavía tiene energía, no quiere dormir.",
         ALREADY_CLEAN: "Ya está limpio ✨",
       };
@@ -190,7 +218,16 @@ export default function PetScreen({ navigation }) {
         </View>
       </View>
 
-      <Text style={styles.moodText}>{MOOD_LABEL[mood] || "🐾"}</Text>
+      {sleeping ? (
+        <View style={styles.sleepBanner}>
+          <Text style={styles.sleepBannerText}>
+            😴 Durmiendo… lista en {formatMMSS(sleepLeft)}
+          </Text>
+          <Text style={styles.sleepBannerHint}>Sal y vuelve -- te avisamos cuando despierte.</Text>
+        </View>
+      ) : (
+        <Text style={styles.moodText}>{MOOD_LABEL[mood] || "🐾"}</Text>
+      )}
 
       {/* Nivel de amistad */}
       <View style={styles.lvlRow}>
@@ -220,13 +257,13 @@ export default function PetScreen({ navigation }) {
         <ActionBtn
           emoji="☕"
           label={busy === "coffee" ? "..." : `Café · ${pantry.coffee}`}
-          disabled={pantry.coffee <= 0 || !!busy}
+          disabled={pantry.coffee <= 0 || !!busy || sleeping}
           onPress={() => call("/pet/feed", { type: "coffee" }, "coffee")}
         />
         <ActionBtn
           emoji="🥐"
           label={busy === "bread" ? "..." : `Pan · ${pantry.bread}`}
-          disabled={pantry.bread <= 0 || !!busy}
+          disabled={pantry.bread <= 0 || !!busy || sleeping}
           onPress={() => call("/pet/feed", { type: "bread" }, "bread")}
         />
       </View>
@@ -236,29 +273,29 @@ export default function PetScreen({ navigation }) {
           emoji="🧼"
           label={busy === "clean" ? "..." : "Limpiar"}
           badge={mess}
-          disabled={!!busy}
+          disabled={!!busy || sleeping}
           onPress={() => call("/pet/clean", null, "clean")}
         />
         <ActionBtn
           emoji="😴"
-          label={busy === "sleep" ? "..." : "Dormir"}
-          disabled={!tired || !!busy}
+          label={busy === "sleep" ? "..." : sleeping ? formatMMSS(sleepLeft) : "Dormir"}
+          disabled={!tired || !!busy || sleeping}
           onPress={() => call("/pet/sleep", null, "sleep")}
         />
       </View>
 
       <View style={styles.playRow}>
         <Pressable
-          style={[styles.playBtn, (!canPlay || busy) && { opacity: 0.45 }]}
-          onPress={() => canPlay && !busy && setGameOpen(true)}
-          disabled={!canPlay || !!busy}
+          style={[styles.playBtn, (!canPlay || busy || sleeping) && { opacity: 0.45 }]}
+          onPress={() => canPlay && !busy && !sleeping && setGameOpen(true)}
+          disabled={!canPlay || !!busy || sleeping}
         >
           <Text style={styles.playText}>🎮 Atrapa</Text>
         </Pressable>
         <Pressable
-          style={[styles.playBtn, (!canPlay || busy) && { opacity: 0.45 }]}
-          onPress={() => canPlay && !busy && setMatch3Open(true)}
-          disabled={!canPlay || !!busy}
+          style={[styles.playBtn, (!canPlay || busy || sleeping) && { opacity: 0.45 }]}
+          onPress={() => canPlay && !busy && !sleeping && setMatch3Open(true)}
+          disabled={!canPlay || !!busy || sleeping}
         >
           <Text style={styles.playText}>🍰 Café Crush</Text>
         </Pressable>
@@ -458,6 +495,16 @@ const styles = StyleSheet.create({
   sceneCaption: { marginTop: 2, color: colors.textMuted, fontSize: 11, fontWeight: "800" },
 
   moodText: { marginTop: 12, textAlign: "center", color: "#111", fontSize: 15, fontWeight: "900" },
+  sleepBanner: {
+    marginTop: 12,
+    alignItems: "center",
+    backgroundColor: "rgba(74,55,40,0.08)",
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  sleepBannerText: { color: "#111", fontSize: 15, fontWeight: "900" },
+  sleepBannerHint: { marginTop: 2, color: colors.textMuted, fontSize: 12, fontWeight: "600" },
 
   lvlRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16 },
   lvlLabel: { color: "#111", fontSize: 12, fontWeight: "900" },

@@ -150,6 +150,39 @@ cron.schedule("*/30 * * * *", async () => {
   }
 });
 
+// 😴 CADA MINUTO → avisar cuando la mascota termina de dormir (el freeze de
+// "Dormir" dura solo unos minutos, así que necesita un cron más seguido que
+// el de cada 30 min de arriba -- si no, el aviso podría tardar hasta media
+// hora en llegar en vez de casi al toque).
+cron.schedule("* * * * *", async () => {
+  const now = new Date();
+
+  const users = await User.find({
+    "pet.owned": true,
+    "pet.sleepUntil": { $ne: null, $lte: now },
+    "pet.sleepNotified": false,
+  });
+
+  for (const user of users) {
+    const p = user.pet;
+    try {
+      if (user.expoPushToken && user.notificationPrefs?.pet !== false) {
+        await sendExpoPushNotification(
+          user.expoPushToken,
+          `${p.name || "Tu mascota"} ya despertó 😊`,
+          "Durmió bien y ya tiene toda su energía -- ven a jugar con ella.",
+          { type: "pet-woke-up" }
+        );
+      }
+      p.sleepNotified = true;
+      user.markModified("pet");
+      await user.save();
+    } catch (err) {
+      console.log(`⚠️ sleep-wake push (${user._id}):`, err?.message);
+    }
+  }
+});
+
 // 🔵 TODOS LOS DÍAS 7PM → streak reminder
 cron.schedule("0 19 * * *", async () => {
   console.log("⏰ Enviando recordatorios de racha...");
