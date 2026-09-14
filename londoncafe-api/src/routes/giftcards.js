@@ -92,12 +92,12 @@ router.get("/mine", requireAuth, async (req, res) => {
     $or: [{ toUser: userId }, { toEmail: normalizeEmail(req.user.email) }],
     })
     .sort({ createdAt: -1 })
-    .populate("fromUser", "name username avatarConfig")  // 👈 esto
+    .populate("fromUser", "name username avatarConfig avatar3d")  // 👈 esto
     .lean();
 
     const sent = await GiftCard.find({ fromUser: userId })
     .sort({ createdAt: -1 })
-    .populate("toUser", "name username avatarConfig email") // opcional
+    .populate("toUser", "name username avatarConfig avatar3d email") // opcional
     .lean();
 
     return res.json({ ok: true, received, sent });

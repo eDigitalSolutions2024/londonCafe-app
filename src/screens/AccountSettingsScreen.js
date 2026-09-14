@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Alert } from "react-native";
 import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
-import AvatarPreview from "../components/AvatarPreview";
+import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
 import { apiFetch } from "../api/client";
 import { deleteAccount } from "../api/auth";
 import Screen from "../components/Screen";
@@ -10,7 +10,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import GuestPrompt from "../components/GuestPrompt";
 
 export default function AccountSettingsScreen({ navigation }) {
-  const { token, signOut } = useContext(AuthContext);
+  const { token, signOut, user } = useContext(AuthContext);
   const tabBarHeight = useBottomTabBarHeight();
 
   const [loading, setLoading] = useState(true);
@@ -314,7 +314,7 @@ export default function AccountSettingsScreen({ navigation }) {
             style={styles.avatarPreviewRow}
           >
             <View style={styles.avatarCircle}>
-              <AvatarPreview config={avatarConfig} size={56} />
+              <AvatarPreview config={mergeAvatar3D(user)} size={56} />
             </View>
 
             <View style={{ flex: 1 }}>

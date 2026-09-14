@@ -5,7 +5,7 @@ import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
-import AvatarPreview from "../components/AvatarPreview";
+import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
 import PetActor from "../components/PetActor";
 import PetMiniGame from "../components/PetMiniGame";
 import PetMatch3 from "../components/PetMatch3";
@@ -49,7 +49,7 @@ const ACTION_REACTION = { feed: "eat", play: "play", clean: "clean" };
 
 export default function PetScreen({ navigation }) {
   const { user } = useContext(AuthContext);
-  const avatarConfig = user?.avatarConfig || {};
+  const avatarConfig = mergeAvatar3D(user);
 
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState(null); // petView completo

@@ -65,6 +65,10 @@ const Avatar3DViewer = forwardRef(function Avatar3DViewer(
     } else if (msg.type === "snapshot") {
       const resolvers = captureResolvers.current.splice(0, captureResolvers.current.length);
       resolvers.forEach((r) => r(msg.dataUrl));
+    } else if (msg.type === "error") {
+      console.log("❌ Avatar3DViewer JS error:", msg.message);
+    } else if (msg.type === "debug") {
+      console.log("🔍 Avatar3DViewer debug:", msg.message);
     }
   };
 
@@ -108,7 +112,7 @@ function buildHtml(interactive) {
 </head>
 <body>
 <div id="stage"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.148.0/three.min.js"></script>
 <script>
 (function () {
   var INTERACTIVE = ${interactive ? "true" : "false"};
@@ -120,10 +124,23 @@ function buildHtml(interactive) {
 
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-  camera.position.set(0, 1.15, 4.2);
-  camera.lookAt(0, 1.0, 0);
+  // El personaje mide ~2.7 unidades de alto (puntas del pelo ~2.15,
+  // pies ~-0.5) -- se aleja lo suficiente para que quepa completo con
+  // margen, centrado a la mitad de esa altura.
+  camera.position.set(0, 0.95, 5.6);
+  camera.lookAt(0, 0.85, 0);
 
-  var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  } catch (e) {
+    post({ type: "error", message: "WebGLRenderer falló: " + e.message });
+    return;
+  }
+  if (!renderer.getContext()) {
+    post({ type: "error", message: "WebGL no disponible en este WebView" });
+    return;
+  }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   document.getElementById("stage").appendChild(renderer.domElement);
 
@@ -278,13 +295,36 @@ function buildHtml(interactive) {
   };
 
   function resize() {
-    var w = window.innerWidth, h = window.innerHeight;
+    var stage = document.getElementById("stage");
+    var w = stage.clientWidth || window.innerWidth;
+    var h = stage.clientHeight || window.innerHeight;
+    if (!w || !h) return; // el WebView todavía no terminó su layout -- nada que medir aún
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    renderer.setSize(w, h, false);
+    // ⚠️ El 3er argumento (updateStyle) en false deja el tamaño VISUAL
+    // (CSS) del canvas sin tocar mientras cambia el buffer de dibujo --
+    // como el canvas no tenía su propio CSS explícito, quedaba con un
+    // tamaño default (o heredado) distinto al buffer real, dando un
+    // encuadre recortado/deformado. true dejará que three.js iguale el
+    // estilo del canvas al tamaño real, así siempre calzan.
+    renderer.setSize(w, h, true);
   }
   window.addEventListener("resize", resize);
+  // El primer resize() puede correr ANTES de que el WebView termine de
+  // acomodar su viewport -- innerWidth/innerHeight (o el tamaño de
+  // #stage) pueden venir en 0 todavía, dejando el canvas sin tamaño y la
+  // escena invisible aunque todo lo demás cargó bien. Se reintenta unas
+  // cuantas veces con requestAnimationFrame hasta que el tamaño ya no
+  // sea cero, y también al evento "load" por si acaso.
   resize();
+  var resizeAttempts = 0;
+  (function ensureSized() {
+    if (renderer.domElement.width > 0 || resizeAttempts > 30) return;
+    resizeAttempts++;
+    resize();
+    requestAnimationFrame(ensureSized);
+  })();
+  window.addEventListener("load", resize);
 
   // Rotación con el dedo (orbit simple, sin librerías extra) -- solo si
   // interactive=true. La vista chica (no interactiva) se queda quieta
@@ -320,7 +360,12 @@ function buildHtml(interactive) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  // alignItems:"center" (el default sensato para casi todo) NO estira a
+  // los hijos en el eje transversal -- el WebView (flex:1) se quedaba con
+  // ancho 0 aunque el alto sí tomaba el tamaño del padre (diagnosticado
+  // con canvas=600x300 stage=0x240: alto bien, ancho en cero). "stretch"
+  // sí lo obliga a llenar exactamente el width/height que se le pasa.
+  wrap: { alignItems: "stretch", justifyContent: "center", overflow: "hidden" },
   webview: { flex: 1, backgroundColor: "transparent" },
   loading: {
     position: "absolute",

@@ -13,7 +13,7 @@ import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
-import AvatarPreview from "../components/AvatarPreview";
+import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
 import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
 import { GuestLockCard } from "../components/GuestPrompt";
 
@@ -56,12 +56,12 @@ export default function RewardsScreen({ navigation }) {
 
       const u = r?.user ?? user ?? null;
       setMe(u);
-      setAvatarConfig(u?.avatarConfig ?? null);
+      setAvatarConfig(mergeAvatar3D(u));
     } catch (e) {
       console.log("❌ Rewards fetchAll:", e?.status, e?.data || e?.message);
       const u = user ?? null;
       setMe(u);
-      setAvatarConfig(u?.avatarConfig ?? null);
+      setAvatarConfig(mergeAvatar3D(u));
     } finally {
       setLoading(false);
     }

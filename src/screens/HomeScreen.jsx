@@ -41,7 +41,7 @@ import LondonCafeLogo from "../assets/markers/londoncafe1.jpg";
 import PromosSection from "../components/PromoSection";
 
 // ✅ Modal avatar grande
-import AvatarPreview from "../components/AvatarPreview";
+import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
 import PetDioramaCard from "../components/PetDioramaCard";
 
 // ✅ mood por energía (front fallback)
@@ -568,7 +568,7 @@ useEffect(() => {
       const u = r?.user ?? user ?? null;
       setMe(u);
 
-      setAvatarConfig(u?.avatarConfig ?? null);
+      setAvatarConfig(mergeAvatar3D(u));
       setBuddy(u?.buddy ?? null);
       setStreak(
   r?.streak || {
@@ -585,7 +585,7 @@ useEffect(() => {
 
       const u = user ?? null;
       setMe(u);
-      setAvatarConfig(u?.avatarConfig ?? null);
+      setAvatarConfig(mergeAvatar3D(u));
       setBuddy(u?.buddy ?? null);
       setStreak({
   count: 0,

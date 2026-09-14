@@ -21,7 +21,7 @@ import { AuthContext } from "../context/AuthContext";
 import { fetchMyGiftCards, purchaseGiftCard, redeemGiftCard } from "../api/giftcards";
 import { colors } from "../theme/colors";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import AvatarPreview from "../components/AvatarPreview";
+import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
 import { GuestLockCard } from "../components/GuestPrompt";
 
 const moneyPresets = [50, 100, 200, 300, 500];
@@ -237,8 +237,8 @@ function GiftPreview({ amount, toEmail, message, fromUser }) {
               overflow: "hidden",
             }}
           >
-            {fromUser?.avatarConfig ? (
-              <AvatarPreview config={fromUser.avatarConfig} size={52} />
+            {fromUser?.avatarConfig || fromUser?.avatar3d?.snapshotUrl ? (
+              <AvatarPreview config={mergeAvatar3D(fromUser)} size={52} />
             ) : (
               <Text style={{ color: "#fff", fontWeight: "900" }}>🙂</Text>
             )}
@@ -340,8 +340,8 @@ function GiftPillCard({ item, variant = "received", onPress }) {
               overflow: "hidden",
             }}
           >
-            {from?.avatarConfig ? (
-              <AvatarPreview config={from.avatarConfig} size={54} />
+            {from?.avatarConfig || from?.avatar3d?.snapshotUrl ? (
+              <AvatarPreview config={mergeAvatar3D(from)} size={54} />
             ) : (
               <Text style={{ color: "#fff", fontWeight: "900" }}>🙂</Text>
             )}

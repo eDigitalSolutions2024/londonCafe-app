@@ -7,6 +7,16 @@ function getAsset(id) {
   return avatarAssets[id] || null;
 }
 
+// Helper compartido: junta el avatarConfig plano (legado) con la snapshot
+// del avatar 3D en un solo objeto que <AvatarPreview config={...}> sabe
+// leer. Se usa en cada pantalla que trae un `user` (de /me, /auth/me,
+// route params, etc.) antes de pasarlo como `config` -- así el contrato
+// del componente (config/size) no cambia en ninguno de los ~11 lugares
+// donde se usa, solo el VALOR que se le arma.
+export function mergeAvatar3D(user) {
+  return { ...(user?.avatarConfig || {}), avatar3dSnapshotUrl: user?.avatar3d?.snapshotUrl || null };
+}
+
 // Mantiene el MISMO contrato (config/size) desde siempre -- lo que cambió
 // es de DÓNDE sale la imagen: si `config.avatar3dSnapshotUrl` viene (el
 // PNG plano capturado del avatar 3D real, ver Avatar3DViewer.jsx +

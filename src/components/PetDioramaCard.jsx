@@ -158,9 +158,11 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
 
       <View style={styles.meta}>
         <Text style={styles.title}>Mascota VIP</Text>
-        <Text style={styles.status} numberOfLines={2}>
-          {statusLine}
-        </Text>
+        {/* Sin numberOfLines: en pantallas angostas (confirmado cortado en
+            iPhone real incluso con el límite de 2 líneas) el texto puede
+            necesitar 3+ líneas -- mejor que la tarjeta crezca un poco de
+            alto a que la mascota/necesidad se corte a media palabra. */}
+        <Text style={styles.status}>{statusLine}</Text>
       </View>
       <Text style={styles.chevron}>›</Text>
     </Pressable>
