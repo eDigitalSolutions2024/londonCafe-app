@@ -3,48 +3,37 @@ import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing, PanResponde
 import { colors } from "../theme/colors";
 import AvatarPreview from "./AvatarPreview";
 import PetActor from "./PetActor";
+import { getMatch3Level, MAX_MATCH3_LEVEL } from "../assets/matchLevels";
 
 // --- Tablero estilo Pokémon Puzzle / Tetris Attack -------------------------
 const COLS = 6;
 const ROWS = 12;
 const TILE_NORMAL = 38;
 const TILE_COMPACT = 24; // modo "ver todo el tablero" -- las 12 filas caben en pantalla
-const START_FILLED = 4;
-const RISE_MS_START = 6500;
-const RISE_MS_MIN = 2600;
-const RISE_SPEEDUP_EVERY = 22000;
-const TARGET_CLEARED = 60;
 const SWAP_FRACTION = 0.42; // fracción de una celda que hay que arrastrar para intercambiar
 
 const KINDS = ["☕", "🥐", "🍰", "🍪", "🫖", "🥯"];
 const CLEARING = -2;
 
-const rndKind = () => Math.floor(Math.random() * KINDS.length);
+const rndKind = (kindsCount) => Math.floor(Math.random() * kindsCount);
 const emptyRow = () => new Array(COLS).fill(null);
 
-function newBottomRow() {
-  const row = [];
-  for (let c = 0; c < COLS; c++) {
-    let k;
-    do {
-      k = rndKind();
-    } while (c >= 2 && row[c - 1] === k && row[c - 2] === k);
-    row.push(k);
-  }
-  return row;
-}
-
-function makeGrid() {
+// Tablero LLENO desde el inicio (a diferencia del modo libre viejo, que
+// arrancaba solo con las últimas filas llenas y el resto subía con el
+// tiempo) -- acá es "por niveles": una meta fija de fichas con un número
+// fijo de movimientos, estilo Candy Crush. `kindsCount` recorta cuántos
+// sabores de KINDS están en juego (ver matchLevels.js).
+function makeFullGrid(kindsCount) {
   const g = [];
   for (let r = 0; r < ROWS; r++) g.push(emptyRow());
-  for (let r = ROWS - START_FILLED; r < ROWS; r++) {
+  for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       let k;
       do {
-        k = rndKind();
+        k = rndKind(kindsCount);
       } while (
         (c >= 2 && g[r][c - 1] === k && g[r][c - 2] === k) ||
-        (r >= ROWS - START_FILLED + 2 && g[r - 1][c] === k && g[r - 2][c] === k)
+        (r >= 2 && g[r - 1][c] === k && g[r - 2][c] === k)
       );
       g[r][c] = k;
     }
@@ -89,12 +78,25 @@ function applyGravity(g) {
   return ng;
 }
 
+// Tras la gravedad, los huecos que quedan siempre están arriba de cada
+// columna (la gravedad ya compactó lo demás hacia abajo) -- se rellenan
+// con fichas nuevas, como las candys que "caen" desde arriba en cualquier
+// match-3. Si eso arma una combinación nueva sola (cascada), el propio
+// loop de runResolve la va a encontrar en la siguiente vuelta.
+function refillTop(g, kindsCount) {
+  const ng = g.map((row) => row.slice());
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS; r++) {
+      if (ng[r][c] == null) ng[r][c] = rndKind(kindsCount);
+      else break;
+    }
+  }
+  return ng;
+}
+
 // ¿Hay al menos UN movimiento posible (horizontal o vertical, con una
 // celda vecina) que arme una combinación? Si no, el tablero está
-// "trabado" -- puede seguir subiendo para siempre sin que el jugador
-// pueda hacer nada. Se revisa cada intercambio adyacente real (celda
-// llena <-> celda llena) y también mover una ficha a un hueco vecino
-// (celda llena <-> null, que cae por gravedad y puede armar algo).
+// "trabado" y hay que rebarajarlo.
 function hasAnyMove(g) {
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -118,9 +120,9 @@ function tryTestSwap(g, r1, c1, r2, c2) {
   return findMatches(settled).size > 0;
 }
 
-// Reparte de nuevo los sabores existentes en las mismas posiciones
-// (conserva cuánto ha subido el tablero) hasta encontrar un reparto que
-// SÍ tenga un movimiento posible y no regale un match gratis de una vez.
+// Reparte de nuevo los sabores existentes en las mismas posiciones hasta
+// encontrar un reparto que SÍ tenga un movimiento posible y no regale un
+// match gratis de una vez.
 function reshuffleBoard(g) {
   const positions = [];
   const values = [];
@@ -149,13 +151,16 @@ function reshuffleBoard(g) {
   return best || g; // tras 40 intentos, lo que haya salido (rarísimo llegar aquí)
 }
 
-export default function PetMatch3({ visible, species = "cat", petName = "tu mascota", avatarConfig, onClose, onFinish }) {
-  const [grid, setGrid] = useState(makeGrid);
+export default function PetMatch3({ visible, level = 1, species = "cat", petName = "tu mascota", avatarConfig, onClose, onFinish }) {
+  const levelDef = getMatch3Level(level);
+
+  const [grid, setGrid] = useState(() => makeFullGrid(levelDef.kinds));
   const [cleared, setCleared] = useState(0);
+  const [movesLeft, setMovesLeft] = useState(levelDef.moves);
   const [combo, setCombo] = useState(0);
   const [comboSize, setComboSize] = useState(0); // fichas juntadas en ESE golpe (no el chain)
   const [phase, setPhase] = useState("play");
-  const [danger, setDanger] = useState(false);
+  const [won, setWon] = useState(false);
   const [dragCell, setDragCell] = useState(null); // {r, c} celda agarrada (solo para marcar el render)
   const [compact, setCompact] = useState(false); // "ver tablero completo" -- fichas más chicas, se ven las 12 filas
 
@@ -169,16 +174,19 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
   const resolving = useRef(false);
   const resolvePending = useRef(false);
-  const riseTimer = useRef(null);
-  const speedTimer = useRef(null);
-  const riseMs = useRef(RISE_MS_START);
   const overRef = useRef(false);
   const phaseRef = useRef("play");
   const gridRef = useRef(grid);
+  // Fuente de verdad SÍNCRONA de cleared/movesLeft -- setCleared/setMovesLeft
+  // son async (batched), y runResolve necesita el valor real YA actualizado
+  // dentro de la MISMA llamada async (después de un await) para decidir si
+  // el nivel se ganó o se perdió, no el valor que tenía el closure al
+  // arrancar la función.
+  const clearedRef = useRef(0);
+  const movesLeftRef = useRef(levelDef.moves);
   gridRef.current = grid;
   phaseRef.current = phase;
 
-  const riseAnim = useRef(new Animated.Value(0)).current;
   const comboAnim = useRef(new Animated.Value(0)).current;
   const comboSpin = useRef(new Animated.Value(0)).current;
   const [comboBurst, setComboBurst] = useState([]); // chispas que salen disparadas del "¡Combo!"
@@ -211,22 +219,23 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     Array.from({ length: ROWS }, () => React.createRef())
   ).current;
 
-  useEffect(() => {
-    if (!visible) return;
-    const g0 = makeGrid();
+  function resetLevel() {
+    const g0 = makeFullGrid(levelDef.kinds);
     setGrid(g0);
     gridRef.current = g0;
     setCleared(0);
+    clearedRef.current = 0;
+    setMovesLeft(levelDef.moves);
+    movesLeftRef.current = levelDef.moves;
     setCombo(0);
     setComboSize(0);
+    setWon(false);
     setPhase("play");
     phaseRef.current = "play";
-    setDanger(false);
     setDragCell(null);
     resolving.current = false;
     resolvePending.current = false;
     overRef.current = false;
-    riseMs.current = RISE_MS_START;
     dragX.setValue(0);
     dragY.setValue(0);
     nbL.setValue(0);
@@ -234,58 +243,16 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     nbUp.setValue(0);
     nbDown.setValue(0);
     setShuffled(false);
+  }
 
-    scheduleRise();
-    speedTimer.current = setInterval(() => {
-      riseMs.current = Math.max(RISE_MS_MIN, riseMs.current - 400);
-    }, RISE_SPEEDUP_EVERY);
-
-    return () => {
-      clearTimeout(riseTimer.current);
-      clearInterval(speedTimer.current);
-    };
+  useEffect(() => {
+    if (!visible) return;
+    resetLevel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
-
-  function scheduleRise() {
-    clearTimeout(riseTimer.current);
-    riseTimer.current = setTimeout(onRiseTick, riseMs.current);
-  }
-
-  function onRiseTick() {
-    if (overRef.current) return;
-    if (resolving.current || dragRef.current.active) {
-      scheduleRise();
-      return;
-    }
-    const ended = doRise();
-    if (!ended) scheduleRise();
-  }
-
-  function doRise() {
-    if (overRef.current) return true;
-    const g = gridRef.current;
-    if (g[0].some((x) => x != null && x !== CLEARING)) {
-      endGame();
-      return true;
-    }
-    const ng = g.slice(1).map((row) => row.slice());
-    ng.push(newBottomRow());
-    setGrid(ng);
-    gridRef.current = ng;
-
-    riseAnim.setValue(cellRef.current);
-    Animated.timing(riseAnim, { toValue: 0, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
-
-    setDanger(ng[1].some((x) => x != null) || ng[0].some((x) => x != null));
-    if (findMatches(ng).size > 0) runResolve(0);
-    else checkDeadlock(ng);
-    return false;
-  }
+  }, [visible, level]);
 
   // Si ya no hay NINGÚN movimiento posible (ver hasAnyMove arriba), el
-  // tablero quedó trabado -- seguiría subiendo para siempre sin que el
-  // jugador pueda hacer nada. Se rebaraja en el lugar (mismas posiciones,
+  // tablero quedó trabado. Se rebaraja en el lugar (mismas posiciones,
   // sabores redistribuidos) y se avisa brevemente.
   function checkDeadlock(g) {
     if (overRef.current || dragRef.current.active) return;
@@ -303,7 +270,10 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   }
 
   // Re-entrante: si ya está corriendo, marca pendiente y sale. Lee gridRef
-  // fresco en cada iteración, así ve swaps hechos entre pasos.
+  // fresco en cada iteración, así ve swaps hechos entre pasos. Tras cada
+  // vuelta de gravedad, rellena los huecos de arriba con fichas nuevas
+  // (refillTop) -- si eso arma una cascada, el propio while la agarra en
+  // la siguiente iteración sin gastar un movimiento extra.
   async function runResolve(baseCombo) {
     if (resolving.current) {
       resolvePending.current = true;
@@ -342,13 +312,16 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
 
       await wait(170);
       const g2 = applyGravity(gridRef.current);
-      setGrid(g2);
-      gridRef.current = g2;
+      const g3 = refillTop(g2, levelDef.kinds);
+      setGrid(g3);
+      gridRef.current = g3;
       await wait(140);
     }
 
-    if (total > 0) setCleared((x) => x + total);
-    setDanger(gridRef.current[1].some((x) => x != null) || gridRef.current[0].some((x) => x != null));
+    if (total > 0) {
+      clearedRef.current += total;
+      setCleared(clearedRef.current);
+    }
     resolving.current = false;
 
     if (resolvePending.current && !overRef.current) {
@@ -359,39 +332,25 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     // El tablero ya se asentó del todo (sin cadena pendiente) -- si nadie
     // tiene ninguna jugada posible desde aquí, se reparte de nuevo.
     checkDeadlock(gridRef.current);
+
+    // Ya no queda nada pendiente: revisa si el nivel se ganó o se perdió.
+    if (!overRef.current) {
+      if (clearedRef.current >= levelDef.target) endGame(true);
+      else if (movesLeftRef.current <= 0) endGame(false);
+    }
   }
 
   // --- Gestos ---
-  // Antes había UN solo PanResponder en todo el tablero, y la fila se
-  // calculaba con (toqueY - origenTableroY) / CELL. Ese cálculo dependía
-  // de que measureInWindow() del tablero completo coincidiera EXACTO con
-  // el sistema de coordenadas del toque -- en iOS eso quedaba desfasado
-  // (había que tocar más arriba de la ficha real para agarrarla) y
-  // ocasionalmente no agarraba nada.
-  //
-  // Ahora hay un PanResponder POR FILA. La fila ya no se calcula: el
-  // propio sistema táctil de RN decide, por dónde tocaste, cuál fila
-  // recibe el gesto -- cero matemática, cero desfase vertical posible.
-  // Solo queda resolver la COLUMNA, y para eso basta medir esa fila en el
-  // eje X (measureInWindow no se ve afectado por el transform vertical
-  // de riseAnim, así que tampoco hace falta esperar a que termine de
-  // animar para que la medición sea confiable).
+  // Un PanResponder POR FILA: el propio sistema táctil de RN decide, por
+  // dónde tocaste, cuál fila recibe el gesto -- cero matemática, cero
+  // desfase vertical posible. Solo queda resolver la COLUMNA, midiendo esa
+  // fila en el eje X.
   // ⚠️ Ya NO se bloquea el arrastre mientras `resolving` está en marcha
-  // (una cadena/combo resolviéndose): antes tapabas la pantalla entera
-  // ~1seg+ por cada combo y no podías seguir jugando durante esa ventana.
-  // runResolve ya es re-entrante (resolvePending), así que un swap hecho
-  // a mitad de una cadena simplemente encola otra pasada -- se pueden
-  // seguir acumulando combos sin esperar a que termine la animación.
-  // Lo único que sigue bloqueando el agarre es que el juego haya
-  // terminado (overRef) o que la celda tocada ya no tenga una ficha
-  // válida en ESE instante (se relee gridRef fresco, así que si la
-  // cadena ya se llevó esa ficha, simplemente no se agarra nada).
-  // Movimiento en CRUZ: dx manda un swap horizontal (misma fila, columna
-  // vecina), dy manda uno vertical (misma columna, fila vecina). Cada
-  // frame de onPanResponderMove se traba al eje que domine en ESE
-  // momento (como cualquier match-3), así que no hay estado "diagonal a
-  // medias" -- si el dedo se mueve sobre todo a la derecha, es
-  // horizontal; si sobre todo hacia abajo, es vertical.
+  // (una cadena/combo resolviéndose): runResolve ya es re-entrante
+  // (resolvePending), así que un swap hecho a mitad de una cadena
+  // simplemente encola otra pasada. Lo único que sigue bloqueando el
+  // agarre es que el juego haya terminado (overRef) o que la celda tocada
+  // ya no tenga una ficha válida en ESE instante.
   const rowPans = useRef(
     Array.from({ length: ROWS }, (_, r) =>
       PanResponder.create({
@@ -505,28 +464,30 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
     const targetVal = g[tr][tc];
 
     // Ahora se puede arrastrar mientras una cadena/combo sigue resolviendo
-    // (ver comentario junto a rowPans) -- eso abre una ventana rara donde,
-    // entre el momento en que agarraste la ficha y el momento en que
-    // sueltas, esa MISMA celda pudo vaciarse (una cadena la limpió y la
-    // gravedad corrió todo). Si ya no hay nada que mover, no hay swap.
+    // -- eso abre una ventana rara donde, entre el momento en que agarraste
+    // la ficha y el momento en que sueltas, esa MISMA celda pudo vaciarse
+    // (una cadena la limpió y la gravedad corrió todo). Si ya no hay nada
+    // que mover, no hay swap.
     if (sourceVal == null || sourceVal === CLEARING) {
       doSnap();
       return;
     }
 
     if (targetVal == null) {
-      // El destino está vacío -- no es un intercambio entre dos fichas,
-      // es "mover la ficha ahí". Debe CAER por gravedad hasta apoyarse en
-      // lo que haya debajo en esa columna (si no hay nada, llega al fondo).
-      // Siempre se confirma: no hay "a dónde regresar" que tenga más
-      // sentido que dejarla caer.
+      // El destino está vacío (ventana transitoria de una cascada en
+      // curso) -- mover la ficha ahí, cae por gravedad. Solo gasta un
+      // movimiento si de casualidad arma una combinación.
       g[d.r][d.c] = null;
       g[tr][tc] = sourceVal;
       const settled = applyGravity(g);
       setGrid(settled);
       gridRef.current = settled;
       resetOffsets();
-      if (findMatches(settled).size > 0) runResolve(0);
+      if (findMatches(settled).size > 0) {
+        movesLeftRef.current = Math.max(0, movesLeftRef.current - 1);
+        setMovesLeft(movesLeftRef.current);
+        runResolve(0);
+      }
       return;
     }
 
@@ -537,12 +498,8 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       return;
     }
 
-    // Intercambio normal entre dos fichas. Si no arma ninguna combinación,
-    // no tiene "dónde acomodarse" -- vuelve a su lugar en vez de quedarse.
-    // Se pasa por gravedad igual como red de seguridad -- en un tablero
-    // sin huecos esto es un no-op, pero si por la ventana de concurrencia
-    // de arriba algo quedó desalineado, esto lo vuelve a dejar consistente
-    // en vez de dejar una ficha flotando.
+    // Intercambio normal entre dos fichas. Solo se confirma (y gasta un
+    // movimiento) si arma una combinación -- si no, vuelve a su lugar.
     g[d.r][d.c] = targetVal;
     g[tr][tc] = sourceVal;
     const settled = applyGravity(g);
@@ -550,27 +507,24 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
       setGrid(settled);
       gridRef.current = settled;
       resetOffsets();
+      movesLeftRef.current = Math.max(0, movesLeftRef.current - 1);
+      setMovesLeft(movesLeftRef.current);
       runResolve(0);
     } else {
       doSnap();
     }
   }
 
-  function endGame() {
+  function endGame(didWin) {
     if (overRef.current) return;
     overRef.current = true;
+    setWon(!!didWin);
     setPhase("over");
     phaseRef.current = "over";
-    clearTimeout(riseTimer.current);
-    clearInterval(speedTimer.current);
   }
 
   // Combo "deslumbrante": punch con rebote (overshoot), un pequeño giro de
   // celebración, y chispas ✨🎉 que salen disparadas en todas direcciones.
-  // `power` combina DOS cosas distintas que ambas merecen celebración:
-  // el chain (varias cadenas seguidas) Y el tamaño de un solo golpe (4+
-  // fichas de un tirón, aunque sea la primera y única jugada). Entre más
-  // grande, más chispas, más dura el brillo y más grande el texto.
   function popCombo(chain, size) {
     const power = Math.max(chain, size - 2);
     comboAnim.setValue(0);
@@ -615,8 +569,8 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
   }
   const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
-  const score = Math.max(0, Math.min(1, cleared / TARGET_CLEARED));
-  const finish = () => onFinish?.(score, cleared);
+  const score = Math.max(0, Math.min(1, cleared / levelDef.target));
+  const finish = () => onFinish?.(score, cleared, level, won);
 
   const avatarScale = avatarBounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
   const comboScale = comboAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.22] });
@@ -634,19 +588,20 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
           {phase === "play" ? (
             <>
               <View style={styles.hdr}>
-                <Text style={styles.hdrTitle}>Café Crush 🍰</Text>
-                <View style={styles.hdrRight}>
-                  <Text style={[styles.hdrMeta, danger && styles.hdrDanger]}>
-                    {danger ? "¡Peligro!" : `${cleared} fichas`}
-                  </Text>
-                  <Pressable
-                    onPress={() => setCompact((v) => !v)}
-                    style={styles.zoomBtn}
-                    hitSlop={8}
-                  >
-                    <Text style={styles.zoomBtnText}>{compact ? "🔍" : "🔎"}</Text>
-                  </Pressable>
-                </View>
+                <Text style={styles.hdrTitle}>Café Crush 🍰 · Nivel {level}</Text>
+                <Pressable
+                  onPress={() => setCompact((v) => !v)}
+                  style={styles.zoomBtn}
+                  hitSlop={8}
+                >
+                  <Text style={styles.zoomBtnText}>{compact ? "🔍" : "🔎"}</Text>
+                </Pressable>
+              </View>
+              <View style={styles.goalRow}>
+                <Text style={styles.goalText}>🎯 {cleared}/{levelDef.target}</Text>
+                <Text style={[styles.goalText, movesLeft <= 3 && styles.goalDanger]}>
+                  🔁 {movesLeft} {movesLeft === 1 ? "movimiento" : "movimientos"}
+                </Text>
               </View>
               <Text style={styles.hdrSub}>
                 Arrastra una ficha (↔ ↕) para acomodarla · junta 3 o más
@@ -661,50 +616,48 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                   </View>
                 </Animated.View>
 
-                <View style={[styles.boardWrap, danger && styles.boardDanger]}>
+                <View style={styles.boardWrap}>
                   <View style={styles.boardClip}>
-                    <Animated.View style={{ transform: [{ translateY: riseAnim }] }}>
-                      {grid.map((row, r) => (
-                        <View key={r} ref={rowRefs[r]} collapsable={false} style={styles.row} {...rowPans[r].panHandlers}>
-                          {row.map((k, c) => {
-                            const empty = k == null;
-                            const clearing = k === CLEARING;
-                            const isDrag = dragCell && dragCell.r === r && dragCell.c === c;
-                            const isNbL = dragCell && dragCell.r === r && c === dragCell.c - 1;
-                            const isNbR = dragCell && dragCell.r === r && c === dragCell.c + 1;
-                            const isNbUp = dragCell && dragCell.c === c && r === dragCell.r - 1;
-                            const isNbDown = dragCell && dragCell.c === c && r === dragCell.r + 1;
-                            let extra = null;
-                            if (isDrag) {
-                              extra = {
-                                transform: [{ translateX: dragX }, { translateY: dragY }, { scale: 1.08 }],
-                                zIndex: 20,
-                              };
-                            } else if (isNbL) extra = { transform: [{ translateX: nbL }] };
-                            else if (isNbR) extra = { transform: [{ translateX: nbR }] };
-                            else if (isNbUp) extra = { transform: [{ translateY: nbUp }] };
-                            else if (isNbDown) extra = { transform: [{ translateY: nbDown }] };
-                            return (
-                              <Animated.View
-                                key={`${r}-${c}`}
-                                style={[
-                                  styles.cell,
-                                  { width: tileSize, height: tileSize },
-                                  empty && styles.cellEmpty,
-                                  clearing && styles.cellClearing,
-                                  isDrag && styles.cellDrag,
-                                  extra,
-                                ]}
-                              >
-                                <Text style={[styles.tile, { fontSize: tileSize * 0.63 }]}>
-                                  {empty ? "" : clearing ? "✨" : KINDS[k]}
-                                </Text>
-                              </Animated.View>
-                            );
-                          })}
-                        </View>
-                      ))}
-                    </Animated.View>
+                    {grid.map((row, r) => (
+                      <View key={r} ref={rowRefs[r]} collapsable={false} style={styles.row} {...rowPans[r].panHandlers}>
+                        {row.map((k, c) => {
+                          const empty = k == null;
+                          const clearing = k === CLEARING;
+                          const isDrag = dragCell && dragCell.r === r && dragCell.c === c;
+                          const isNbL = dragCell && dragCell.r === r && c === dragCell.c - 1;
+                          const isNbR = dragCell && dragCell.r === r && c === dragCell.c + 1;
+                          const isNbUp = dragCell && dragCell.c === c && r === dragCell.r - 1;
+                          const isNbDown = dragCell && dragCell.c === c && r === dragCell.r + 1;
+                          let extra = null;
+                          if (isDrag) {
+                            extra = {
+                              transform: [{ translateX: dragX }, { translateY: dragY }, { scale: 1.08 }],
+                              zIndex: 20,
+                            };
+                          } else if (isNbL) extra = { transform: [{ translateX: nbL }] };
+                          else if (isNbR) extra = { transform: [{ translateX: nbR }] };
+                          else if (isNbUp) extra = { transform: [{ translateY: nbUp }] };
+                          else if (isNbDown) extra = { transform: [{ translateY: nbDown }] };
+                          return (
+                            <Animated.View
+                              key={`${r}-${c}`}
+                              style={[
+                                styles.cell,
+                                { width: tileSize, height: tileSize },
+                                empty && styles.cellEmpty,
+                                clearing && styles.cellClearing,
+                                isDrag && styles.cellDrag,
+                                extra,
+                              ]}
+                            >
+                              <Text style={[styles.tile, { fontSize: tileSize * 0.63 }]}>
+                                {empty ? "" : clearing ? "✨" : KINDS[k]}
+                              </Text>
+                            </Animated.View>
+                          );
+                        })}
+                      </View>
+                    ))}
                   </View>
 
                   <View pointerEvents="none" style={styles.comboWrap}>
@@ -749,19 +702,33 @@ export default function PetMatch3({ visible, species = "cat", petName = "tu masc
                 </View>
               </View>
 
-              <Pressable style={styles.endBtn} onPress={endGame}>
-                <Text style={styles.endBtnText}>Terminar</Text>
+              <Pressable style={styles.endBtn} onPress={() => endGame(false)}>
+                <Text style={styles.endBtnText}>Salir</Text>
               </Pressable>
             </>
           ) : (
             <View style={styles.doneWrap}>
-              <Text style={styles.doneEmoji}>{score >= 0.75 ? "🎉" : score >= 0.4 ? "😸" : "🙂"}</Text>
-              <Text style={styles.doneTitle}>{cleared} fichas</Text>
-              <Text style={styles.doneSub}>
-                {score >= 0.75 ? `¡${petName} está feliz!` : score >= 0.4 ? `A ${petName} le gustó` : `${petName} quiere otra`}
+              <Text style={styles.doneEmoji}>{won ? "🎉" : "😿"}</Text>
+              <Text style={styles.doneTitle}>
+                {won ? `¡Nivel ${level} completo!` : `${cleared}/${levelDef.target} fichas`}
               </Text>
-              <Pressable style={styles.doneBtn} onPress={finish}>
-                <Text style={styles.doneBtnText}>Listo</Text>
+              <Text style={styles.doneSub}>
+                {won
+                  ? `¡${petName} está feliz! 🎉${level < MAX_MATCH3_LEVEL ? " Ya se abrió el siguiente nivel." : " ¡Completaste todos los niveles!"}`
+                  : `Te faltaron ${Math.max(0, levelDef.target - cleared)} -- ¡inténtalo de nuevo!`}
+              </Text>
+              {!won && (
+                <Pressable style={styles.doneBtn} onPress={resetLevel}>
+                  <Text style={styles.doneBtnText}>Reintentar</Text>
+                </Pressable>
+              )}
+              <Pressable
+                style={won ? styles.doneBtn : styles.doneBtnOutline}
+                onPress={finish}
+              >
+                <Text style={won ? styles.doneBtnText : styles.doneBtnOutlineText}>
+                  {won ? "Ver niveles 🗺️" : "Salir"}
+                </Text>
               </Pressable>
             </View>
           )}
@@ -776,10 +743,7 @@ const styles = StyleSheet.create({
   sheet: { width: "100%", maxWidth: 400, backgroundColor: colors.card, borderRadius: 22, padding: 14 },
 
   hdr: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  hdrTitle: { color: "#111", fontSize: 17, fontWeight: "900" },
-  hdrRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  hdrMeta: { color: colors.primary, fontSize: 15, fontWeight: "900" },
-  hdrDanger: { color: "#d9534f" },
+  hdrTitle: { color: "#111", fontSize: 16, fontWeight: "900" },
   zoomBtn: {
     width: 26,
     height: 26,
@@ -790,14 +754,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   zoomBtnText: { fontSize: 13 },
-  hdrSub: { color: colors.textMuted, fontSize: 11.5, fontWeight: "800", marginTop: 2, marginBottom: 8 },
+  goalRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
+  goalText: { color: colors.primary, fontSize: 13, fontWeight: "900" },
+  goalDanger: { color: "#d9534f" },
+  hdrSub: { color: colors.textMuted, fontSize: 11.5, fontWeight: "800", marginTop: 4, marginBottom: 8 },
 
   stageRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
   sideChar: { width: 46, alignItems: "center", justifyContent: "flex-end" },
   sideCap: { marginTop: 2, color: colors.textMuted, fontSize: 9, fontWeight: "800" },
 
   boardWrap: { backgroundColor: "#f3e6d3", borderRadius: 12, borderWidth: 2, borderColor: colors.primarySoft, padding: 3 },
-  boardDanger: { borderColor: "#d9534f" },
   boardClip: { overflow: "hidden", borderRadius: 8 },
   row: { flexDirection: "row" },
   cell: {
@@ -868,7 +834,9 @@ const styles = StyleSheet.create({
   doneWrap: { alignItems: "center", paddingVertical: 20 },
   doneEmoji: { fontSize: 54 },
   doneTitle: { color: "#111", fontSize: 22, fontWeight: "900", marginTop: 6 },
-  doneSub: { color: colors.textMuted, fontSize: 13, fontWeight: "700", marginTop: 4 },
+  doneSub: { color: colors.textMuted, fontSize: 13, fontWeight: "700", marginTop: 4, textAlign: "center", paddingHorizontal: 10 },
   doneBtn: { marginTop: 18, backgroundColor: colors.primary, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 44 },
   doneBtnText: { color: "#fff", fontWeight: "900", fontSize: 14 },
+  doneBtnOutline: { marginTop: 12, borderRadius: 999, borderWidth: 1.5, borderColor: colors.primarySoft, paddingVertical: 11, paddingHorizontal: 44 },
+  doneBtnOutlineText: { color: colors.primary, fontWeight: "900", fontSize: 14 },
 });

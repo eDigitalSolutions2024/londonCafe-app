@@ -354,11 +354,23 @@ async function playPet(req, res) {
     // y `game:"tetris"` -- alimenta el leaderboard (GET /pet/leaderboard).
     // El mini-juego de atrapar no manda esto y no toca tetrisBest.
     let tetrisRecord = false;
+    let levelUp = false;
     if (req.body?.game === "tetris") {
       const cleared = Math.max(0, Math.floor(Number(req.body?.cleared) || 0));
       if (cleared > Number(user.pet.tetrisBest ?? 0)) {
         user.pet.tetrisBest = cleared;
         tetrisRecord = true;
+      }
+
+      // Progresión de niveles: SOLO avanza si ganaste justo el nivel que
+      // tenías abierto (match3Level) -- así un cliente no puede "mandar"
+      // un nivel más alto para saltarse el desbloqueo secuencial.
+      const won = req.body?.won === true;
+      const level = Math.floor(Number(req.body?.level));
+      const current = Number(user.pet.match3Level) || 1;
+      if (won && Number.isFinite(level) && level === current && current < 10) {
+        user.pet.match3Level = current + 1;
+        levelUp = true;
       }
     }
 
@@ -374,7 +386,7 @@ async function playPet(req, res) {
     user.markModified("pet");
     await user.save();
 
-    return res.json(petView(user, { action: "play", happyGain, xpGain, tetrisRecord }));
+    return res.json(petView(user, { action: "play", happyGain, xpGain, tetrisRecord, levelUp }));
   } catch (err) {
     console.error("playPet ERROR:", err);
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });

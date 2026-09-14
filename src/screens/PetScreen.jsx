@@ -9,6 +9,7 @@ import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
 import PetActor from "../components/PetActor";
 import PetMiniGame from "../components/PetMiniGame";
 import PetMatch3 from "../components/PetMatch3";
+import Match3LevelMap from "../components/Match3LevelMap";
 import PetLeaderboard from "../components/PetLeaderboard";
 
 const SPECIES = [
@@ -67,7 +68,11 @@ export default function PetScreen({ navigation }) {
   const [adopting, setAdopting] = useState(false);
   const [busy, setBusy] = useState(null);
   const [gameOpen, setGameOpen] = useState(false);
+  // ✅ Café Crush ahora es por niveles: `match3Open` controla si el mapa de
+  // niveles está visible, y `match3Level` (no-null) cuál nivel se está
+  // jugando ahora mismo -- null = mostrando el mapa, número = jugando.
   const [match3Open, setMatch3Open] = useState(false);
+  const [match3Level, setMatch3Level] = useState(null);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   // ✅ El sueño ya no es una animación cosmética de 2.6s -- el backend
   // devuelve `sleepSecondsLeft` (tiempo real restante del freeze, ver
@@ -177,9 +182,9 @@ export default function PetScreen({ navigation }) {
     await call("/pet/play", { score }, "play");
   };
 
-  const onMatch3Finish = async (score, cleared) => {
-    setMatch3Open(false);
-    await call("/pet/play", { score, cleared, game: "tetris" }, "play");
+  const onMatch3Finish = async (score, cleared, level, won) => {
+    setMatch3Level(null); // vuelve al mapa de niveles (match3Open sigue true)
+    await call("/pet/play", { score, cleared, game: "tetris", level, won }, "play");
   };
 
   const pet = state?.pet;
@@ -402,12 +407,19 @@ export default function PetScreen({ navigation }) {
         onClose={() => setGameOpen(false)}
         onFinish={onGameFinish}
       />
+      <Match3LevelMap
+        visible={match3Open && match3Level == null}
+        unlockedLevel={Number(pet?.match3Level) || 1}
+        onSelect={(lvl) => setMatch3Level(lvl)}
+        onClose={() => setMatch3Open(false)}
+      />
       <PetMatch3
-        visible={match3Open}
+        visible={match3Open && match3Level != null}
+        level={match3Level || 1}
         species={pet?.species}
         petName={pet?.name || "tu mascota"}
         avatarConfig={avatarConfig}
-        onClose={() => setMatch3Open(false)}
+        onClose={() => setMatch3Level(null)}
         onFinish={onMatch3Finish}
       />
       <PetLeaderboard visible={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} />

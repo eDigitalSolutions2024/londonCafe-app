@@ -138,6 +138,11 @@ const petSchema = new mongoose.Schema(
     // Alimenta el leaderboard -- ver GET /pet/leaderboard.
     tetrisBest: { type: Number, default: 0, min: 0 },
 
+    // Nivel más alto DESBLOQUEADO del Café Crush (progresión secuencial,
+    // ver matchLevels.js en el cliente y playPet() abajo) -- todo nivel
+    // < match3Level ya se pasó, match3Level mismo es el actual abierto.
+    match3Level: { type: Number, default: 1, min: 1, max: 10 },
+
     // ✅ Anti-spam de notificaciones: se marca al avisar y se limpia cuando
     // la barra correspondiente se recupera (mismo patrón que
     // buddy.energyAlerts). Ver cron/pushJobs.js.
