@@ -168,19 +168,68 @@ function buildHtml(interactive) {
     }
   }
 
+  // v2: antes el torso era una cápsula y los brazos salían casi de su
+  // CENTRO (a la altura del estómago, no del hombro) -- sin cuello, sin
+  // manos ni pies. La primera pasada de este rediseño probó partir el
+  // torso en pecho+cintura, pero el pecho (esfera achatada) quedaba más
+  // angosto que donde estaban los brazos a esa altura -- se veían
+  // flotando, separados del cuerpo. Se volvió a UNA sola cápsula (más
+  // corta, deja espacio para el cuello) y en su lugar se ajustó dónde
+  // sale cada pieza: brazos a la altura del hombro (arriba del todo del
+  // torso, no al centro), + cuello, manos y pies nuevos.
   function buildBody(id, skinColor) {
     var g = new THREE.Group();
     var mat = new THREE.MeshStandardMaterial({ color: skinColor || "#e0ac69", roughness: 0.7 });
     var big = id === "body3d_02";
-    var torso = new THREE.Mesh(new THREE.CapsuleGeometry(big ? 0.46 : 0.4, 0.75, 6, 12), mat);
-    torso.position.y = 0.62;
+
+    var torsoRadius = big ? 0.46 : 0.4;
+    var torso = new THREE.Mesh(new THREE.CapsuleGeometry(torsoRadius, 0.62, 6, 12), mat);
+    torso.position.y = 0.58;
     g.add(torso);
-    var armGeo = new THREE.CapsuleGeometry(0.09, 0.55, 4, 8);
-    var armL = new THREE.Mesh(armGeo, mat); armL.position.set(-0.52, 0.68, 0); armL.rotation.z = 0.18; g.add(armL);
-    var armR = new THREE.Mesh(armGeo, mat); armR.position.set(0.52, 0.68, 0); armR.rotation.z = -0.18; g.add(armR);
-    var legGeo = new THREE.CapsuleGeometry(0.13, 0.5, 4, 8);
-    var legL = new THREE.Mesh(legGeo, mat); legL.position.set(-0.18, -0.1, 0); g.add(legL);
-    var legR = new THREE.Mesh(legGeo, mat); legR.position.set(0.18, -0.1, 0); g.add(legR);
+
+    // Cuello: conecta la base de la cabeza (~y=1.20) con la punta del
+    // torso (~y=1.28) -- antes la cabeza quedaba pegada directo al
+    // torso, sin nada entre medio.
+    var neck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.15, 0.16, 12), mat);
+    neck.position.y = 1.3;
+    g.add(neck);
+
+    // Brazos a la altura del HOMBRO (arriba del todo del torso, dentro
+    // de su sección cilíndrica ancha) -- antes salían del centro del
+    // torso (y=0.68 contra un centro de torso en 0.62), casi del
+    // estómago. armX queda un poco DENTRO del radio del torso a esa
+    // altura para que se vean pegados, no flotando separados.
+    var armY = 0.92;
+    var armX = torsoRadius - 0.02;
+    var armGeo = new THREE.CapsuleGeometry(0.085, 0.48, 4, 8);
+    var armL = new THREE.Mesh(armGeo, mat); armL.position.set(-armX, armY, 0); armL.rotation.z = 0.24; g.add(armL);
+    var armR = new THREE.Mesh(armGeo, mat); armR.position.set(armX, armY, 0); armR.rotation.z = -0.24; g.add(armR);
+
+    // Manos: al final de cada brazo (mitad del largo + radio, corrido
+    // por la misma rotación del brazo).
+    var handDrop = 0.48 / 2 + 0.085;
+    var handGeo = new THREE.SphereGeometry(0.1, 10, 10);
+    var handL = new THREE.Mesh(handGeo, mat);
+    handL.position.set(-armX - Math.sin(0.24) * handDrop, armY - Math.cos(0.24) * handDrop, 0.01);
+    g.add(handL);
+    var handR = new THREE.Mesh(handGeo, mat);
+    handR.position.set(armX + Math.sin(0.24) * handDrop, armY - Math.cos(0.24) * handDrop, 0.01);
+    g.add(handR);
+
+    var legGeo = new THREE.CapsuleGeometry(0.12, 0.46, 4, 8);
+    var legL = new THREE.Mesh(legGeo, mat); legL.position.set(-0.16, -0.25, 0); g.add(legL);
+    var legR = new THREE.Mesh(legGeo, mat); legR.position.set(0.16, -0.25, 0); g.add(legR);
+
+    // Pies: esferas achatadas y alargadas hacia adelante (+z), color fijo
+    // de zapato (no depende del tono de piel) -- así siempre se ven como
+    // zapatitos puestos, no como pies desnudos.
+    var shoeMat = new THREE.MeshStandardMaterial({ color: "#4a3728", roughness: 0.8 });
+    var footGeo = new THREE.SphereGeometry(0.135, 10, 8);
+    var footL = new THREE.Mesh(footGeo, shoeMat);
+    footL.scale.set(1, 0.55, 1.35); footL.position.set(-0.16, -0.62, 0.04); g.add(footL);
+    var footR = new THREE.Mesh(footGeo, shoeMat);
+    footR.scale.set(1, 0.55, 1.35); footR.position.set(0.16, -0.62, 0.04); g.add(footR);
+
     return g;
   }
 
@@ -307,39 +356,41 @@ function buildHtml(interactive) {
     var c = colorsById[id] || "#7a1e3a";
     var shirtMat = new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 });
 
-    // Radio un poco mayor que el torso MÁS GRANDE posible (body3d_02 usa
-    // 0.46 en buildBody) -- si la camisa quedara más chica que el torso
-    // "grande", la piel se asoma por los bordes y tapa la tela.
-    var shirt = new THREE.Mesh(new THREE.CapsuleGeometry(0.49, 0.62, 6, 12), shirtMat);
-    shirt.position.y = 0.68;
+    // Radio/alto suficiente para envolver el torso completo (buildBody
+    // v2: radio hasta 0.46 en el cuerpo grande, centro en y=0.58) -- si
+    // quedara más chica, la piel se asoma por los bordes.
+    var shirt = new THREE.Mesh(new THREE.CapsuleGeometry(0.49, 0.5, 6, 12), shirtMat);
+    shirt.position.y = 0.58;
     g.add(shirt);
 
-    // Mangas: mismo origen/rotación que armL/armR (buildBody), pero solo
-    // cubren la mitad de arriba del brazo y con radio mayor -- así se ven
-    // como tela encima del brazo, no como el brazo mismo repintado.
-    var sleeveGeo = new THREE.CapsuleGeometry(0.115, 0.22, 4, 8);
+    // Mangas: mismo origen/rotación que armL/armR (buildBody v2, hombro a
+    // y=0.92), pero con radio mayor -- así se ven como tela encima del
+    // brazo, no como el brazo repintado.
+    var sleeveGeo = new THREE.CapsuleGeometry(0.11, 0.18, 4, 8);
     var sleeveL = new THREE.Mesh(sleeveGeo, shirtMat);
-    sleeveL.position.set(-0.52, 0.92, 0); sleeveL.rotation.z = 0.18; g.add(sleeveL);
+    sleeveL.position.set(-0.4, 0.92, 0); sleeveL.rotation.z = 0.24; g.add(sleeveL);
     var sleeveR = new THREE.Mesh(sleeveGeo, shirtMat);
-    sleeveR.position.set(0.52, 0.92, 0); sleeveR.rotation.z = -0.18; g.add(sleeveR);
+    sleeveR.position.set(0.4, 0.92, 0); sleeveR.rotation.z = -0.24; g.add(sleeveR);
 
-    var collarRadius = id === "outfit3d_03" ? 0.05 : 0.035;
-    var collar = new THREE.Mesh(new THREE.TorusGeometry(0.24, collarRadius, 8, 16), shirtMat);
-    collar.position.y = 1.0; collar.rotation.x = Math.PI / 2; g.add(collar);
+    // Cuello de la camisa: a la altura de la base del cuello (buildBody
+    // v2 pone el cuello en y=1.3, radio inferior 0.15).
+    var collarRadius = id === "outfit3d_03" ? 0.055 : 0.04;
+    var collar = new THREE.Mesh(new THREE.TorusGeometry(0.17, collarRadius, 8, 16), shirtMat);
+    collar.position.y = 1.22; collar.rotation.x = Math.PI / 2; g.add(collar);
 
-    if (id === "outfit3d_02") { // hoodie -- capucha
+    if (id === "outfit3d_02") { // hoodie -- capucha, detrás de la cabeza
       var hood = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.08, 8, 16, Math.PI), shirtMat);
-      hood.position.set(0, 1.16, -0.15); hood.rotation.x = Math.PI; g.add(hood);
+      hood.position.set(0, 1.55, -0.15); hood.rotation.x = Math.PI; g.add(hood);
     }
 
-    // Pantalón: mismo origen que legL/legR (buildBody), solo la mitad de
-    // arriba de cada pierna, color neutro fijo (no depende del outfit).
+    // Pantalón: mismo origen que legL/legR (buildBody v2), solo la mitad
+    // de arriba de cada pierna, color neutro fijo (no depende del outfit).
     var pantsMat = new THREE.MeshStandardMaterial({ color: "#33414f", roughness: 0.8 });
-    var pantsGeo = new THREE.CapsuleGeometry(0.145, 0.22, 4, 8);
+    var pantsGeo = new THREE.CapsuleGeometry(0.135, 0.2, 4, 8);
     var pantsL = new THREE.Mesh(pantsGeo, pantsMat);
-    pantsL.position.set(-0.18, 0.08, 0); g.add(pantsL);
+    pantsL.position.set(-0.16, 0.0, 0); g.add(pantsL);
     var pantsR = new THREE.Mesh(pantsGeo, pantsMat);
-    pantsR.position.set(0.18, 0.08, 0); g.add(pantsR);
+    pantsR.position.set(0.16, 0.0, 0); g.add(pantsR);
 
     return g;
   }
