@@ -291,21 +291,57 @@ function buildHtml(interactive) {
     return g;
   }
 
-  function buildOutfit(id, group) {
-    // el "atuendo" ajusta el color/silueta del torso ya creado por buildBody
+  // Antes la "camisa" era solo una banda de color (CylinderGeometry)
+  // flotando encima de un torso 100% del color de piel -- se veía como
+  // una pintura, no como ropa real. Ahora: una CÁPSULA que envuelve el
+  // torso completo (mismo tipo de geometría que buildBody, un poco más
+  // grande de radio para taparlo del todo), MANGAS de verdad sobre la
+  // parte de arriba de cada brazo (mismo origen/rotación que armL/armR en
+  // buildBody, pero más gruesas que el brazo desnudo), un cuello, y un
+  // PANTALÓN corto sobre la parte de arriba de cada pierna -- así ya no
+  // queda piel desnuda de brazos/piernas por debajo de "ropa puesta".
+  function buildOutfit(id) {
+    if (!id) return null;
+    var g = new THREE.Group();
     var colorsById = { outfit3d_01: "#7a1e3a", outfit3d_02: "#3c5a7a", outfit3d_03: "#3a7a4e" };
     var c = colorsById[id] || "#7a1e3a";
-    var shirtMat = new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 });
-    var shirt = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 0.5, 16), shirtMat);
-    shirt.position.y = 0.82;
+    var shirtMat = new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 });
+
+    // Radio un poco mayor que el torso MÁS GRANDE posible (body3d_02 usa
+    // 0.46 en buildBody) -- si la camisa quedara más chica que el torso
+    // "grande", la piel se asoma por los bordes y tapa la tela.
+    var shirt = new THREE.Mesh(new THREE.CapsuleGeometry(0.49, 0.62, 6, 12), shirtMat);
+    shirt.position.y = 0.68;
+    g.add(shirt);
+
+    // Mangas: mismo origen/rotación que armL/armR (buildBody), pero solo
+    // cubren la mitad de arriba del brazo y con radio mayor -- así se ven
+    // como tela encima del brazo, no como el brazo mismo repintado.
+    var sleeveGeo = new THREE.CapsuleGeometry(0.115, 0.22, 4, 8);
+    var sleeveL = new THREE.Mesh(sleeveGeo, shirtMat);
+    sleeveL.position.set(-0.52, 0.92, 0); sleeveL.rotation.z = 0.18; g.add(sleeveL);
+    var sleeveR = new THREE.Mesh(sleeveGeo, shirtMat);
+    sleeveR.position.set(0.52, 0.92, 0); sleeveR.rotation.z = -0.18; g.add(sleeveR);
+
+    var collarRadius = id === "outfit3d_03" ? 0.05 : 0.035;
+    var collar = new THREE.Mesh(new THREE.TorusGeometry(0.24, collarRadius, 8, 16), shirtMat);
+    collar.position.y = 1.0; collar.rotation.x = Math.PI / 2; g.add(collar);
+
     if (id === "outfit3d_02") { // hoodie -- capucha
       var hood = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.08, 8, 16, Math.PI), shirtMat);
-      hood.position.set(0, 1.28, -0.15); hood.rotation.x = Math.PI; shirt.add(hood);
-    } else if (id === "outfit3d_03") { // jacket -- cuello
-      var collar = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.045, 8, 16), shirtMat);
-      collar.position.y = 1.06; collar.rotation.x = Math.PI / 2; shirt.add(collar);
+      hood.position.set(0, 1.16, -0.15); hood.rotation.x = Math.PI; g.add(hood);
     }
-    return shirt;
+
+    // Pantalón: mismo origen que legL/legR (buildBody), solo la mitad de
+    // arriba de cada pierna, color neutro fijo (no depende del outfit).
+    var pantsMat = new THREE.MeshStandardMaterial({ color: "#33414f", roughness: 0.8 });
+    var pantsGeo = new THREE.CapsuleGeometry(0.145, 0.22, 4, 8);
+    var pantsL = new THREE.Mesh(pantsGeo, pantsMat);
+    pantsL.position.set(-0.18, 0.08, 0); g.add(pantsL);
+    var pantsR = new THREE.Mesh(pantsGeo, pantsMat);
+    pantsR.position.set(0.18, 0.08, 0); g.add(pantsR);
+
+    return g;
   }
 
   function buildAccessory(id) {
