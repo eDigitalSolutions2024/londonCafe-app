@@ -184,18 +184,84 @@ function buildHtml(interactive) {
     return g;
   }
 
+  // Oscurece un color hex un poco -- se usa para que la nariz/cejas no
+  // sean el mismo tono plano de la piel/pelo, dan algo de relieve a la cara.
+  function shade(hex, amt) {
+    var c = new THREE.Color(hex || "#e0ac69");
+    c.multiplyScalar(1 + amt);
+    return c;
+  }
+
   function buildHead(id, skinColor) {
     var mat = new THREE.MeshStandardMaterial({ color: skinColor || "#e0ac69", roughness: 0.6 });
     var oval = id === "head3d_02";
     var head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 20), mat);
     head.scale.set(1, oval ? 1.12 : 1, 0.92);
     head.position.y = 1.62;
-    // ojos simples
-    var eyeMat = new THREE.MeshStandardMaterial({ color: "#241a14" });
-    var eyeGeo = new THREE.SphereGeometry(0.045, 10, 10);
-    var eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.15, 1.62, 0.36); head.add(eyeL);
-    var eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.15, 1.62, 0.36); head.add(eyeR);
+    buildFace(head, skinColor);
     return head;
+  }
+
+  // Cara estilo Bitmoji/Snapchat: ojos grandes (esclera + iris + brillo),
+  // cejas, nariz y boca sonriente -- todo geometría simple de three.js
+  // montada como hijos del mesh de la cabeza, así rota/escala con ella.
+  function buildFace(head, skinColor) {
+    // Los rasgos son HIJOS de head, así que sus posiciones son LOCALES al
+    // origen de la cabeza (0,0,0) -- heredan el position.y=1.62 del padre
+    // automáticamente. Sumar 1.62 aquí también (como el bug original de
+    // "ojos simples") los mandaba a y=3.24 en el mundo, muy por encima de
+    // la cabeza real -- por eso nunca se veían.
+    var cy = 0;
+
+    // Ojos: esclera blanca + iris oscuro + punto de brillo, el look
+    // "grande y expresivo" característico de Bitmoji.
+    var scleraMat = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.3 });
+    var irisMat = new THREE.MeshStandardMaterial({ color: "#3a2418", roughness: 0.25 });
+    var pupilMat = new THREE.MeshStandardMaterial({ color: "#120b08", roughness: 0.2 });
+    var glintMat = new THREE.MeshStandardMaterial({ color: "#ffffff", emissive: "#ffffff", emissiveIntensity: 0.5 });
+
+    [-1, 1].forEach(function (side) {
+      var ex = 0.155 * side;
+      var sclera = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 14), scleraMat);
+      sclera.scale.set(1, 1.15, 0.6);
+      sclera.position.set(ex, cy + 0.01, 0.365);
+      head.add(sclera);
+
+      var iris = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), irisMat);
+      iris.position.set(ex, cy + 0.01, 0.408);
+      head.add(iris);
+
+      var pupil = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 10), pupilMat);
+      pupil.position.set(ex, cy + 0.01, 0.425);
+      head.add(pupil);
+
+      var glint = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), glintMat);
+      glint.position.set(ex - 0.018, cy + 0.035, 0.43);
+      head.add(glint);
+    });
+
+    // Cejas: cápsulas finas encima de cada ojo.
+    var browMat = new THREE.MeshStandardMaterial({ color: shade(skinColor, -0.55), roughness: 0.8 });
+    [-1, 1].forEach(function (side) {
+      var brow = new THREE.Mesh(new THREE.CapsuleGeometry(0.012, 0.11, 4, 6), browMat);
+      brow.position.set(0.16 * side, cy + 0.145, 0.375);
+      brow.rotation.z = Math.PI / 2 + side * 0.18;
+      head.add(brow);
+    });
+
+    // Nariz: pequeño bulto que sobresale al centro de la cara.
+    var noseMat = new THREE.MeshStandardMaterial({ color: shade(skinColor, -0.08), roughness: 0.6 });
+    var nose = new THREE.Mesh(new THREE.SphereGeometry(0.038, 10, 10), noseMat);
+    nose.scale.set(0.8, 1, 0.9);
+    nose.position.set(0, cy - 0.06, 0.415);
+    head.add(nose);
+
+    // Boca: medio toro (arco) que forma una sonrisa simple.
+    var mouthMat = new THREE.MeshStandardMaterial({ color: "#7a3b3b", roughness: 0.5 });
+    var mouth = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.013, 8, 16, Math.PI), mouthMat);
+    mouth.rotation.z = Math.PI; // voltea el arco para que abra hacia arriba (∪, sonrisa)
+    mouth.position.set(0, cy - 0.16, 0.375);
+    head.add(mouth);
   }
 
   function buildHair(id, hairColor) {
