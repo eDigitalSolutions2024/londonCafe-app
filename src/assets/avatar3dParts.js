@@ -35,8 +35,41 @@ export const ACCESSORY_OPTIONS = [
   { id: "acc3d_02", label: "Gorra", emoji: "🧢" },
 ];
 
+export const EYEBROW_OPTIONS = [
+  { id: "eyebrow3d_01", label: "Recta", emoji: "➖" },
+  { id: "eyebrow3d_02", label: "Arqueada", emoji: "〜" },
+  { id: "eyebrow3d_03", label: "Gruesa", emoji: "▬" },
+];
+
+export const NOSE_OPTIONS = [
+  { id: "nose3d_01", label: "Chica", emoji: "👃" },
+  { id: "nose3d_02", label: "Marcada", emoji: "👃" },
+];
+
+export const MOUTH_OPTIONS = [
+  { id: "mouth3d_01", label: "Sonrisa", emoji: "🙂" },
+  { id: "mouth3d_02", label: "Neutral", emoji: "😐" },
+  { id: "mouth3d_03", label: "Sonrisón", emoji: "😄" },
+];
+
+// Poses/gestos -- variaciones simples de la posición de los brazos (sin
+// segundo segmento tipo codo, a propósito: se pidió que esto quedara
+// básico). Cada una define rotación en Z (abrir/cerrar hacia el cuerpo)
+// y en X (subir/bajar hacia adelante) para cada brazo -- buildBody usa
+// los mismos valores para calcular dónde cae la mano, así que cambiar
+// la pose no necesita tocar nada más.
+export const POSE_OPTIONS = [
+  { id: "pose3d_01", label: "Normal", emoji: "🧍" },
+  { id: "pose3d_02", label: "Manos en cintura", emoji: "🧍‍♀️" },
+  { id: "pose3d_03", label: "Saludo", emoji: "🙋" },
+  { id: "pose3d_04", label: "Pulgar arriba", emoji: "👍" },
+  { id: "pose3d_05", label: "Paz ✌️", emoji: "✌️" },
+  { id: "pose3d_06", label: "Manos atrás", emoji: "🙆" },
+];
+
 export const SKIN_COLORS = ["#f2d3b3", "#e0ac69", "#c68642", "#8d5524", "#5a3825"];
 export const HAIR_COLORS = ["#1c1c1c", "#4a2c14", "#a35b2c", "#d9a441", "#b33951", "#3c3c8c"];
+export const EYE_COLORS = ["#3a2418", "#1a1410", "#3a6ea8", "#3a7a4e", "#8a6a2a"];
 
 // Tono de piel sugerido a partir de la foto: promedio de color de un
 // recuadro central de la imagen, mapeado al SKIN_COLORS más cercano.

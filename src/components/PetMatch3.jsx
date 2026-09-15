@@ -81,14 +81,34 @@ function applyGravity(g) {
 // Tras la gravedad, los huecos que quedan siempre están arriba de cada
 // columna (la gravedad ya compactó lo demás hacia abajo) -- se rellenan
 // con fichas nuevas, como las candys que "caen" desde arriba en cualquier
-// match-3. Si eso arma una combinación nueva sola (cascada), el propio
-// loop de runResolve la va a encontrar en la siguiente vuelta.
+// match-3.
+//
+// v2: antes se rellenaba con rndKind() puro, sin evitar que la ficha
+// nueva quedara pegada a dos iguales (izquierda o arriba) -- con solo
+// 4-6 sabores en juego, eso arma una combinación "gratis" por pura
+// suerte casi en cada jugada, y el loop de runResolve la contaba como
+// CASCADA del mismo combo (de ahí "apenas haces una combinación y todo
+// lo que cae se hace combo"). Ahora, igual que makeFullGrid, se evita a
+// propósito que la ficha nueva complete un 3-en-línea con lo que ya
+// quedó asentado -- las cascadas de verdad siguen pasando (cuando el
+// swap del jugador hace caer fichas EXISTENTES a una alineación nueva
+// por gravedad), pero ya no se regalan solas desde el relleno aleatorio.
 function refillTop(g, kindsCount) {
   const ng = g.map((row) => row.slice());
   for (let c = 0; c < COLS; c++) {
     for (let r = 0; r < ROWS; r++) {
-      if (ng[r][c] == null) ng[r][c] = rndKind(kindsCount);
-      else break;
+      if (ng[r][c] != null) break; // ya no hay más huecos en esta columna
+      let k;
+      let tries = 0;
+      do {
+        k = rndKind(kindsCount);
+        tries++;
+      } while (
+        tries < 12 &&
+        ((c >= 2 && ng[r][c - 1] === k && ng[r][c - 2] === k) ||
+          (r >= 2 && ng[r - 1][c] === k && ng[r - 2][c] === k))
+      );
+      ng[r][c] = k;
     }
   }
   return ng;

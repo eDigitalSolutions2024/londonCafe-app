@@ -481,10 +481,15 @@ const AVATAR3D_PART_IDS = {
   body: new Set(["body3d_01", "body3d_02"]),
   outfit: new Set(["outfit3d_01", "outfit3d_02", "outfit3d_03"]),
   accessory: new Set([null, "acc3d_01", "acc3d_02"]),
+  eyebrow: new Set(["eyebrow3d_01", "eyebrow3d_02", "eyebrow3d_03"]),
+  nose: new Set(["nose3d_01", "nose3d_02"]),
+  mouth: new Set(["mouth3d_01", "mouth3d_02", "mouth3d_03"]),
+  pose: new Set(["pose3d_01", "pose3d_02", "pose3d_03", "pose3d_04", "pose3d_05", "pose3d_06"]),
 };
 const AVATAR3D_SLOTS = Object.keys(AVATAR3D_PART_IDS);
 const AVATAR3D_SKIN_COLORS = new Set(["#f2d3b3", "#e0ac69", "#c68642", "#8d5524", "#5a3825"]);
 const AVATAR3D_HAIR_COLORS = new Set(["#1c1c1c", "#4a2c14", "#a35b2c", "#d9a441", "#b33951", "#3c3c8c"]);
+const AVATAR3D_EYE_COLORS = new Set(["#3a2418", "#1a1410", "#3a6ea8", "#3a7a4e", "#8a6a2a"]);
 
 const SNAPSHOT_DIR = path.join(__dirname, "..", "..", "uploads", "avatars");
 // Mismo dominio que el cliente ya usa como BASE_URL (src/api/client.js) --
@@ -533,6 +538,10 @@ async function updateAvatar3D(req, res) {
       if ("hair" in colors) {
         if (!AVATAR3D_HAIR_COLORS.has(colors.hair)) return res.status(400).json({ error: "INVALID_COLOR", field: "hair" });
         $set["avatar3d.colors.hair"] = colors.hair;
+      }
+      if ("eyes" in colors) {
+        if (!AVATAR3D_EYE_COLORS.has(colors.eyes)) return res.status(400).json({ error: "INVALID_COLOR", field: "eyes" });
+        $set["avatar3d.colors.eyes"] = colors.eyes;
       }
     }
     if (!$set["avatar3d.createdAt"] && !user0.avatar3d?.owned) {

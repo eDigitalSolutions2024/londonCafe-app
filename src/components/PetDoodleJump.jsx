@@ -1,8 +1,25 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Modal, Animated, PanResponder } from "react-native";
-import { Accelerometer } from "expo-sensors";
 import { colors } from "../theme/colors";
 import { getDoodleLevel, MAX_DOODLE_LEVEL } from "../assets/doodleLevels";
+
+// expo-sensors es un módulo NATIVO -- si el binario instalado todavía no
+// lo trae compilado (dev-client viejo, o cualquier build hecho antes de
+// agregar esta dependencia), importarlo revienta la app ENTERA al cargar
+// el bundle, no solo esta pantalla (los sensores de expo-sensors llaman
+// requireNativeModule() a nivel de módulo, y encima el índice del
+// paquete importa TODOS los sensores de un jalón -- hasta Pedometer,
+// aunque acá solo se use Accelerometer). Por eso se carga con require()
+// perezoso + try/catch en vez de un `import` normal: si el módulo nativo
+// no está listo, la inclinación simplemente se desactiva sola (arrastrar
+// con el dedo sigue funcionando igual) en vez de tumbar todo el juego.
+let Accelerometer = null;
+try {
+  // eslint-disable-next-line global-require
+  Accelerometer = require("expo-sensors/build/Accelerometer").default;
+} catch (e) {
+  Accelerometer = null;
+}
 
 /**
  * "Salto Café" -- mini-juego estilo Doodle Jump: la mascota rebota sola
@@ -289,13 +306,18 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
   // juego -- se desuscribe al cerrar/perder/ganar para no seguir leyendo
   // el sensor (batería) ni mover al personaje fuera de esta pantalla.
   useEffect(() => {
-    if (!visible || phase !== "play") return;
-    Accelerometer.setUpdateInterval(FRAME_MS);
-    const sub = Accelerometer.addListener(({ x }) => {
-      tiltRef.current = tiltRef.current * (1 - TILT_SMOOTHING) + x * TILT_SMOOTHING;
-    });
+    if (!visible || phase !== "play" || !Accelerometer) return;
+    let sub;
+    try {
+      Accelerometer.setUpdateInterval(FRAME_MS);
+      sub = Accelerometer.addListener(({ x }) => {
+        tiltRef.current = tiltRef.current * (1 - TILT_SMOOTHING) + x * TILT_SMOOTHING;
+      });
+    } catch (e) {
+      sub = null;
+    }
     return () => {
-      sub.remove();
+      sub?.remove?.();
       tiltRef.current = 0;
     };
   }, [visible, phase]);

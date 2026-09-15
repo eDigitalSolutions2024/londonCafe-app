@@ -13,8 +13,13 @@ import {
   BODY_OPTIONS,
   OUTFIT_OPTIONS,
   ACCESSORY_OPTIONS,
+  EYEBROW_OPTIONS,
+  NOSE_OPTIONS,
+  MOUTH_OPTIONS,
+  POSE_OPTIONS,
   SKIN_COLORS,
   HAIR_COLORS,
+  EYE_COLORS,
   nearestSkinColor,
 } from "../assets/avatar3dParts";
 
@@ -125,10 +130,15 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
     body: existing?.parts?.body || BODY_OPTIONS[0].id,
     outfit: existing?.parts?.outfit || OUTFIT_OPTIONS[0].id,
     accessory: existing?.parts?.accessory ?? null,
+    eyebrow: existing?.parts?.eyebrow || EYEBROW_OPTIONS[0].id,
+    nose: existing?.parts?.nose || NOSE_OPTIONS[0].id,
+    mouth: existing?.parts?.mouth || MOUTH_OPTIONS[0].id,
+    pose: existing?.parts?.pose || POSE_OPTIONS[0].id,
   });
   const [avColors, setAvColors] = useState({
     skin: existing?.colors?.skin || SKIN_COLORS[1],
     hair: existing?.colors?.hair || HAIR_COLORS[0],
+    eyes: existing?.colors?.eyes || EYE_COLORS[0],
   });
 
   const [pendingPhoto, setPendingPhoto] = useState(null); // {base64}
@@ -299,10 +309,15 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
           <ColorRow title="Tono de piel" colors={SKIN_COLORS} value={avColors.skin} onChange={(v) => setColor("skin", v)} />
           <PartRow title="Pelo" options={HAIR_OPTIONS} value={parts.hair} onChange={(v) => setPart("hair", v)} />
           <ColorRow title="Color de pelo" colors={HAIR_COLORS} value={avColors.hair} onChange={(v) => setColor("hair", v)} />
+          <PartRow title="Cejas" options={EYEBROW_OPTIONS} value={parts.eyebrow} onChange={(v) => setPart("eyebrow", v)} />
+          <ColorRow title="Color de ojos" colors={EYE_COLORS} value={avColors.eyes} onChange={(v) => setColor("eyes", v)} />
+          <PartRow title="Nariz" options={NOSE_OPTIONS} value={parts.nose} onChange={(v) => setPart("nose", v)} />
+          <PartRow title="Boca" options={MOUTH_OPTIONS} value={parts.mouth} onChange={(v) => setPart("mouth", v)} />
           <PartRow title="Cara" options={HEAD_OPTIONS} value={parts.head} onChange={(v) => setPart("head", v)} />
           <PartRow title="Cuerpo" options={BODY_OPTIONS} value={parts.body} onChange={(v) => setPart("body", v)} />
           <PartRow title="Atuendo" options={OUTFIT_OPTIONS} value={parts.outfit} onChange={(v) => setPart("outfit", v)} />
           <PartRow title="Accesorio" options={ACCESSORY_OPTIONS} value={parts.accessory} onChange={(v) => setPart("accessory", v)} />
+          <PartRow title="Pose" options={POSE_OPTIONS} value={parts.pose} onChange={(v) => setPart("pose", v)} />
 
           {/* Mascota VIP -- especie/nombre; cuidarla vive en PetScreen.
               No aplica todavía en el gate obligatorio post-login. */}
