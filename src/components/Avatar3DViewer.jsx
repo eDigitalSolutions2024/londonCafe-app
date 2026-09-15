@@ -24,9 +24,10 @@ import { CHARACTER_OPTIONS, BRAND_LOGO_URL } from "../assets/avatar3dParts";
  * desproporcionados en varios de los 12 personajes) -- el código sigue acá,
  * listo para reactivarse cuando se ajuste mejor.
  *
- * Todos los personajes llevan el logo de London Café al pecho y "LONDON
- * VIBES / COFFEE MOMENTS" en la espalda -- ver buildBrand(), posicionado
- * igual que el accesorio (midiendo el "body-mesh" real), no a mano.
+ * buildBrand() arma un logo de London Café al pecho + "LONDON VIBES /
+ * COFFEE MOMENTS" en la espalda, pero está APAGADO (no se llama) -- no
+ * gustó cómo se veía puesto. Queda el código por si se retoma con otro
+ * diseño.
  *
  * Uso:
  *   const ref = useRef(null);
@@ -226,7 +227,7 @@ function measureMesh(obj, namePattern) {
 function measureHead(obj) { return measureMesh(obj, /head/i); }
 function measureBody(obj) { return measureMesh(obj, /body/i); }
 
-var logoTexture = new THREE.TextureLoader().load(BRAND_LOGO_URL);
+var logoTexture = null; // se cargaba acá; apagado junto con buildBrand() más abajo
 
 // Dibuja un rectángulo con esquinas redondeadas en un canvas 2D -- usado
 // para la placa del texto de atrás (sin esto ctx.fillRect() daría un
@@ -419,8 +420,9 @@ function loadAndSwapCharacter(url) {
     // los lentes/la gorra hasta tapar toda la pantalla.
     currentHeadInfo = measureHead(obj);
 
-    var brand = buildBrand(currentHeadInfo, measureBody(obj));
-    if (brand) { avatarGroup.add(brand); currentBrand = brand; }
+    // buildBrand() (logo al pecho + texto atrás) se deja definido pero SIN
+    // llamar -- no gustó cómo se veía puesto. currentBrand se queda en
+    // null siempre por ahora.
 
     // Pose "idle" en loop (en vez de una T-pose fija) -- confirmado con
     // captura que el frame 0 de "idle" es una pose de pie natural, brazos
