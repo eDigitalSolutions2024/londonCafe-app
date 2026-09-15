@@ -493,18 +493,31 @@ async function sleepPet(req, res) {
 
 const LEADERBOARD_LIMIT = 10; // top 10 por lo pronto
 
-// GET /pet/leaderboard -- top mascotas por fichas en Café Tetris (mejor
-// partida). Incluye la posición del usuario que pregunta aunque no esté
-// en el top, así siempre tiene "alguien a quien superar" a la vista.
+// v2: el leaderboard cubre Café Crush ("tetris", campo pet.tetrisBest) Y
+// Salto Café ("doodle", campo pet.doodleBest) -- antes solo existía para
+// Café Crush. "Atrapa" (el mini-juego original) no tiene un mejor puntaje
+// persistido en el schema, así que no tiene tabla acá.
+const LEADERBOARD_FIELDS = {
+  tetris: "tetrisBest",
+  doodle: "doodleBest",
+};
+
+// GET /pet/leaderboard?game=tetris|doodle -- top mascotas por mejor
+// partida en ese juego. Incluye la posición del usuario que pregunta
+// aunque no esté en el top, así siempre tiene "alguien a quien superar".
 async function getLeaderboard(req, res) {
   try {
     const uid = req.user?.uid;
     if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
 
-    const top = await User.find({ "pet.owned": true, "pet.tetrisBest": { $gt: 0 } })
-      .sort({ "pet.tetrisBest": -1 })
+    const game = LEADERBOARD_FIELDS[req.query?.game] ? req.query.game : "tetris";
+    const field = LEADERBOARD_FIELDS[game];
+    const petField = `pet.${field}`;
+
+    const top = await User.find({ "pet.owned": true, [petField]: { $gt: 0 } })
+      .sort({ [petField]: -1 })
       .limit(LEADERBOARD_LIMIT)
-      .select("name username pet.species pet.name pet.tetrisBest")
+      .select(`name username pet.species pet.name pet.${field}`)
       .lean();
 
     const rows = top.map((u, i) => ({
@@ -514,16 +527,16 @@ async function getLeaderboard(req, res) {
       ownerName: u.username || u.name || "Alguien",
       species: u.pet?.species || "cat",
       petName: u.pet?.name || "Mascota",
-      best: Number(u.pet?.tetrisBest) || 0,
+      best: Number(u.pet?.[field]) || 0,
     }));
 
     let me = rows.find((r) => r.isMe) || null;
     if (!me) {
       // No está en el top -- calculamos su posición real igual, para que
       // siempre tenga una meta clara ("te faltan N fichas para el top").
-      const meUser = await User.findById(uid).select("name username pet.species pet.name pet.tetrisBest").lean();
-      const myBest = Number(meUser?.pet?.tetrisBest) || 0;
-      const ahead = await User.countDocuments({ "pet.owned": true, "pet.tetrisBest": { $gt: myBest } });
+      const meUser = await User.findById(uid).select(`name username pet.species pet.name pet.${field}`).lean();
+      const myBest = Number(meUser?.pet?.[field]) || 0;
+      const ahead = await User.countDocuments({ "pet.owned": true, [petField]: { $gt: myBest } });
       me = {
         rank: ahead + 1,
         userId: String(uid),
@@ -536,7 +549,7 @@ async function getLeaderboard(req, res) {
       };
     }
 
-    return res.json({ ok: true, top: rows, me });
+    return res.json({ ok: true, game, top: rows, me });
   } catch (err) {
     console.error("getLeaderboard ERROR:", err);
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });

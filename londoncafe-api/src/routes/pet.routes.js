@@ -15,7 +15,7 @@ const router = Router();
 
 // GET /pet
 router.get("/", requireAuth, getPet);
-// GET /pet/leaderboard -- top Café Tetris
+// GET /pet/leaderboard?game=tetris|doodle -- top Café Crush o Salto Café
 router.get("/leaderboard", requireAuth, getLeaderboard);
 // POST /pet/adopt   body: { species, name }
 router.post("/adopt", requireAuth, adoptPet);

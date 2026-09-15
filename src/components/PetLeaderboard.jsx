@@ -6,23 +6,32 @@ import { apiFetch } from "../api/client";
 const SPECIES_EMOJI = { cat: "🐱", dog: "🐶", hamster: "🐹" };
 const MEDAL = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
+// v2: antes esto era SOLO Café Crush -- ahora `game` elige cuál tabla
+// pedir al backend (ver GET /pet/leaderboard?game=... en pet.controller.js),
+// mismo componente para las dos.
+const GAME_META = {
+  tetris: { title: "🏆 Top Café Crush", sub: "Las mascotas que más fichas juntaron en una sola partida", unit: "🍰", noun: "fichas" },
+  doodle: { title: "🏆 Top Salto Café", sub: "Las mascotas que llegaron más alto en Salto Café", unit: "🦘", noun: "de altura" },
+};
+
 /**
- * Top de Café Crush: quién ha juntado más fichas en una sola partida.
- * Siempre muestra al usuario actual (aunque quede fuera del top) para que
- * tenga claro a cuánto está de subir -- "alguien a quien superar".
+ * Top de un mini-juego: quién tiene el mejor puntaje. Siempre muestra al
+ * usuario actual (aunque quede fuera del top) para que tenga claro a
+ * cuánto está de subir -- "alguien a quien superar".
  */
-export default function PetLeaderboard({ visible, onClose }) {
+export default function PetLeaderboard({ visible, game = "tetris", onClose }) {
   const [loading, setLoading] = useState(true);
   const [top, setTop] = useState([]);
   const [me, setMe] = useState(null);
   const [err, setErr] = useState(false);
+  const meta = GAME_META[game] || GAME_META.tetris;
 
   useEffect(() => {
     if (!visible) return;
     let alive = true;
     setLoading(true);
     setErr(false);
-    apiFetch("/pet/leaderboard")
+    apiFetch(`/pet/leaderboard?game=${game}`)
       .then((r) => {
         if (!alive) return;
         setTop(Array.isArray(r?.top) ? r.top : []);
@@ -33,7 +42,7 @@ export default function PetLeaderboard({ visible, onClose }) {
     return () => {
       alive = false;
     };
-  }, [visible]);
+  }, [visible, game]);
 
   const meInTop = top.some((r) => r.isMe);
 
@@ -42,12 +51,12 @@ export default function PetLeaderboard({ visible, onClose }) {
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.hdr}>
-            <Text style={styles.hdrTitle}>🏆 Top Café Crush</Text>
+            <Text style={styles.hdrTitle}>{meta.title}</Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeText}>Cerrar</Text>
             </Pressable>
           </View>
-          <Text style={styles.hdrSub}>Las mascotas que más fichas juntaron en una sola partida</Text>
+          <Text style={styles.hdrSub}>{meta.sub}</Text>
 
           {loading ? (
             <View style={{ paddingVertical: 40, alignItems: "center" }}>
@@ -56,16 +65,16 @@ export default function PetLeaderboard({ visible, onClose }) {
           ) : err ? (
             <Text style={styles.emptyText}>No se pudo cargar la tabla. Intenta de nuevo.</Text>
           ) : top.length === 0 ? (
-            <Text style={styles.emptyText}>Todavía nadie ha jugado Café Crush. ¡Sé el primero! 🎮</Text>
+            <Text style={styles.emptyText}>Todavía nadie ha jugado. ¡Sé el primero! 🎮</Text>
           ) : (
             <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
               {top.map((r) => (
-                <Row key={r.userId} r={r} />
+                <Row key={r.userId} r={r} unit={meta.unit} />
               ))}
               {me && !meInTop && (
                 <>
                   <View style={styles.divider} />
-                  <Row r={me} />
+                  <Row r={me} unit={meta.unit} />
                 </>
               )}
             </ScrollView>
@@ -75,7 +84,7 @@ export default function PetLeaderboard({ visible, onClose }) {
             <Text style={styles.meFooter}>
               {me.rank === 1
                 ? "¡Vas en primer lugar! 👑"
-                : `Estás #${me.rank}${top[0] ? ` · te faltan ${Math.max(0, (top[0].best || 0) - (me.best || 0))} fichas para el 1° lugar` : ""}`}
+                : `Estás #${me.rank}${top[0] ? ` · te faltan ${Math.max(0, (top[0].best || 0) - (me.best || 0))} ${meta.noun} para el 1° lugar` : ""}`}
             </Text>
           )}
         </View>
@@ -84,7 +93,7 @@ export default function PetLeaderboard({ visible, onClose }) {
   );
 }
 
-function Row({ r }) {
+function Row({ r, unit }) {
   return (
     <View style={[styles.row, r.isMe && styles.rowMe]}>
       <Text style={styles.rank}>{MEDAL[r.rank] || `#${r.rank}`}</Text>
@@ -93,7 +102,7 @@ function Row({ r }) {
         <Text style={styles.rowPet} numberOfLines={1}>{r.petName}</Text>
         <Text style={styles.rowOwner} numberOfLines={1}>{r.isMe ? "Tú" : r.ownerName}</Text>
       </View>
-      <Text style={styles.rowScore}>{r.best} 🍰</Text>
+      <Text style={styles.rowScore}>{r.best} {unit}</Text>
     </View>
   );
 }

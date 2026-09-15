@@ -80,7 +80,12 @@ export default function PetScreen({ navigation }) {
   // Mismo patrón exacto para "Salto Café" (Doodle Jump).
   const [doodleOpen, setDoodleOpen] = useState(false);
   const [doodleLevel, setDoodleLevel] = useState(null);
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  // null = cerrado, "tetris"/"doodle" = qué tabla mostrar (ver PetLeaderboard).
+  const [leaderboardGame, setLeaderboardGame] = useState(null);
+  // El #1 de cada juego (para que la tarjeta del minijuego presuma "a quién
+  // hay que superar" sin tener que abrir la tabla completa) -- solo
+  // Café Crush y Salto Café tienen tabla (Atrapa no guarda mejor puntaje).
+  const [top1, setTop1] = useState({ tetris: null, doodle: null });
   // ✅ El sueño ya no es una animación cosmética de 2.6s -- el backend
   // devuelve `sleepSecondsLeft` (tiempo real restante del freeze, ver
   // pet.controller.js) y aquí solo lo hacemos "tickear" cada segundo en
@@ -91,13 +96,19 @@ export default function PetScreen({ navigation }) {
 
   const load = useCallback(async () => {
     try {
-      const [petRes, walletRes] = await Promise.all([
+      const [petRes, walletRes, tetrisTop, doodleTop] = await Promise.all([
         apiFetch("/pet"),
         apiFetch("/points/wallet").catch(() => null),
+        apiFetch("/pet/leaderboard?game=tetris").catch(() => null),
+        apiFetch("/pet/leaderboard?game=doodle").catch(() => null),
       ]);
       setState(petRes || null);
       setSleepLeft(Math.max(0, Number(petRes?.sleepSecondsLeft) || 0));
       if (walletRes) setPoints(Number(walletRes?.wallet?.balance) || 0);
+      setTop1({
+        tetris: tetrisTop?.top?.[0] || null,
+        doodle: doodleTop?.top?.[0] || null,
+      });
     } catch (e) {
       console.log("❌ load pet:", e?.data || e?.message);
     } finally {
@@ -219,11 +230,7 @@ export default function PetScreen({ navigation }) {
       <View style={styles.scene}>
         <View style={styles.sceneChar}>
           {user?.avatar3d?.owned ? (
-            <Avatar3DViewer
-              parts={user.avatar3d.parts}
-              colors={user.avatar3d.colors}
-              size={150}
-            />
+            <Avatar3DViewer parts={user.avatar3d.parts} size={150} />
           ) : (
             <AvatarPreview config={avatarConfig} size={96} />
           )}
@@ -309,38 +316,35 @@ export default function PetScreen({ navigation }) {
         />
       </View>
 
-      <View style={styles.playRow}>
-        <Pressable
-          style={[styles.playBtn, (!canPlay || busy || sleeping) && { opacity: 0.45 }]}
-          onPress={() => canPlay && !busy && !sleeping && setGameOpen(true)}
-          disabled={!canPlay || !!busy || sleeping}
-        >
-          <Text style={styles.playText}>🎮 Atrapa</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.playBtn, (!canPlay || busy || sleeping) && { opacity: 0.45 }]}
-          onPress={() => canPlay && !busy && !sleeping && setMatch3Open(true)}
-          disabled={!canPlay || !!busy || sleeping}
-        >
-          <Text style={styles.playText}>🍰 Café Crush</Text>
-        </Pressable>
-      </View>
-
-      <View style={[styles.playRow, { marginTop: 10 }]}>
-        <Pressable
-          style={[styles.playBtn, (!canPlay || busy || sleeping) && { opacity: 0.45 }]}
-          onPress={() => canPlay && !busy && !sleeping && setDoodleOpen(true)}
-          disabled={!canPlay || !!busy || sleeping}
-        >
-          <Text style={styles.playText}>🦘 Salto Café</Text>
-        </Pressable>
-      </View>
-
-      <Pressable style={styles.leaderboardLink} onPress={() => setLeaderboardOpen(true)}>
-        <Text style={styles.leaderboardLinkText}>
-          🏆 Top Café Crush{pet?.tetrisBest ? ` · tu mejor: ${pet.tetrisBest} fichas` : ""}
-        </Text>
-      </Pressable>
+      <Text style={styles.gamesTitle}>Minijuegos</Text>
+      <MiniGameCard
+        emoji="🍰"
+        title="Café Crush"
+        tint="#7B1E3A"
+        blocked={!canPlay || !!busy || sleeping}
+        myBest={pet?.tetrisBest ? `${pet.tetrisBest} fichas` : null}
+        top={top1.tetris ? `${top1.tetris.isMe ? "Tú vas 1° 👑" : `${top1.tetris.petName}: ${top1.tetris.best} 🍰`}` : null}
+        onPress={() => setMatch3Open(true)}
+        onPressTop={() => setLeaderboardGame("tetris")}
+      />
+      <MiniGameCard
+        emoji="🦘"
+        title="Salto Café"
+        tint="#4f9d69"
+        blocked={!canPlay || !!busy || sleeping}
+        myBest={pet?.doodleBest ? `altura ${pet.doodleBest}` : null}
+        top={top1.doodle ? `${top1.doodle.isMe ? "Tú vas 1° 👑" : `${top1.doodle.petName}: altura ${top1.doodle.best} 🦘`}` : null}
+        onPress={() => setDoodleOpen(true)}
+        onPressTop={() => setLeaderboardGame("doodle")}
+      />
+      <MiniGameCard
+        emoji="🎮"
+        title="Atrapa"
+        tint="#4a90c2"
+        blocked={!canPlay || !!busy || sleeping}
+        subtitle="Atrapa lo que caiga, rapidito"
+        onPress={() => setGameOpen(true)}
+      />
 
       {!canPlay ? (
         <Text style={styles.nudgeText}>
@@ -472,8 +476,45 @@ export default function PetScreen({ navigation }) {
         onClose={() => setDoodleLevel(null)}
         onFinish={onDoodleFinish}
       />
-      <PetLeaderboard visible={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} />
+      <PetLeaderboard
+        visible={!!leaderboardGame}
+        game={leaderboardGame || "tetris"}
+        onClose={() => setLeaderboardGame(null)}
+      />
     </Screen>
+  );
+}
+
+// Tarjeta grande por minijuego -- reemplaza los 3 botoncitos de texto de
+// antes (apenas se distinguían entre sí y no mostraban ningún puntaje sin
+// tocar un link aparte). `myBest`/`top` son opcionales: "Atrapa" no tiene
+// mejor puntaje guardado en el backend, así que se le pasa `subtitle` fijo
+// en vez de datos de tabla.
+function MiniGameCard({ emoji, title, tint, blocked, myBest, top, subtitle, onPress, onPressTop }) {
+  return (
+    <Pressable
+      style={[styles.gameCard, blocked && { opacity: 0.45 }]}
+      onPress={() => !blocked && onPress()}
+      disabled={blocked}
+    >
+      <View style={[styles.gameIcon, { backgroundColor: `${tint}1f` }]}>
+        <Text style={styles.gameEmoji}>{emoji}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.gameTitle}>{title}</Text>
+        {myBest ? <Text style={styles.gameMyBest}>Tu mejor: {myBest}</Text> : null}
+        {top ? (
+          <Pressable onPress={(e) => { e.stopPropagation?.(); onPressTop?.(); }} hitSlop={6}>
+            <Text style={[styles.gameTop, { color: tint }]}>{top}</Text>
+          </Pressable>
+        ) : subtitle ? (
+          <Text style={styles.gameMyBest}>{subtitle}</Text>
+        ) : null}
+      </View>
+      <View style={[styles.gamePlayBtn, { backgroundColor: tint }]}>
+        <Text style={styles.gamePlayText}>Jugar</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -596,26 +637,25 @@ const styles = StyleSheet.create({
   foodLabel: { marginTop: 4, color: "#111", fontSize: 12, fontWeight: "900" },
   badge: { position: "absolute", top: 8, right: 10, width: 9, height: 9, borderRadius: 999, backgroundColor: "#d9534f" },
 
-  playRow: { flexDirection: "row", gap: 10, marginTop: 14 },
-  playBtn: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: 999,
-    backgroundColor: colors.primary,
+  gamesTitle: { marginTop: 16, marginBottom: 8, color: "#111", fontSize: 13, fontWeight: "900" },
+  gameCard: {
+    flexDirection: "row",
     alignItems: "center",
-  },
-  playText: { color: "#fff", fontWeight: "900", fontSize: 14 },
-
-  leaderboardLink: {
-    marginTop: 12,
-    alignSelf: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 999,
+    gap: 12,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: colors.primarySoft,
   },
-  leaderboardLinkText: { color: colors.primary, fontSize: 11.5, fontWeight: "900" },
+  gameIcon: { width: 52, height: 52, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  gameEmoji: { fontSize: 26 },
+  gameTitle: { color: "#111", fontSize: 15, fontWeight: "900" },
+  gameMyBest: { marginTop: 2, color: colors.textMuted, fontSize: 11.5, fontWeight: "700" },
+  gameTop: { marginTop: 2, fontSize: 11.5, fontWeight: "900" },
+  gamePlayBtn: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999 },
+  gamePlayText: { color: "#fff", fontWeight: "900", fontSize: 12.5 },
 
   tipText: { marginTop: 12, color: colors.textMuted, fontSize: 11, fontWeight: "700", textAlign: "center", lineHeight: 16 },
   nudgeText: {
