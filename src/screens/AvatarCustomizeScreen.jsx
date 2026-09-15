@@ -1,27 +1,11 @@
 import React, { useState, useContext, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Alert, TextInput, Image } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { WebView } from "react-native-webview";
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import Avatar3DViewer from "../components/Avatar3DViewer";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
-import {
-  HAIR_OPTIONS,
-  HEAD_OPTIONS,
-  BODY_OPTIONS,
-  OUTFIT_OPTIONS,
-  ACCESSORY_OPTIONS,
-  EYEBROW_OPTIONS,
-  NOSE_OPTIONS,
-  MOUTH_OPTIONS,
-  POSE_OPTIONS,
-  SKIN_COLORS,
-  HAIR_COLORS,
-  EYE_COLORS,
-  nearestSkinColor,
-} from "../assets/avatar3dParts";
+import { CHARACTER_OPTIONS, ACCESSORY_OPTIONS } from "../assets/avatar3dParts";
 
 const PET_SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -29,46 +13,28 @@ const PET_SPECIES = [
   { id: "hamster", emoji: "🐹", label: "Hámster" },
 ];
 
-// Muestrea el tono de piel promedio del centro de una foto -- corre 100%
-// en el cliente (WebView + canvas, la imagen nunca sale del teléfono ni se
-// sube al backend). Se monta solo mientras hay una foto pendiente de
-// analizar y se desmonta al terminar.
-function PhotoSkinSampler({ base64, onSample }) {
-  const html = `<!DOCTYPE html><html><body style="margin:0">
-<canvas id="c" width="40" height="40"></canvas>
-<script>
-  var img = new Image();
-  img.onload = function () {
-    var c = document.getElementById("c");
-    var ctx = c.getContext("2d");
-    var side = Math.min(img.width, img.height) * 0.5;
-    var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
-    ctx.drawImage(img, sx, sy, side, side, 0, 0, 40, 40);
-    var data = ctx.getImageData(0, 0, 40, 40).data;
-    var r = 0, g = 0, b = 0, n = 0;
-    for (var i = 0; i < data.length; i += 4) { r += data[i]; g += data[i+1]; b += data[i+2]; n++; }
-    var result = { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
-    window.ReactNativeWebView.postMessage(JSON.stringify(result));
-  };
-  img.onerror = function () { window.ReactNativeWebView.postMessage(JSON.stringify({ error: true })); };
-  img.src = "data:image/jpeg;base64,${base64}";
-</script>
-</body></html>`;
-
+// Elige el personaje base (modelo .glb completo, ver avatar3dParts.js) --
+// reemplaza al viejo picker de 9 partes sueltas (pelo/cejas/nariz/etc)
+// ahora que el cuerpo es un modelo real en vez de geometría armada a mano.
+function CharacterRow({ options, value, onChange }) {
   return (
-    <View style={{ width: 1, height: 1, opacity: 0, position: "absolute" }}>
-      <WebView
-        originWhitelist={["*"]}
-        source={{ html }}
-        onMessage={(e) => {
-          try {
-            const d = JSON.parse(e.nativeEvent.data);
-            onSample(d.error ? null : d);
-          } catch {
-            onSample(null);
-          }
-        }}
-      />
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Personaje</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
+        {options.map((opt) => {
+          const active = value === opt.id;
+          return (
+            <Pressable
+              key={opt.id}
+              onPress={() => onChange(opt.id)}
+              style={[styles.charBtn, active && styles.charBtnActive]}
+            >
+              <Image source={{ uri: opt.preview }} style={styles.charThumb} />
+              <Text style={[styles.partLabel, active && styles.partLabelActive]}>{opt.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -96,26 +62,6 @@ function PartRow({ title, options, value, onChange }) {
   );
 }
 
-function ColorRow({ title, colors: opts, value, onChange }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.colorRow}>
-        {opts.map((hex) => {
-          const active = value === hex;
-          return (
-            <Pressable
-              key={hex}
-              onPress={() => onChange(hex)}
-              style={[styles.swatch, { backgroundColor: hex }, active && styles.swatchActive]}
-            />
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
 // `forced`: usado por Avatar3DGateScreen (migración obligatoria post-login)
 // -- oculta "Cerrar" y la sección de mascota (no aplica en ese momento) y
 // llama `onDone` en vez de navigation.goBack() al terminar de guardar.
@@ -125,54 +71,13 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
 
   const existing = user?.avatar3d;
   const [parts, setParts] = useState({
-    hair: existing?.parts?.hair || HAIR_OPTIONS[0].id,
-    head: existing?.parts?.head || HEAD_OPTIONS[0].id,
-    body: existing?.parts?.body || BODY_OPTIONS[0].id,
-    outfit: existing?.parts?.outfit || OUTFIT_OPTIONS[0].id,
+    character: existing?.parts?.character || CHARACTER_OPTIONS[0].id,
     accessory: existing?.parts?.accessory ?? null,
-    eyebrow: existing?.parts?.eyebrow || EYEBROW_OPTIONS[0].id,
-    nose: existing?.parts?.nose || NOSE_OPTIONS[0].id,
-    mouth: existing?.parts?.mouth || MOUTH_OPTIONS[0].id,
-    pose: existing?.parts?.pose || POSE_OPTIONS[0].id,
-  });
-  const [avColors, setAvColors] = useState({
-    skin: existing?.colors?.skin || SKIN_COLORS[1],
-    hair: existing?.colors?.hair || HAIR_COLORS[0],
-    eyes: existing?.colors?.eyes || EYE_COLORS[0],
   });
 
-  const [pendingPhoto, setPendingPhoto] = useState(null); // {base64}
   const viewerRef = useRef(null);
 
   const setPart = (slot, val) => setParts((p) => ({ ...p, [slot]: val }));
-  const setColor = (key, val) => setAvColors((c) => ({ ...c, [key]: val }));
-
-  const pickPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Permiso necesario", "Necesitamos acceso a tus fotos para sugerir un tono de piel.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-      base64: true,
-    });
-    if (result.canceled) return;
-    const asset = result.assets?.[0];
-    if (asset?.base64) setPendingPhoto({ base64: asset.base64, uri: asset.uri });
-  };
-
-  const onSkinSampled = (rgb) => {
-    setPendingPhoto(null);
-    if (!rgb) {
-      Alert.alert("No se pudo leer la foto", "Elige tu tono de piel manualmente abajo.");
-      return;
-    }
-    setColor("skin", nearestSkinColor(rgb));
-  };
 
   // Mascota (sin cambios -- especie/nombre; cuidarla vive en PetScreen)
   const [petOwned, setPetOwned] = useState(false);
@@ -238,7 +143,7 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
       const r = await apiFetch("/me/avatar3d", {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ parts, colors: avColors }),
+        body: JSON.stringify({ parts }),
       });
 
       const dataUrl = await viewerRef.current?.capture();
@@ -293,31 +198,14 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
         </View>
 
         <View style={styles.stickyCard}>
-          <Avatar3DViewer ref={viewerRef} parts={parts} colors={avColors} interactive size={240} />
+          <Avatar3DViewer ref={viewerRef} parts={parts} interactive size={240} />
         </View>
       </View>
 
       <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
-          <Pressable onPress={pickPhoto} style={styles.photoBtn}>
-            <Text style={styles.photoBtnText}>📷 Sugerir tono de piel con una foto</Text>
-          </Pressable>
-          {pendingPhoto && (
-            <PhotoSkinSampler base64={pendingPhoto.base64} onSample={onSkinSampled} />
-          )}
-
-          <ColorRow title="Tono de piel" colors={SKIN_COLORS} value={avColors.skin} onChange={(v) => setColor("skin", v)} />
-          <PartRow title="Pelo" options={HAIR_OPTIONS} value={parts.hair} onChange={(v) => setPart("hair", v)} />
-          <ColorRow title="Color de pelo" colors={HAIR_COLORS} value={avColors.hair} onChange={(v) => setColor("hair", v)} />
-          <PartRow title="Cejas" options={EYEBROW_OPTIONS} value={parts.eyebrow} onChange={(v) => setPart("eyebrow", v)} />
-          <ColorRow title="Color de ojos" colors={EYE_COLORS} value={avColors.eyes} onChange={(v) => setColor("eyes", v)} />
-          <PartRow title="Nariz" options={NOSE_OPTIONS} value={parts.nose} onChange={(v) => setPart("nose", v)} />
-          <PartRow title="Boca" options={MOUTH_OPTIONS} value={parts.mouth} onChange={(v) => setPart("mouth", v)} />
-          <PartRow title="Cara" options={HEAD_OPTIONS} value={parts.head} onChange={(v) => setPart("head", v)} />
-          <PartRow title="Cuerpo" options={BODY_OPTIONS} value={parts.body} onChange={(v) => setPart("body", v)} />
-          <PartRow title="Atuendo" options={OUTFIT_OPTIONS} value={parts.outfit} onChange={(v) => setPart("outfit", v)} />
+          <CharacterRow options={CHARACTER_OPTIONS} value={parts.character} onChange={(v) => setPart("character", v)} />
           <PartRow title="Accesorio" options={ACCESSORY_OPTIONS} value={parts.accessory} onChange={(v) => setPart("accessory", v)} />
-          <PartRow title="Pose" options={POSE_OPTIONS} value={parts.pose} onChange={(v) => setPart("pose", v)} />
 
           {/* Mascota VIP -- especie/nombre; cuidarla vive en PetScreen.
               No aplica todavía en el gate obligatorio post-login. */}
@@ -431,17 +319,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  photoBtn: {
-    alignSelf: "center",
-    paddingVertical: 9,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
-    marginBottom: 6,
-  },
-  photoBtnText: { color: colors.primary, fontWeight: "900", fontSize: 12 },
-
   section: { marginTop: 14 },
   sectionTitle: { color: colors.textMuted, fontSize: 12, fontWeight: "900", letterSpacing: 0.3, marginBottom: 10 },
 
@@ -465,9 +342,17 @@ const styles = StyleSheet.create({
   partLabel: { marginTop: 4, color: "#111", fontSize: 11, fontWeight: "900" },
   partLabelActive: { color: "#fff" },
 
-  colorRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "transparent" },
-  swatchActive: { borderColor: colors.primary },
+  charBtn: {
+    alignItems: "center",
+    padding: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: "#fff",
+    marginRight: 10,
+  },
+  charBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  charThumb: { width: 64, height: 64, borderRadius: 10, backgroundColor: colors.primarySoft },
 
   saveBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
   saveText: { color: "#fff", fontWeight: "900", fontSize: 14 },

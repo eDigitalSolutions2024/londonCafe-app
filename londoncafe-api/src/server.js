@@ -54,6 +54,14 @@ app.use(express.json());
 // S3/Cloudinary por ahora (ver plan del avatar 3D).
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
+// Assets ESTÁTICOS del avatar 3D (modelos .glb del cuerpo base -- Kenney
+// "Mini Characters", CC0, ver public/avatar3d-assets/kenney/License.txt)
+// -- a diferencia de /uploads, esto SÍ se commitea al repo (son assets de
+// la app, no contenido generado por el usuario). El visor (Avatar3DViewer.jsx)
+// los carga con GLTFLoader desde acá vía HTTPS, igual que ya carga three.js
+// desde un CDN.
+app.use("/avatar3d-assets", express.static(path.join(__dirname, "..", "public", "avatar3d-assets")));
+
 // health
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "LondonCafe API running 🚀" });

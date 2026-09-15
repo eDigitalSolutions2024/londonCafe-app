@@ -2,31 +2,30 @@
 // AVATAR3D_PART_IDS en londoncafe-api/src/controllers/me.controller.js.
 // Actualizar los dos lados juntos si se agrega/quita algo.
 //
-// Cada parte es geometría 3D generada con código (ver Avatar3DViewer.jsx),
-// no un modelo .glb -- por eso el catálogo es solo metadata para el picker
-// (id, nombre, emoji para la miniatura), el "cómo se ve" vive en el visor.
+// v2 (cambio grande): el cuerpo/cabeza/pelo ya NO es geometría generada
+// por código (primitivas de three.js) -- se veía "gordo"/artificial sin
+// importar cuánto se ajustara. Ahora es un modelo .glb real (Kenney "Mini
+// Characters", CC0, ver londoncafe-api/public/avatar3d-assets/kenney/
+// License.txt) cargado con GLTFLoader dentro del visor. A cambio de la
+// personalización fina de antes (cejas/nariz/boca/tono de piel/pose por
+// separado), ahora se elige UN personaje completo entre 12 variantes ya
+// diseñadas por un artista -- mejor calidad visual, menos perillas.
+export const API_STATIC_URL = "https://app.londoncafejrz.com";
+const KENNEY_BASE = `${API_STATIC_URL}/avatar3d-assets/kenney`;
 
-export const HAIR_OPTIONS = [
-  { id: "hair3d_01", label: "Corto", emoji: "💇" },
-  { id: "hair3d_02", label: "Largo", emoji: "👩‍🦱" },
-  { id: "hair3d_03", label: "Chongo", emoji: "🎀" },
-  { id: "hair3d_04", label: "Rapado", emoji: "👨‍🦲" },
-];
-
-export const HEAD_OPTIONS = [
-  { id: "head3d_01", label: "Redonda", emoji: "😊" },
-  { id: "head3d_02", label: "Ovalada", emoji: "🙂" },
-];
-
-export const BODY_OPTIONS = [
-  { id: "body3d_01", label: "Delgado", emoji: "🧍" },
-  { id: "body3d_02", label: "Robusto", emoji: "🧍‍♂️" },
-];
-
-export const OUTFIT_OPTIONS = [
-  { id: "outfit3d_01", label: "Playera", emoji: "👕" },
-  { id: "outfit3d_02", label: "Hoodie", emoji: "🧥" },
-  { id: "outfit3d_03", label: "Chamarra", emoji: "🧥" },
+export const CHARACTER_OPTIONS = [
+  { id: "kenney_male_a", label: "Chico A", glb: `${KENNEY_BASE}/character-male-a.glb`, preview: `${KENNEY_BASE}/Previews/character-male-a.png` },
+  { id: "kenney_male_b", label: "Chico B", glb: `${KENNEY_BASE}/character-male-b.glb`, preview: `${KENNEY_BASE}/Previews/character-male-b.png` },
+  { id: "kenney_male_c", label: "Chico C", glb: `${KENNEY_BASE}/character-male-c.glb`, preview: `${KENNEY_BASE}/Previews/character-male-c.png` },
+  { id: "kenney_male_d", label: "Chico D", glb: `${KENNEY_BASE}/character-male-d.glb`, preview: `${KENNEY_BASE}/Previews/character-male-d.png` },
+  { id: "kenney_male_e", label: "Chico E", glb: `${KENNEY_BASE}/character-male-e.glb`, preview: `${KENNEY_BASE}/Previews/character-male-e.png` },
+  { id: "kenney_male_f", label: "Chico F", glb: `${KENNEY_BASE}/character-male-f.glb`, preview: `${KENNEY_BASE}/Previews/character-male-f.png` },
+  { id: "kenney_female_a", label: "Chica A", glb: `${KENNEY_BASE}/character-female-a.glb`, preview: `${KENNEY_BASE}/Previews/character-female-a.png` },
+  { id: "kenney_female_b", label: "Chica B", glb: `${KENNEY_BASE}/character-female-b.glb`, preview: `${KENNEY_BASE}/Previews/character-female-b.png` },
+  { id: "kenney_female_c", label: "Chica C", glb: `${KENNEY_BASE}/character-female-c.glb`, preview: `${KENNEY_BASE}/Previews/character-female-c.png` },
+  { id: "kenney_female_d", label: "Chica D", glb: `${KENNEY_BASE}/character-female-d.glb`, preview: `${KENNEY_BASE}/Previews/character-female-d.png` },
+  { id: "kenney_female_e", label: "Chica E", glb: `${KENNEY_BASE}/character-female-e.glb`, preview: `${KENNEY_BASE}/Previews/character-female-e.png` },
+  { id: "kenney_female_f", label: "Chica F", glb: `${KENNEY_BASE}/character-female-f.glb`, preview: `${KENNEY_BASE}/Previews/character-female-f.png` },
 ];
 
 export const ACCESSORY_OPTIONS = [
@@ -34,61 +33,3 @@ export const ACCESSORY_OPTIONS = [
   { id: "acc3d_01", label: "Lentes", emoji: "👓" },
   { id: "acc3d_02", label: "Gorra", emoji: "🧢" },
 ];
-
-export const EYEBROW_OPTIONS = [
-  { id: "eyebrow3d_01", label: "Recta", emoji: "➖" },
-  { id: "eyebrow3d_02", label: "Arqueada", emoji: "〜" },
-  { id: "eyebrow3d_03", label: "Gruesa", emoji: "▬" },
-];
-
-export const NOSE_OPTIONS = [
-  { id: "nose3d_01", label: "Chica", emoji: "👃" },
-  { id: "nose3d_02", label: "Marcada", emoji: "👃" },
-];
-
-export const MOUTH_OPTIONS = [
-  { id: "mouth3d_01", label: "Sonrisa", emoji: "🙂" },
-  { id: "mouth3d_02", label: "Neutral", emoji: "😐" },
-  { id: "mouth3d_03", label: "Sonrisón", emoji: "😄" },
-];
-
-// Poses/gestos -- variaciones simples de la posición de los brazos (sin
-// segundo segmento tipo codo, a propósito: se pidió que esto quedara
-// básico). Cada una define rotación en Z (abrir/cerrar hacia el cuerpo)
-// y en X (subir/bajar hacia adelante) para cada brazo -- buildBody usa
-// los mismos valores para calcular dónde cae la mano, así que cambiar
-// la pose no necesita tocar nada más.
-export const POSE_OPTIONS = [
-  { id: "pose3d_01", label: "Normal", emoji: "🧍" },
-  { id: "pose3d_02", label: "Manos en cintura", emoji: "🧍‍♀️" },
-  { id: "pose3d_03", label: "Saludo", emoji: "🙋" },
-  { id: "pose3d_04", label: "Pulgar arriba", emoji: "👍" },
-  { id: "pose3d_05", label: "Paz ✌️", emoji: "✌️" },
-  { id: "pose3d_06", label: "Manos atrás", emoji: "🙆" },
-];
-
-export const SKIN_COLORS = ["#f2d3b3", "#e0ac69", "#c68642", "#8d5524", "#5a3825"];
-export const HAIR_COLORS = ["#1c1c1c", "#4a2c14", "#a35b2c", "#d9a441", "#b33951", "#3c3c8c"];
-export const EYE_COLORS = ["#3a2418", "#1a1410", "#3a6ea8", "#3a7a4e", "#8a6a2a"];
-
-// Tono de piel sugerido a partir de la foto: promedio de color de un
-// recuadro central de la imagen, mapeado al SKIN_COLORS más cercano.
-// Todo esto corre en el cliente -- la foto nunca se sube al backend.
-export function nearestSkinColor(rgb) {
-  const toRgb = (hex) => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
-  let best = SKIN_COLORS[0];
-  let bestDist = Infinity;
-  for (const hex of SKIN_COLORS) {
-    const [r, g, b] = toRgb(hex);
-    const d = (r - rgb.r) ** 2 + (g - rgb.g) ** 2 + (b - rgb.b) ** 2;
-    if (d < bestDist) {
-      bestDist = d;
-      best = hex;
-    }
-  }
-  return best;
-}

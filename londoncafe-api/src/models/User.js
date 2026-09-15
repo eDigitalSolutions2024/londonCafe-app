@@ -14,11 +14,19 @@ const avatarSchema = new mongoose.Schema(
 
 // ✅ Avatar 3D "de verdad" -- reemplaza en USO (no en schema, para no
 // romper cuentas viejas a medio migrar) al `avatarConfig` plano de solo
-// pelo. Se arma combinando partes 3D prediseñadas (ver
-// src/assets/avatar3dParts.js en el cliente) -- NO es generación por IA
-// desde la foto (esa opción de mercado -- Ready Player Me -- cerró en
-// enero 2026, y las alternativas de pago cobran $800+/mes, desproporcionado
-// para esta app). La foto solo sugiere un tono de piel de partida.
+// pelo. NO es generación por IA desde la foto (esa opción de mercado --
+// Ready Player Me -- cerró en enero 2026, y las alternativas de pago
+// cobran $800+/mes, desproporcionado para esta app).
+//
+// v2: `parts.character` reemplaza a lo que antes eran 8 campos sueltos
+// (hair/head/body/outfit/eyebrow/nose/mouth/pose) -- las primitivas de
+// three.js generadas por código (esferas/cápsulas) se veían artificiales
+// sin importar cuánto se ajustaran. Ahora es UN personaje completo,
+// modelo .glb real (Kenney "Mini Characters", CC0) elegido entre 12
+// variantes ya diseñadas por un artista -- ver src/assets/avatar3dParts.js
+// en el cliente y londoncafe-api/public/avatar3d-assets/kenney/. Los
+// colores de piel/pelo/ojos quedaron fijos por personaje (vienen ya
+// pintados en el modelo), así que `colors` ya no aplica.
 // `snapshotUrl` es un PNG plano pre-renderizado (captura del canvas de
 // three.js) que se usa en los 11+ lugares chicos de la app en vez de
 // cargar el visor 3D interactivo ahí (ver Avatar3DViewer.jsx).
@@ -26,20 +34,8 @@ const avatar3dSchema = new mongoose.Schema(
   {
     owned: { type: Boolean, default: false },
     parts: {
-      hair: { type: String, default: null },
-      head: { type: String, default: null },
-      body: { type: String, default: null },
-      outfit: { type: String, default: null },
+      character: { type: String, default: null },
       accessory: { type: String, default: null },
-      eyebrow: { type: String, default: null },
-      nose: { type: String, default: null },
-      mouth: { type: String, default: null },
-      pose: { type: String, default: null },
-    },
-    colors: {
-      skin: { type: String, default: null },
-      hair: { type: String, default: null },
-      eyes: { type: String, default: null },
     },
     snapshotUrl: { type: String, default: null },
     createdAt: { type: Date, default: null },

@@ -475,21 +475,19 @@ async function updateAvatar(req, res) {
 // src/assets/avatar3dParts.js del cliente -- ACTUALIZAR ambos lados juntos
 // cuando se agreguen assets nuevos (ids de ejemplo hasta que el set real de
 // modelos 3D quede elegido/importado -- ver plan).
+// v2: el cuerpo/cabeza/pelo dejó de ser geometría por partes (hair/head/
+// body/outfit/eyebrow/nose/mouth/pose por separado) -- ahora es UN
+// personaje completo (modelo .glb real, Kenney CC0) elegido entre 12
+// variantes ya diseñadas. `character` reemplaza a todo eso junto;
+// `accessory` (lentes/gorra) sigue siendo geometría procedural aparte.
 const AVATAR3D_PART_IDS = {
-  hair: new Set(["hair3d_01", "hair3d_02", "hair3d_03", "hair3d_04"]),
-  head: new Set(["head3d_01", "head3d_02"]),
-  body: new Set(["body3d_01", "body3d_02"]),
-  outfit: new Set(["outfit3d_01", "outfit3d_02", "outfit3d_03"]),
+  character: new Set([
+    "kenney_male_a", "kenney_male_b", "kenney_male_c", "kenney_male_d", "kenney_male_e", "kenney_male_f",
+    "kenney_female_a", "kenney_female_b", "kenney_female_c", "kenney_female_d", "kenney_female_e", "kenney_female_f",
+  ]),
   accessory: new Set([null, "acc3d_01", "acc3d_02"]),
-  eyebrow: new Set(["eyebrow3d_01", "eyebrow3d_02", "eyebrow3d_03"]),
-  nose: new Set(["nose3d_01", "nose3d_02"]),
-  mouth: new Set(["mouth3d_01", "mouth3d_02", "mouth3d_03"]),
-  pose: new Set(["pose3d_01", "pose3d_02", "pose3d_03", "pose3d_04", "pose3d_05", "pose3d_06"]),
 };
 const AVATAR3D_SLOTS = Object.keys(AVATAR3D_PART_IDS);
-const AVATAR3D_SKIN_COLORS = new Set(["#f2d3b3", "#e0ac69", "#c68642", "#8d5524", "#5a3825"]);
-const AVATAR3D_HAIR_COLORS = new Set(["#1c1c1c", "#4a2c14", "#a35b2c", "#d9a441", "#b33951", "#3c3c8c"]);
-const AVATAR3D_EYE_COLORS = new Set(["#3a2418", "#1a1410", "#3a6ea8", "#3a7a4e", "#8a6a2a"]);
 
 const SNAPSHOT_DIR = path.join(__dirname, "..", "..", "uploads", "avatars");
 // Mismo dominio que el cliente ya usa como BASE_URL (src/api/client.js) --
@@ -497,13 +495,13 @@ const SNAPSHOT_DIR = path.join(__dirname, "..", "..", "uploads", "avatars");
 // resuelve rutas relativas como lo haría un navegador.
 const API_PUBLIC_URL = process.env.API_PUBLIC_URL || "https://app.londoncafejrz.com";
 
-// PUT /me/avatar3d   body: { parts: {hair,head,body,outfit,accessory}, colors: {skin,hair} }
+// PUT /me/avatar3d   body: { parts: {character, accessory} }
 async function updateAvatar3D(req, res) {
   try {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
-    const { parts, colors } = req.body || {};
+    const { parts } = req.body || {};
     if (!parts || typeof parts !== "object") {
       return res.status(400).json({ error: "BAD_PARTS" });
     }
@@ -518,31 +516,12 @@ async function updateAvatar3D(req, res) {
       }
       $set[`avatar3d.parts.${slot}`] = val;
     }
-    // hair/head/body son obligatorios para tener un avatar completo -- si
-    // es la primera vez (no estaba `owned`), exige los 3.
+    // `character` es obligatorio para tener un avatar completo -- si es
+    // la primera vez (no estaba `owned`), lo exige.
     const user0 = await User.findById(uid).select("avatar3d.owned");
     if (!user0) return res.status(404).json({ error: "USER_NOT_FOUND" });
-    if (!user0.avatar3d?.owned) {
-      for (const req3 of ["hair", "head", "body"]) {
-        if (!$set[`avatar3d.parts.${req3}`]) {
-          return res.status(400).json({ error: "MISSING_PART", slot: req3 });
-        }
-      }
-    }
-
-    if (colors && typeof colors === "object") {
-      if ("skin" in colors) {
-        if (!AVATAR3D_SKIN_COLORS.has(colors.skin)) return res.status(400).json({ error: "INVALID_COLOR", field: "skin" });
-        $set["avatar3d.colors.skin"] = colors.skin;
-      }
-      if ("hair" in colors) {
-        if (!AVATAR3D_HAIR_COLORS.has(colors.hair)) return res.status(400).json({ error: "INVALID_COLOR", field: "hair" });
-        $set["avatar3d.colors.hair"] = colors.hair;
-      }
-      if ("eyes" in colors) {
-        if (!AVATAR3D_EYE_COLORS.has(colors.eyes)) return res.status(400).json({ error: "INVALID_COLOR", field: "eyes" });
-        $set["avatar3d.colors.eyes"] = colors.eyes;
-      }
+    if (!user0.avatar3d?.owned && !$set["avatar3d.parts.character"]) {
+      return res.status(400).json({ error: "MISSING_PART", slot: "character" });
     }
     if (!$set["avatar3d.createdAt"] && !user0.avatar3d?.owned) {
       $set["avatar3d.createdAt"] = new Date();
