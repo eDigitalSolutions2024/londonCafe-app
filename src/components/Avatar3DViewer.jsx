@@ -2,7 +2,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, use
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { WebView } from "react-native-webview";
 import { colors } from "../theme/colors";
-import { CHARACTER_OPTIONS } from "../assets/avatar3dParts";
+import { CHARACTER_OPTIONS, BRAND_LOGO_URL } from "../assets/avatar3dParts";
 
 /**
  * Visor del avatar 3D "de verdad": WebView + three.js (0.160.0, ES modules
@@ -19,7 +19,14 @@ import { CHARACTER_OPTIONS } from "../assets/avatar3dParts";
  * entre 12 variantes vía GLTFLoader -- ver avatar3dParts.js. El accesorio
  * (lentes/gorra) se sigue armando con geometría simple, pero ahora se
  * posiciona midiendo la cabeza REAL del modelo cargado (bounding box del
- * mesh "head-mesh"), no con coordenadas fijas a mano.
+ * mesh "head-mesh"), no con coordenadas fijas a mano. El picker de
+ * accesorios está OCULTO por lo pronto en AvatarCustomizeScreen (se veían
+ * desproporcionados en varios de los 12 personajes) -- el código sigue acá,
+ * listo para reactivarse cuando se ajuste mejor.
+ *
+ * Todos los personajes llevan el logo de London Café al pecho y "LONDON
+ * VIBES / COFFEE MOMENTS" en la espalda -- ver buildBrand(), posicionado
+ * igual que el accesorio (midiendo el "body-mesh" real), no a mano.
  *
  * Uso:
  *   const ref = useRef(null);
@@ -132,6 +139,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 var INTERACTIVE = ${interactive ? "true" : "false"};
+var BRAND_LOGO_URL = "${BRAND_LOGO_URL}";
 var post = function (obj) {
   if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(obj));
 };
@@ -177,6 +185,7 @@ var loader = new GLTFLoader();
 var gltfCache = {}; // url -> gltf ya cargado, para no re-descargar al volver a elegir el mismo personaje
 var currentModel = null;
 var currentAccessory = null;
+var currentBrand = null; // logo del pecho + texto de la espalda, ver buildBrand()
 var currentHeadInfo = null; // medición de la cabeza tomada UNA vez al cargar, ver nota en loadAndSwapCharacter
 var mixer = null;
 var clock = new THREE.Clock();
@@ -189,20 +198,108 @@ function loadCharacter(url) {
   });
 }
 
-// Mide el mesh de la cabeza REAL del modelo cargado (bounding box en
-// coordenadas de mundo) -- así el accesorio se posiciona en proporción al
-// personaje que sea, sin depender de coordenadas fijas a mano por modelo.
-function measureHead(obj) {
-  var headMesh = null;
-  obj.traverse(function (c) { if (c.isMesh && /head/i.test(c.name || "")) headMesh = c; });
-  if (!headMesh) return null;
-  var box = new THREE.Box3().setFromObject(headMesh);
-  var size = new THREE.Vector3(); box.getSize(size);
-  var center = new THREE.Vector3(); box.getCenter(center);
-  // Convertido a coordenadas LOCALES de avatarGroup (el padre de obj), no
-  // de mundo -- rig gira en Y, así que "mundo" cambia con la rotación.
-  var localCenter = avatarGroup.worldToLocal(center.clone());
+// Mide un mesh por nombre (regex) -- SIZE sale de la geometría LOCAL cruda
+// (bind pose, sin transformar) × MODEL_SCALE, no de Box3.setFromObject()
+// sobre el mundo. OJO: probado con captura -- usar el AABB de mundo para el
+// tamaño se ve "bien" a rotación 0, pero el rig arranca rotado (rotY=0.35)
+// y un box no-cúbico rotado en Y agranda su propio AABB (mezcla ancho y
+// profundidad), dando un tamaño que depende de en qué ángulo esté el
+// avatar en ese momento -- con esa cabeza dio 2.17 de ancho en vez de 1.81
+// (el 4x real), bastante para que el logo saliera gigante. CENTER sí usa
+// mundo (vía Box3.setFromObject), porque ahí SÍ queremos la posición
+// actual ya rotada, para que el parche quede pegado al cuerpo al girarlo.
+function measureMesh(obj, namePattern) {
+  var mesh = null;
+  obj.traverse(function (c) { if (c.isMesh && namePattern.test(c.name || "")) mesh = c; });
+  if (!mesh) return null;
+  mesh.geometry.computeBoundingBox();
+  var size = new THREE.Vector3();
+  mesh.geometry.boundingBox.getSize(size);
+  size.multiplyScalar(MODEL_SCALE);
+
+  var box = new THREE.Box3().setFromObject(mesh);
+  var worldCenter = new THREE.Vector3();
+  box.getCenter(worldCenter);
+  var localCenter = avatarGroup.worldToLocal(worldCenter.clone());
   return { center: localCenter, size: size };
+}
+function measureHead(obj) { return measureMesh(obj, /head/i); }
+function measureBody(obj) { return measureMesh(obj, /body/i); }
+
+var logoTexture = new THREE.TextureLoader().load(BRAND_LOGO_URL);
+
+// Dibuja un rectángulo con esquinas redondeadas en un canvas 2D -- usado
+// para la placa del texto de atrás (sin esto ctx.fillRect() daría un
+// rectángulo con esquinas cuadradas, menos parecido a una etiqueta real).
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// Logo de London Café al frente (parche, PNG con transparencia real) +
+// "LONDON VIBES / COFFEE MOMENTS" atrás (dibujado con canvas sobre una
+// placa del color de marca -- así se lee igual sin importar de qué color
+// sea la camisa de cada uno de los 12 personajes). Ambos son planos
+// simples pegados al cuerpo, no geometría 3D -- mucho más tolerante a
+// que el torso varíe de forma entre personajes que un accesorio rígido.
+//
+// OJO con el ancho: Box3.setFromObject() de un SkinnedMesh lee la
+// geometría en su pose de BIND (T-pose, brazos bien abiertos), NUNCA la
+// pose animada -- da igual en qué momento se mida. body.size.x (ancho de
+// PUNTA A PUNTA de mano a mano en T-pose) sale gigante por eso, se
+// confirmó con captura (el logo tapaba medio cuerpo). head.size.x en
+// cambio es la cabeza sola, no le afectan los brazos -- se usa esa como
+// referencia de escala en vez del ancho del body-mesh. Alto/profundidad
+// (Y/Z) sí son confiables desde body (los brazos en T-pose no cambian
+// cuánto mide el cuerpo de pies a hombro ni de pecho a espalda).
+function buildBrand(head, body) {
+  if (!body || !head) return null;
+  var g = new THREE.Group();
+  var scaleRef = head.size.x;
+  var frontZ = body.center.z + body.size.z / 2;
+  var backZ = body.center.z - body.size.z / 2;
+  // A la altura del pecho -- un poco abajo del hombro (arriba del todo del
+  // body-mesh, que termina donde empieza el cuello/cabeza).
+  var chestY = body.center.y + body.size.y * 0.32;
+
+  var logoSize = scaleRef * 0.5;
+  var logoMat = new THREE.MeshBasicMaterial({ map: logoTexture, transparent: true, alphaTest: 0.1 });
+  var logo = new THREE.Mesh(new THREE.PlaneGeometry(logoSize, logoSize), logoMat);
+  logo.position.set(body.center.x, chestY, frontZ + 0.003);
+  g.add(logo);
+
+  var canvas = document.createElement("canvas");
+  canvas.width = 512; canvas.height = 220;
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#7a1e3a";
+  roundRectPath(ctx, 4, 4, 504, 212, 28);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "900 58px Arial, sans-serif";
+  ctx.fillText("LONDON VIBES", 256, 84);
+  ctx.font = "700 42px Arial, sans-serif";
+  ctx.fillText("COFFEE MOMENTS", 256, 152);
+  var backTexture = new THREE.CanvasTexture(canvas);
+  // Sin esto el canvas se ve descolorido/rosa pálido en vez del maroon de
+  // marca -- CanvasTexture no asume espacio sRGB por defecto como sí lo
+  // hacen las texturas cargadas de archivo, y el renderer corrige de más.
+  backTexture.colorSpace = THREE.SRGBColorSpace;
+  var backMat = new THREE.MeshBasicMaterial({ map: backTexture, transparent: true });
+  var backW = scaleRef * 1.15;
+  var backH = backW * (canvas.height / canvas.width);
+  var back = new THREE.Mesh(new THREE.PlaneGeometry(backW, backH), backMat);
+  back.position.set(body.center.x, chestY, backZ - 0.003);
+  back.rotation.y = Math.PI; // mira hacia atrás (normal por defecto del plano es +Z)
+  g.add(back);
+
+  return g;
 }
 
 function buildAccessory(id, head) {
@@ -272,14 +369,19 @@ function buildAccessory(id, head) {
 function clearCurrent() {
   if (currentModel) { avatarGroup.remove(currentModel); currentModel = null; }
   if (currentAccessory) { avatarGroup.remove(currentAccessory); currentAccessory = null; }
+  if (currentBrand) { avatarGroup.remove(currentBrand); currentBrand = null; }
   currentHeadInfo = null;
   mixer = null;
 }
 
-function applyAccessory(id, headInfo) {
+// Apagado por lo pronto -- lentes/gorra (buildAccessory arriba) se veían
+// mal puestos (flotando, desproporcionados) en varios de los 12
+// personajes. Esto los apaga en TODOS lados (no solo el picker de
+// AvatarCustomizeScreen), incluyendo cuentas que ya tenían uno guardado de
+// antes. buildAccessory() se deja intacto para reactivar esto después con
+// mejor ajuste -- no se llama desde ningún lado mientras tanto.
+function applyAccessory() {
   if (currentAccessory) { avatarGroup.remove(currentAccessory); currentAccessory = null; }
-  var acc = buildAccessory(id, headInfo);
-  if (acc) { avatarGroup.add(acc); currentAccessory = acc; }
 }
 
 function loadAndSwapCharacter(url) {
@@ -316,6 +418,9 @@ function loadAndSwapCharacter(url) {
     // bien la deformación de un SkinnedMesh en animación), lo que inflaba
     // los lentes/la gorra hasta tapar toda la pantalla.
     currentHeadInfo = measureHead(obj);
+
+    var brand = buildBrand(currentHeadInfo, measureBody(obj));
+    if (brand) { avatarGroup.add(brand); currentBrand = brand; }
 
     // Pose "idle" en loop (en vez de una T-pose fija) -- confirmado con
     // captura que el frame 0 de "idle" es una pose de pie natural, brazos

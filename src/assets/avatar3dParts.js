@@ -13,6 +13,10 @@
 export const API_STATIC_URL = "https://app.londoncafejrz.com";
 const KENNEY_BASE = `${API_STATIC_URL}/avatar3d-assets/kenney`;
 
+// Logo de London Café (mismo PNG que assets/icon.png, con transparencia)
+// para estampar en el pecho del avatar -- ver Avatar3DViewer.jsx applyBrand().
+export const BRAND_LOGO_URL = `${API_STATIC_URL}/avatar3d-assets/branding/logo.png`;
+
 export const CHARACTER_OPTIONS = [
   { id: "kenney_male_a", label: "Chico A", glb: `${KENNEY_BASE}/character-male-a.glb`, preview: `${KENNEY_BASE}/Previews/character-male-a.png` },
   { id: "kenney_male_b", label: "Chico B", glb: `${KENNEY_BASE}/character-male-b.glb`, preview: `${KENNEY_BASE}/Previews/character-male-b.png` },

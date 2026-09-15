@@ -5,7 +5,7 @@ import { colors } from "../theme/colors";
 import Avatar3DViewer from "../components/Avatar3DViewer";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
-import { CHARACTER_OPTIONS, ACCESSORY_OPTIONS } from "../assets/avatar3dParts";
+import { CHARACTER_OPTIONS } from "../assets/avatar3dParts";
 
 const PET_SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -16,24 +16,42 @@ const PET_SPECIES = [
 // Elige el personaje base (modelo .glb completo, ver avatar3dParts.js) --
 // reemplaza al viejo picker de 9 partes sueltas (pelo/cejas/nariz/etc)
 // ahora que el cuerpo es un modelo real en vez de geometría armada a mano.
+//
+// v2: en vez de una sola fila con los 12 mezclados, se separan en 2 filas
+// (Chicos / Chicas) que se desplazan JUNTAS (un solo ScrollView con ambas
+// filas adentro) -- así la variante A de cada género queda alineada en
+// columna con la B, C, etc., en vez de tener que buscarla suelta en la fila.
 function CharacterRow({ options, value, onChange }) {
+  const chicos = options.filter((o) => o.id.startsWith("kenney_male_"));
+  const chicas = options.filter((o) => o.id.startsWith("kenney_female_"));
+
+  const renderRow = (opts) => (
+    <View style={styles.charRow}>
+      {opts.map((opt) => {
+        const active = value === opt.id;
+        return (
+          <Pressable
+            key={opt.id}
+            onPress={() => onChange(opt.id)}
+            style={[styles.charBtn, active && styles.charBtnActive]}
+          >
+            <Image source={{ uri: opt.preview }} style={styles.charThumb} />
+            <Text style={[styles.partLabel, active && styles.partLabelActive]}>{opt.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Personaje</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
-        {options.map((opt) => {
-          const active = value === opt.id;
-          return (
-            <Pressable
-              key={opt.id}
-              onPress={() => onChange(opt.id)}
-              style={[styles.charBtn, active && styles.charBtnActive]}
-            >
-              <Image source={{ uri: opt.preview }} style={styles.charThumb} />
-              <Text style={[styles.partLabel, active && styles.partLabelActive]}>{opt.label}</Text>
-            </Pressable>
-          );
-        })}
+        <View>
+          {renderRow(chicos)}
+          <View style={{ height: 8 }} />
+          {renderRow(chicas)}
+        </View>
       </ScrollView>
     </View>
   );
@@ -70,22 +88,27 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
   const [saving, setSaving] = useState(false);
 
   const existing = user?.avatar3d;
+  // accessory: forzado a null (no se lee `existing`) -- el picker de
+  // lentes/gorra está apagado por lo pronto (ver Avatar3DViewer.jsx), así
+  // que guardar desde acá limpia cualquier accesorio que hubiera quedado
+  // de antes en vez de mantenerlo guardado sin forma de quitarlo.
   const [parts, setParts] = useState({
     character: existing?.parts?.character || CHARACTER_OPTIONS[0].id,
-    accessory: existing?.parts?.accessory ?? null,
+    accessory: null,
   });
 
   const viewerRef = useRef(null);
 
   const setPart = (slot, val) => setParts((p) => ({ ...p, [slot]: val }));
 
-  // Mascota (sin cambios -- especie/nombre; cuidarla vive en PetScreen)
+  // Mascota (sin cambios -- especie/nombre; cuidarla vive en PetScreen).
+  // Ya no tiene su propio botón "Guardar mascota" -- se guarda junto con
+  // el avatar en un solo botón (onSave), ver ahí.
   const [petOwned, setPetOwned] = useState(false);
   const [petSpecies, setPetSpecies] = useState("cat");
   const [petName, setPetName] = useState("");
   const [petOrigName, setPetOrigName] = useState("");
   const [petOrigSpecies, setPetOrigSpecies] = useState("cat");
-  const [petSaving, setPetSaving] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -107,34 +130,17 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
 
   const petDirty = petOwned && (petSpecies !== petOrigSpecies || petName.trim() !== petOrigName);
 
-  const savePet = async () => {
-    const clean = petName.trim();
-    if (!clean) {
-      Alert.alert("Falta el nombre", "Ponle un nombre a tu mascota.");
-      return;
-    }
-    try {
-      setPetSaving(true);
-      const r = await apiFetch("/pet/customize", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ species: petSpecies, name: clean }),
-      });
-      const p = r?.pet;
-      setPetOrigSpecies(p?.species || petSpecies);
-      setPetOrigName(p?.name || clean);
-      Alert.alert("Listo", "Mascota actualizada 🐾");
-    } catch (e) {
-      const err = e?.data?.error || e?.message;
-      Alert.alert("Error", err === "NO_CHANGES" ? "No cambiaste nada." : err || "No se pudo.");
-    } finally {
-      setPetSaving(false);
-    }
-  };
-
+  // Un solo botón guarda TODO: el avatar 3D y, si hay cambios pendientes,
+  // también el nombre/especie de la mascota -- antes eran dos botones
+  // separados (uno para cada cosa), confuso porque "Guardar avatar" no
+  // guardaba la mascota y viceversa.
   const onSave = async () => {
     if (!token) {
       Alert.alert("Sesión", "No hay token. Vuelve a iniciar sesión.");
+      return;
+    }
+    if (petDirty && !petName.trim()) {
+      Alert.alert("Falta el nombre", "Ponle un nombre a tu mascota.");
       return;
     }
     try {
@@ -161,14 +167,26 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
         setUser((prev) => ({ ...(prev || {}), avatar3d }));
       }
 
+      if (petDirty) {
+        const clean = petName.trim();
+        const pr = await apiFetch("/pet/customize", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ species: petSpecies, name: clean }),
+        });
+        const p = pr?.pet;
+        setPetOrigSpecies(p?.species || petSpecies);
+        setPetOrigName(p?.name || clean);
+      }
+
       if (forced) {
         onDone?.(avatar3d);
       } else {
-        Alert.alert("Listo", "Tu avatar 3D quedó guardado ✅");
+        Alert.alert("Listo", "Todo quedó guardado ✅");
         if (navigation?.canGoBack?.()) navigation.goBack();
       }
     } catch (e) {
-      console.log("❌ save avatar3d:", e?.data || e?.message);
+      console.log("❌ save avatar3d/pet:", e?.data || e?.message);
       Alert.alert("Error", e?.data?.error || e?.message || "REQUEST_FAILED");
     } finally {
       setSaving(false);
@@ -205,7 +223,6 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
       <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <CharacterRow options={CHARACTER_OPTIONS} value={parts.character} onChange={(v) => setPart("character", v)} />
-          <PartRow title="Accesorio" options={ACCESSORY_OPTIONS} value={parts.accessory} onChange={(v) => setPart("accessory", v)} />
 
           {/* Mascota VIP -- especie/nombre; cuidarla vive en PetScreen.
               No aplica todavía en el gate obligatorio post-login. */}
@@ -250,13 +267,6 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
                 />
 
                 <View style={styles.petBtnRow}>
-                  <Pressable
-                    onPress={savePet}
-                    disabled={!petDirty || petSaving}
-                    style={[styles.petSaveBtn, (!petDirty || petSaving) && { opacity: 0.5 }]}
-                  >
-                    <Text style={styles.petSaveText}>{petSaving ? "Guardando..." : "Guardar mascota"}</Text>
-                  </Pressable>
                   <Pressable onPress={() => navigation.navigate("Pet")} style={styles.petLinkBtn}>
                     <Text style={styles.petLinkText}>Cuidarla 🐾</Text>
                   </Pressable>
@@ -276,7 +286,7 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
           )}
 
           <Pressable style={[styles.saveBtn, saving && { opacity: 0.75 }]} onPress={onSave} disabled={saving}>
-            <Text style={styles.saveText}>{saving ? "Guardando..." : "Guardar avatar"}</Text>
+            <Text style={styles.saveText}>{saving ? "Guardando..." : "Guardar"}</Text>
           </Pressable>
         </View>
 
@@ -342,6 +352,7 @@ const styles = StyleSheet.create({
   partLabel: { marginTop: 4, color: "#111", fontSize: 11, fontWeight: "900" },
   partLabelActive: { color: "#fff" },
 
+  charRow: { flexDirection: "row" },
   charBtn: {
     alignItems: "center",
     padding: 8,
@@ -383,8 +394,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   petBtnRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
-  petSaveBtn: { flex: 1, paddingVertical: 12, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
-  petSaveText: { color: "#fff", fontWeight: "900", fontSize: 13 },
   petLinkBtn: { paddingVertical: 12, paddingHorizontal: 14 },
   petLinkText: { color: colors.primary, fontWeight: "900", fontSize: 13 },
 });
