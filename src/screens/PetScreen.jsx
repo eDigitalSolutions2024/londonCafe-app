@@ -45,7 +45,7 @@ function formatMMSS(totalSeconds) {
 function Bar({ label, value, color }) {
   const pct = Math.max(0, Math.min(100, Number(value) || 0));
   return (
-    <View style={{ marginTop: 10 }}>
+    <View style={styles.statItem}>
       <View style={styles.statRow}>
         <Text style={styles.statLabel}>{label}</Text>
         <Text style={styles.statValue}>{Math.round(pct)}%</Text>
@@ -224,15 +224,15 @@ export default function PetScreen({ navigation }) {
   const energy = Number(pet?.energy ?? 100);
   const canPlay = energy >= 22; // mismo umbral que PLAY_MIN_ENERGY en el backend
 
-  const renderOwned = () => (
+  const renderStatus = () => (
     <View>
       {/* Escena */}
       <View style={styles.scene}>
         <View style={styles.sceneChar}>
           {user?.avatar3d?.owned ? (
-            <Avatar3DViewer parts={user.avatar3d.parts} size={150} />
+            <Avatar3DViewer parts={user.avatar3d.parts} size={92} />
           ) : (
-            <AvatarPreview config={avatarConfig} size={96} />
+            <AvatarPreview config={avatarConfig} size={70} />
           )}
           <Text style={styles.sceneCaption}>Tú</Text>
         </View>
@@ -242,7 +242,7 @@ export default function PetScreen({ navigation }) {
             mood={mood}
             mess={mess}
             sleeping={sleeping}
-            size={pet && state?.stage === "bebé" ? 78 : 92}
+            size={pet && state?.stage === "bebé" ? 58 : 68}
             reaction={reaction}
             onTapPet={() => setReaction((x) => ({ type: "tickle", id: x.id + 1 }))}
           />
@@ -277,11 +277,13 @@ export default function PetScreen({ navigation }) {
         />
       </View>
 
-      {/* 4 barras */}
-      <Bar label="Hambre" value={pet.hunger} color={colors.accent} />
-      <Bar label="Felicidad" value={pet.happiness} color={colors.primary} />
-      <Bar label="Energía" value={pet.energy} color="#4f9d69" />
-      <Bar label="Higiene" value={pet.hygiene} color="#4a90c2" />
+      {/* 4 barras, en grilla 2x2 para no ocupar tanto alto */}
+      <View style={styles.statsGrid}>
+        <Bar label="Hambre" value={pet.hunger} color={colors.accent} />
+        <Bar label="Felicidad" value={pet.happiness} color={colors.primary} />
+        <Bar label="Energía" value={pet.energy} color="#4f9d69" />
+        <Bar label="Higiene" value={pet.hygiene} color="#4a90c2" />
+      </View>
 
       {/* Despensa */}
       <Text style={styles.pantryHint}>Despensa (la misma de tu avatar)</Text>
@@ -299,8 +301,7 @@ export default function PetScreen({ navigation }) {
           onPress={() => call("/pet/feed", { type: "bread" }, "bread")}
         />
       </View>
-
-      <View style={[styles.actionRow, { marginTop: 10 }]}>
+      <View style={[styles.actionRow, { marginTop: 6 }]}>
         <ActionBtn
           emoji="🧼"
           label={busy === "clean" ? "..." : "Limpiar"}
@@ -315,8 +316,16 @@ export default function PetScreen({ navigation }) {
           onPress={() => call("/pet/sleep", null, "sleep")}
         />
       </View>
+    </View>
+  );
 
-      <Text style={styles.gamesTitle}>Minijuegos</Text>
+  // Aparte de la tarjeta de estado (arriba) y con su propio fondo de color
+  // -- a propósito, para que salte a la vista frente a las barras/botones
+  // más discretos de arriba en vez de perderse como una sección más.
+  const renderGames = () => (
+    <View style={styles.gamesCard}>
+      <Text style={styles.gamesTitle}>🎮 Minijuegos</Text>
+      <Text style={styles.gamesSub}>Toca un juego · toca el top para ver la tabla completa</Text>
       <MiniGameCard
         emoji="🍰"
         title="Café Crush"
@@ -427,9 +436,11 @@ export default function PetScreen({ navigation }) {
               </Pressable>
             </View>
           ) : (
-            renderOwned()
+            renderStatus()
           )}
         </View>
+
+        {!loading && isVIP && owned && renderGames()}
 
         <View style={{ height: 18 }} />
       </ScrollView>
@@ -590,54 +601,67 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.primarySoft,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 4,
-    minHeight: 190,
+    minHeight: 120,
   },
   sceneChar: { alignItems: "center", maxWidth: "50%" },
-  sceneCaption: { marginTop: 2, color: colors.textMuted, fontSize: 11, fontWeight: "800" },
+  sceneCaption: { marginTop: 2, color: colors.textMuted, fontSize: 10.5, fontWeight: "800" },
 
-  moodText: { marginTop: 12, textAlign: "center", color: "#111", fontSize: 15, fontWeight: "900" },
+  moodText: { marginTop: 8, textAlign: "center", color: "#111", fontSize: 13, fontWeight: "900" },
   sleepBanner: {
-    marginTop: 12,
+    marginTop: 8,
     alignItems: "center",
     backgroundColor: "rgba(74,55,40,0.08)",
     borderRadius: 14,
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 14,
   },
-  sleepBannerText: { color: "#111", fontSize: 15, fontWeight: "900" },
-  sleepBannerHint: { marginTop: 2, color: colors.textMuted, fontSize: 12, fontWeight: "600" },
+  sleepBannerText: { color: "#111", fontSize: 13, fontWeight: "900" },
+  sleepBannerHint: { marginTop: 2, color: colors.textMuted, fontSize: 11, fontWeight: "600" },
 
-  lvlRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16 },
-  lvlLabel: { color: "#111", fontSize: 12, fontWeight: "900" },
-  lvlMeta: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
-  xpTrack: { height: 8, borderRadius: 999, backgroundColor: colors.primarySoft, overflow: "hidden", marginTop: 6 },
+  lvlRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
+  lvlLabel: { color: "#111", fontSize: 11.5, fontWeight: "900" },
+  lvlMeta: { color: colors.textMuted, fontSize: 10.5, fontWeight: "800" },
+  xpTrack: { height: 6, borderRadius: 999, backgroundColor: colors.primarySoft, overflow: "hidden", marginTop: 5 },
   xpFill: { height: "100%", borderRadius: 999, backgroundColor: colors.accent },
 
-  statRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
-  statLabel: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
-  statValue: { color: "#111", fontSize: 12, fontWeight: "900" },
-  barTrack: { height: 10, borderRadius: 999, backgroundColor: colors.primarySoft, overflow: "hidden" },
+  // Grilla 2x2 en vez de 4 barras apiladas -- misma info, la mitad de alto.
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", columnGap: 10, rowGap: 8, marginTop: 10 },
+  statItem: { width: "48%" },
+  statRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 3 },
+  statLabel: { color: colors.textMuted, fontSize: 10.5, fontWeight: "800" },
+  statValue: { color: "#111", fontSize: 10.5, fontWeight: "900" },
+  barTrack: { height: 7, borderRadius: 999, backgroundColor: colors.primarySoft, overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 999 },
 
-  pantryHint: { marginTop: 18, marginBottom: 8, color: colors.textMuted, fontSize: 11, fontWeight: "800", textAlign: "center" },
-  actionRow: { flexDirection: "row", gap: 10 },
+  pantryHint: { marginTop: 12, marginBottom: 6, color: colors.textMuted, fontSize: 10.5, fontWeight: "800", textAlign: "center" },
+  actionRow: { flexDirection: "row", gap: 8 },
   foodBtn: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 12,
-    borderRadius: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: "#fff",
   },
   foodBtnDisabled: { opacity: 0.4 },
-  foodEmoji: { fontSize: 24 },
-  foodLabel: { marginTop: 4, color: "#111", fontSize: 12, fontWeight: "900" },
-  badge: { position: "absolute", top: 8, right: 10, width: 9, height: 9, borderRadius: 999, backgroundColor: "#d9534f" },
+  foodEmoji: { fontSize: 19 },
+  foodLabel: { marginTop: 3, color: "#111", fontSize: 10.5, fontWeight: "900" },
+  badge: { position: "absolute", top: 6, right: 8, width: 8, height: 8, borderRadius: 999, backgroundColor: "#d9534f" },
 
-  gamesTitle: { marginTop: 16, marginBottom: 8, color: "#111", fontSize: 13, fontWeight: "900" },
+  // Tarjeta propia (fondo de color, no blanca como el resto) para que los
+  // minijuegos salten a la vista en vez de leerse como una sección más
+  // debajo de las barras de estado.
+  gamesCard: {
+    marginTop: 14,
+    backgroundColor: "#2a0f1a",
+    borderRadius: 20,
+    padding: 16,
+  },
+  gamesTitle: { color: "#fff", fontSize: 17, fontWeight: "900" },
+  gamesSub: { marginTop: 2, marginBottom: 12, color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700" },
   gameCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -646,8 +670,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   gameIcon: { width: 52, height: 52, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   gameEmoji: { fontSize: 26 },
@@ -657,15 +684,15 @@ const styles = StyleSheet.create({
   gamePlayBtn: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999 },
   gamePlayText: { color: "#fff", fontWeight: "900", fontSize: 12.5 },
 
-  tipText: { marginTop: 12, color: colors.textMuted, fontSize: 11, fontWeight: "700", textAlign: "center", lineHeight: 16 },
+  tipText: { marginTop: 4, color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "700", textAlign: "center", lineHeight: 16 },
   nudgeText: {
-    marginTop: 12,
-    color: "#111",
+    marginTop: 4,
+    color: "#fff",
     fontSize: 12,
     fontWeight: "700",
     textAlign: "center",
     lineHeight: 17,
-    backgroundColor: "rgba(232,207,174,0.22)",
+    backgroundColor: "rgba(255,255,255,0.12)",
     borderRadius: 12,
     padding: 10,
   },
