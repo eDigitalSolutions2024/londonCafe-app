@@ -234,6 +234,12 @@ const userSchema = new mongoose.Schema(
     // que la persona fuera dueña de esa dirección -- cualquiera con la
     // sesión abierta podía cambiarlo sin confirmar nada.
     pendingEmail: { type: String, default: null, lowercase: true, trim: true },
+    // Cuándo se pidió el cambio -- si pasan 24h sin confirmarlo, getMe()
+    // lo cancela solo (ver PENDING_EMAIL_EXPIRE_MS en me.controller.js),
+    // igual que normalizeStreakAutoReset ya hace con la racha. Evita que
+    // el banner "Confirma tu correo nuevo" se quede pegado para siempre
+    // si la persona nunca vuelve a esa pantalla.
+    pendingEmailRequestedAt: { type: Date, default: null },
 
     passwordHash: { type: String, required: true },
     isEmailVerified: { type: Boolean, default: false },

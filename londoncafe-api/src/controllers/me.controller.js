@@ -202,6 +202,19 @@ async function getMe(req, res) {
     normalizeStreakAutoReset(user, now); // ✅ AQUÍ
     user.markModified("buddy"); // ✅ recomendado
 
+    // Cambio de correo abandonado: si pasaron 24h sin confirmarlo, se
+    // cancela solo (mismo enfoque "lazy, al leer" que normalizeStreakAutoReset
+    // arriba) -- si no, el banner "Confirma tu correo nuevo" se queda
+    // pegado para siempre para quien no vuelve a esa pantalla.
+    if (user.pendingEmail && user.pendingEmailRequestedAt) {
+      const ageMs = now - new Date(user.pendingEmailRequestedAt);
+      if (ageMs > PENDING_EMAIL_EXPIRE_MS) {
+        user.pendingEmail = null;
+        user.pendingEmailRequestedAt = null;
+        await EmailVerification.deleteMany({ userId: uid });
+      }
+    }
+
     // ✅ calcula cuánto falta / si ya está listo
     const refillTimer = getRefillTimer(user, now);
 
@@ -235,6 +248,10 @@ async function getMe(req, res) {
 const EMAIL_CHANGE_OTP_EXPIRE_MIN = 10;
 const EMAIL_CHANGE_RESEND_COOLDOWN_SEC = 60;
 const EMAIL_CHANGE_MAX_ATTEMPTS = 5;
+// Distinto del expirado del código OTP (10 min, arriba) -- esto es cuánto
+// tiempo se deja pendingEmail/el banner de confirmación antes de darlo por
+// abandonado y cancelarlo solo (ver el chequeo lazy en getMe()).
+const PENDING_EMAIL_EXPIRE_MS = 24 * 60 * 60 * 1000;
 
 async function updateMe(req, res) {
   try {
@@ -273,6 +290,7 @@ async function updateMe(req, res) {
         if (taken) return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
 
         patch.pendingEmail = newEmail;
+        patch.pendingEmailRequestedAt = new Date();
         emailChangePending = true;
 
         const code = generateOtp6();
@@ -345,6 +363,7 @@ async function confirmEmailChange(req, res) {
 
     user.email = user.pendingEmail;
     user.pendingEmail = null;
+    user.pendingEmailRequestedAt = null;
     await user.save();
     await EmailVerification.deleteMany({ userId: uid });
 
