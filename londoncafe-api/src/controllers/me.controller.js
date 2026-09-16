@@ -402,7 +402,22 @@ const VIP_HAIR_IDS = new Set(["hair_07", "hair_f_05"]);
 const VIP_THRESHOLD = 200;
 // POS_URL ya está declarado arriba (línea 33), reusado aquí.
 
+const VIP_TRIAL_DAYS = 30;
+
 async function isUserVIP(uid) {
+  // ✅ Primer mes gratis: toda cuenta nueva es VIP automático durante sus
+  // primeros 30 días (createdAt viene de los timestamps de Mongoose en
+  // User.js) -- así prueban las funciones completas sin tener que juntar
+  // 200 Buddy Coins primero. Pasado el mes, cae al chequeo normal de abajo
+  // (saldo real vía POS) -- si no llegó a los 200, se le regresa a normal.
+  try {
+    const user = await User.findById(uid).select("createdAt").lean();
+    const ageMs = user?.createdAt ? Date.now() - new Date(user.createdAt).getTime() : Infinity;
+    if (ageMs < VIP_TRIAL_DAYS * 24 * 60 * 60 * 1000) return true;
+  } catch (err) {
+    console.log("isUserVIP trial check error:", err?.message);
+  }
+
   // Un solo blip de red al POS dejaba fuera a un VIP real (falla cerrado).
   // Reintentamos una vez antes de rendirnos.
   for (let attempt = 0; attempt < 2; attempt++) {

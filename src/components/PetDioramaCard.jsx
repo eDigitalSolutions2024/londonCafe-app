@@ -187,7 +187,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
-  stage: { width: 128, height: 94, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
+  // height 94 → 116: en iOS, Apple Color Emoji dibuja el emoji de la
+  // mascota (fontSize 40) notablemente más alto que Noto Color Emoji en
+  // Android con el mismo fontSize -- con overflow:hidden y el contenido
+  // anclado abajo (justifyContent:flex-end), esa diferencia se comía la
+  // parte de arriba del emoji en iPhone real aunque se viera bien en el
+  // emulador Android. Más alto le da margen sin tocar el layout del resto.
+  stage: { width: 128, height: 116, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
   halo: { position: "absolute", width: 116, height: 84, borderRadius: 999, backgroundColor: colors.accent, top: 6 },
   tilt: {
     flexDirection: "row",

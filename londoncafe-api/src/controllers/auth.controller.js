@@ -112,9 +112,11 @@ const FREE_HAIR_IDS = new Set([
   "hair_f_01", "hair_f_02", "hair_f_03", "hair_f_04",
 ]);
 
+const PET_SPECIES = new Set(["cat", "dog", "hamster"]);
+
 async function register(req, res) {
   try {
-    const { name, email, password, gender, phone, birthDate, avatarHair } = req.body;
+    const { name, email, password, gender, phone, birthDate, avatarHair, petSpecies, petName } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: "MISSING_FIELDS" });
@@ -180,6 +182,27 @@ async function register(req, res) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // ✅ Mascota VIP opcional desde el registro -- válido porque toda cuenta
+    // nueva es VIP automática su primer mes (ver isUserVIP en
+    // me.controller.js), así que no hace falta gatear esto por separado:
+    // si mandó especie+nombre válidos, se adopta de una vez.
+    const cleanPetName = typeof petName === "string" ? petName.trim().slice(0, 20) : "";
+    const petChoice = PET_SPECIES.has(petSpecies) && cleanPetName
+      ? {
+          owned: true,
+          species: petSpecies,
+          name: cleanPetName,
+          hunger: 100,
+          happiness: 100,
+          energy: 100,
+          hygiene: 100,
+          mess: false,
+          xp: 0,
+          lastStatsAt: new Date(),
+          adoptedAt: new Date(),
+        }
+      : null;
+
     const user = await User.create({
       name,
       email: emailLower,
@@ -189,6 +212,7 @@ async function register(req, res) {
       avatarConfig,
       ...(validPhone ? { phone: validPhone } : {}),
       ...(bd ? { birthDate: bd } : {}),
+      ...(petChoice ? { pet: petChoice } : {}),
     });
 
     // OTP

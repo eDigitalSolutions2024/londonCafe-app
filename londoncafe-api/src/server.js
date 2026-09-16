@@ -46,8 +46,14 @@ app.post(
   paymentsController.handleStripeWebhook
 );
 
-// ✅ Ahora sí, JSON para todo lo demás
-app.use(express.json());
+// ✅ Ahora sí, JSON para todo lo demás -- el límite default de express.json
+// es 100kb, y el snapshot del avatar 3D (PNG capturado del canvas del
+// visor, mandado como data-URL base64 en el body de
+// POST /me/avatar3d/snapshot) lo pasa fácil, tirando HTTP_413 antes de
+// llegar siquiera al controller (confirmado: nunca se guardaba el
+// snapshot de nadie, todas las cuentas se quedaban con el avatar plano de
+// respaldo). 10mb da margen de sobra para una imagen de avatar.
+app.use(express.json({ limit: "10mb" }));
 
 // Snapshots del avatar 3D (PNG plano, ver me.controller.js
 // uploadAvatar3DSnapshot) -- almacenamiento local en disco, sin
