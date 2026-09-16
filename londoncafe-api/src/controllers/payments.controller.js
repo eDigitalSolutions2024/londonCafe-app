@@ -105,9 +105,30 @@ async function calcOrderAmountFromDB(items = []) {
   return Math.round(total * 100);
 }
 
+const POS_URL = process.env.POS_URL || "https://api.londoncafejrz.com/api";
+
+// El cupón vive en la DB del POS (no en esta), ver Coupon.ts/coupons.ts en
+// el repo LondonCafe -- se valida ahí por HTTP, nunca se confía en un
+// descuento que mande el cliente. Si la validación falla por cualquier
+// razón (cupón inválido, POS caído, etc.) simplemente no se aplica
+// descuento -- no se bloquea el pago por un cupón roto.
+async function validateCouponServerSide(couponCode, loyaltyUserId) {
+  if (!couponCode) return null;
+  try {
+    const url = `${POS_URL}/coupons/${encodeURIComponent(couponCode)}/validate?loyaltyUserId=${encodeURIComponent(loyaltyUserId || "")}`;
+    const res = await fetch(url);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.ok) return null;
+    return data.coupon; // { code, title, discountType, discountValue, expiresAt }
+  } catch (e) {
+    console.log("⚠️ validateCouponServerSide error:", e?.message);
+    return null;
+  }
+}
+
 exports.createPaymentSheet = async (req, res) => {
   try {
-    const { items, customerEmail } = req.body;
+    const { items, customerEmail, couponCode, loyaltyUserId } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ ok: false, error: "CART_EMPTY" });
@@ -131,6 +152,18 @@ exports.createPaymentSheet = async (req, res) => {
       return res.status(400).json({ ok: false, error: "INVALID_AMOUNT" });
     }
 
+    let discountCents = 0;
+    const validCoupon = await validateCouponServerSide(couponCode, loyaltyUserId);
+    if (validCoupon) {
+      discountCents =
+        validCoupon.discountType === "percent"
+          ? Math.round(amount * (Number(validCoupon.discountValue) / 100))
+          : Math.round(Number(validCoupon.discountValue) * 100);
+      // nunca deja el cobro en $0 -- un cupón de 100% igual cobra el mínimo de un peso
+      discountCents = Math.max(0, Math.min(discountCents, amount - 100));
+      amount = amount - discountCents;
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: "mxn",
@@ -139,14 +172,18 @@ exports.createPaymentSheet = async (req, res) => {
       metadata: {
         source: "londoncafe-app",
         userId: req.user?.id ? String(req.user.id) : "",
+        couponCode: validCoupon ? validCoupon.code : "",
       },
     });
 
     return res.json({
-  ok: true,
-  paymentIntentClientSecret: paymentIntent.client_secret,
-  paymentIntentId: paymentIntent.id,
-});
+      ok: true,
+      paymentIntentClientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      amount,
+      discountCents,
+      coupon: validCoupon,
+    });
   } catch (e) {
     console.log("❌ createPaymentSheet:", e?.message || e);
     return res.status(500).json({ ok: false, error: "PAYMENT_INTENT_FAILED" });

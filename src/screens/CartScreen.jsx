@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, FlatList, Image, Pressable, ActivityIndicator, Alert } from "react-native";
+import { View, Text, FlatList, Image, Pressable, ActivityIndicator, Alert, TextInput } from "react-native";
 import Screen from "../components/Screen";
 import { useCart } from "../context/CartContext";
 import { AuthContext } from "../context/AuthContext";
@@ -370,6 +370,55 @@ export default function CartScreen({ navigation }) {
   const [paying, setPaying] = useState(false);
 const tabBarHeight = useBottomTabBarHeight();
 
+  // ✅ Cupón -- se valida directo contra el POS (posFetch, mismo patrón que
+  // promos/cross-sell-rules) para mostrar el descuento de una vez, pero el
+  // cobro real SIEMPRE lo recalcula el server en /payments/sheet (ver
+  // payments.controller.js validateCouponServerSide) -- nunca se confía en
+  // este preview para lo que de verdad se cobra.
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discountType, discountValue }
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponError, setCouponError] = useState("");
+
+  const loyaltyUserId = user?._id || user?.id || "";
+
+  const couponDiscountPreview = appliedCoupon
+    ? appliedCoupon.discountType === "percent"
+      ? (subtotal * Number(appliedCoupon.discountValue)) / 100
+      : Number(appliedCoupon.discountValue)
+    : 0;
+  const estimatedTotal = Math.max(0, subtotal - couponDiscountPreview);
+
+  const onApplyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    try {
+      setCouponBusy(true);
+      setCouponError("");
+      const r = await posFetch(`/coupons/${encodeURIComponent(code)}/validate?loyaltyUserId=${encodeURIComponent(loyaltyUserId)}`);
+      if (!r?.ok) throw new Error(r?.error || "INVALID");
+      setAppliedCoupon(r.coupon);
+    } catch (e) {
+      const map = {
+        NOT_FOUND: "Ese código no existe.",
+        INACTIVE: "Ese cupón ya no está activo.",
+        EXPIRED: "Ese cupón ya venció.",
+        USAGE_LIMIT_REACHED: "Ese cupón ya se agotó.",
+        ALREADY_USED_BY_USER: "Ya usaste ese cupón antes.",
+      };
+      setAppliedCoupon(null);
+      setCouponError(map[e?.data?.error || e?.message] || "No se pudo aplicar el cupón.");
+    } finally {
+      setCouponBusy(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError("");
+  };
+
   // ✅ Recomendaciones / cross-sell (Fase 1) -- mismas CrossSellRule que el
   // Kiosk, ruta pública (sin proxy, GET /api/cross-sell-rules/active).
   const [crossSellRules, setCrossSellRules] = useState([]);
@@ -480,6 +529,8 @@ async function getLoggedUserData() {
       method: "POST",
       body: JSON.stringify({
         items: payloadItems,
+        couponCode: appliedCoupon?.code || undefined,
+        loyaltyUserId: loyaltyUserId || undefined,
       }),
     });
 
@@ -544,9 +595,15 @@ const finalUserId =
   localUser?.user?.id ||
   null;
 
+// El total del pedido refleja lo que Stripe REALMENTE cobró (data.amount,
+// en centavos, ya con el descuento del cupón aplicado por el server) en
+// vez del subtotal crudo del cliente -- si no, el pedido quedaría
+// registrado con el precio de ANTES del cupón.
+const chargedTotal = Number.isFinite(data.amount) ? data.amount / 100 : subtotal;
+
 const orderPayload = buildOrderPayload(
   items,
-  subtotal,
+  chargedTotal,
   paymentIntentId,
   customerName,
   customerPhone,
@@ -554,6 +611,17 @@ const orderPayload = buildOrderPayload(
 );
 
 orderPayload.userId = finalUserId;
+
+// Cupón usado -- se marca canjeado AHORA, ya que el pago de verdad se
+// completó (antes de esto solo era un preview que no consumía nada). Si
+// esto falla no se revierte el pago -- el cliente ya recibió su
+// descuento, solo no queda registrado el canje (aceptable, no crítico).
+if (appliedCoupon?.code) {
+  posFetch(`/coupons/${encodeURIComponent(appliedCoupon.code)}/redeem`, {
+    method: "POST",
+    body: JSON.stringify({ loyaltyUserId: finalUserId, source: "app" }),
+  }).catch((e) => console.log("⚠️ coupon redeem:", e?.data || e?.message));
+}
 
 
 /*console.log("[APP] userId:", finalUserId);
@@ -573,8 +641,9 @@ console.log("[APP] orderPayload:", JSON.stringify(orderPayload, null, 2));
       throw new Error(orderRes?.error || "El pago pasó, pero no se pudo crear el pedido.");
     }
 
-   
+
     clear();
+    removeCoupon();
 
 navigation.navigate("Order", {
   playOrderBubble: true,
@@ -734,6 +803,70 @@ showsVerticalScrollIndicator={false}
     backgroundColor: COLORS.bg,
   }}
 >
+  {/* ✅ Cupón */}
+  {appliedCoupon ? (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: COLORS.wineSoft,
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        marginBottom: 10,
+      }}
+    >
+      <Text style={{ color: COLORS.wine, fontWeight: "900", fontSize: 12.5, flex: 1 }} numberOfLines={1}>
+        🎟️ {appliedCoupon.code}{appliedCoupon.title ? ` · ${appliedCoupon.title}` : ""}
+      </Text>
+      <Pressable onPress={removeCoupon} hitSlop={8}>
+        <Text style={{ color: COLORS.wine, fontWeight: "900", fontSize: 12.5 }}>Quitar</Text>
+      </Pressable>
+    </View>
+  ) : (
+    <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+      <TextInput
+        value={couponInput}
+        onChangeText={(v) => { setCouponInput(v); setCouponError(""); }}
+        placeholder="¿Tienes un cupón?"
+        placeholderTextColor={COLORS.pageMuted}
+        autoCapitalize="characters"
+        autoCorrect={false}
+        style={{
+          flex: 1,
+          borderWidth: 1,
+          borderColor: COLORS.border,
+          borderRadius: 12,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          color: COLORS.pageText,
+          fontWeight: "700",
+        }}
+      />
+      <Pressable
+        onPress={onApplyCoupon}
+        disabled={!couponInput.trim() || couponBusy}
+        style={{
+          paddingHorizontal: 16,
+          borderRadius: 12,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: couponInput.trim() && !couponBusy ? COLORS.wine : "rgba(122,30,58,0.35)",
+        }}
+      >
+        {couponBusy ? <ActivityIndicator color="#fff" size="small" /> : (
+          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12.5 }}>Aplicar</Text>
+        )}
+      </Pressable>
+    </View>
+  )}
+  {couponError ? (
+    <Text style={{ color: "#d9534f", fontWeight: "700", fontSize: 11.5, marginTop: -4, marginBottom: 10 }}>
+      {couponError}
+    </Text>
+  ) : null}
+
   <View
     style={{
       flexDirection: "row",
@@ -743,10 +876,23 @@ showsVerticalScrollIndicator={false}
     }}
   >
     <View>
-      <Text style={{ color: COLORS.pageMuted, fontWeight: "700" }}>Subtotal</Text>
-      <Text style={{ color: COLORS.pageText, fontWeight: "900", fontSize: 22 }}>
-        {money(subtotal)}
-      </Text>
+      {appliedCoupon ? (
+        <>
+          <Text style={{ color: COLORS.pageMuted, fontWeight: "700", fontSize: 12, textDecorationLine: "line-through" }}>
+            {money(subtotal)}
+          </Text>
+          <Text style={{ color: COLORS.pageText, fontWeight: "900", fontSize: 22 }}>
+            {money(estimatedTotal)}
+          </Text>
+        </>
+      ) : (
+        <>
+          <Text style={{ color: COLORS.pageMuted, fontWeight: "700" }}>Subtotal</Text>
+          <Text style={{ color: COLORS.pageText, fontWeight: "900", fontSize: 22 }}>
+            {money(subtotal)}
+          </Text>
+        </>
+      )}
     </View>
 
     {!!items.length && (
