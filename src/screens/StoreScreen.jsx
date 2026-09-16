@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useStripe } from "@stripe/stripe-react-native";
+import Svg, { Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
@@ -19,6 +20,36 @@ const VIP_BENEFITS = [
   "Minijuegos: Café Crush, Salto Café, Atrapa",
   "Acceso a estilos y objetos exclusivos",
 ];
+
+// Próximamente en la Tienda -- adelanto de lo que se va a poder comprar
+// después del Pase VIP (gorras/lentes/props para el avatar, ver
+// investigación de categorías tipo Bitmoji/Roblox que sí pegan bien con
+// el rig de Kenney). Todavía no se vende nada de esto, es solo el teaser.
+const COMING_SOON = [
+  { emoji: "🎩", label: "Gorras y sombreros" },
+  { emoji: "☕", label: "Props para sostener" },
+  { emoji: "✨", label: "Efectos de partículas" },
+];
+
+// Glow radial detrás de la corona -- mismo recurso visual que ya usa
+// RegisterScreen.jsx (Glow), para que la Tienda se sienta parte de la
+// misma familia visual en vez de una pantalla plana aparte.
+function CrownGlow({ size = 130 }) {
+  return (
+    <View pointerEvents="none" style={{ position: "absolute", width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <Svg width={size} height={size}>
+        <Defs>
+          <RadialGradient id="storeGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor="#ffd977" stopOpacity="0.85" />
+            <Stop offset="55%" stopColor="#ffd977" stopOpacity="0.25" />
+            <Stop offset="100%" stopColor="#ffd977" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={size * 0.46} fill="url(#storeGlow)" />
+      </Svg>
+    </View>
+  );
+}
 
 /**
  * Tienda -- por ahora solo vende el Pase VIP (30 días). Reusa el mismo
@@ -96,53 +127,70 @@ export default function StoreScreen() {
           </View>
         ) : (
           <View style={styles.card}>
-            <View style={styles.badgeRow}>
-              <Text style={styles.badge}>⭐ PASE VIP</Text>
+            <View style={styles.banner}>
+              <CrownGlow />
+              <Text style={styles.crown}>👑</Text>
               {status?.isLaunchPromo && !status?.active ? (
-                <Text style={styles.launchBadge}>Lanzamiento</Text>
+                <View style={styles.launchBadge}>
+                  <Text style={styles.launchBadgeText}>🔥 Precio de lanzamiento</Text>
+                </View>
               ) : null}
             </View>
 
-            <Text style={styles.cardTitle}>30 días de acceso VIP completo</Text>
+            <View style={styles.body}>
+              <Text style={styles.badge}>PASE VIP</Text>
+              <Text style={styles.cardTitle}>30 días de acceso VIP completo</Text>
 
-            <View style={{ marginTop: 12 }}>
-              {VIP_BENEFITS.map((b) => (
-                <View key={b} style={styles.benefitRow}>
-                  <Text style={styles.benefitCheck}>✓</Text>
-                  <Text style={styles.benefitText}>{b}</Text>
-                </View>
-              ))}
-            </View>
-
-            {status?.active ? (
-              <View style={styles.activeBanner}>
-                <Text style={styles.activeBannerText}>
-                  Ya tienes tu Pase VIP activo hasta el {formatDate(status.expiresAt)}
-                </Text>
+              <View style={{ marginTop: 12 }}>
+                {VIP_BENEFITS.map((b) => (
+                  <View key={b} style={styles.benefitRow}>
+                    <Text style={styles.benefitCheck}>✓</Text>
+                    <Text style={styles.benefitText}>{b}</Text>
+                  </View>
+                ))}
               </View>
-            ) : (
-              <>
-                <View style={styles.priceRow}>
-                  {status?.isLaunchPromo ? (
-                    <Text style={styles.priceStrike}>{money(status.normalPriceCents)}</Text>
-                  ) : null}
-                  <Text style={styles.price}>{money(status?.priceCents ?? 4900)}</Text>
-                </View>
-                {status?.isLaunchPromo ? (
-                  <Text style={styles.launchHint}>Precio de lanzamiento para tu 2° mes -- después vuelve a $49.00</Text>
-                ) : null}
 
-                <Pressable
-                  style={[styles.buyBtn, buying && { opacity: 0.7 }]}
-                  onPress={onBuy}
-                  disabled={buying}
-                >
-                  <Text style={styles.buyBtnText}>{buying ? "Procesando..." : "Comprar Pase VIP"}</Text>
-                </Pressable>
-              </>
-            )}
+              {status?.active ? (
+                <View style={styles.activeBanner}>
+                  <Text style={styles.activeBannerText}>
+                    ✅ Ya tienes tu Pase VIP activo hasta el {formatDate(status.expiresAt)}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.priceRow}>
+                    {status?.isLaunchPromo ? (
+                      <Text style={styles.priceStrike}>{money(status.normalPriceCents)}</Text>
+                    ) : null}
+                    <Text style={styles.price}>{money(status?.priceCents ?? 4900)}</Text>
+                    <Text style={styles.pricePeriod}>/ 30 días</Text>
+                  </View>
+                  {status?.isLaunchPromo ? (
+                    <Text style={styles.launchHint}>Precio especial de tu 2° mes -- después vuelve a $49.00</Text>
+                  ) : null}
+
+                  <Pressable
+                    style={({ pressed }) => [styles.buyBtn, pressed && { opacity: 0.85 }, buying && { opacity: 0.7 }]}
+                    onPress={onBuy}
+                    disabled={buying}
+                  >
+                    <Text style={styles.buyBtnText}>{buying ? "Procesando..." : "✨ Comprar Pase VIP"}</Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
           </View>
         )}
+
+        <Text style={styles.sectionLabel}>Próximamente</Text>
+        <View style={styles.comingRow}>
+          {COMING_SOON.map((c) => (
+            <View key={c.label} style={styles.comingCard}>
+              <Text style={styles.comingEmoji}>{c.emoji}</Text>
+              <Text style={styles.comingLabel}>{c.label}</Text>
+            </View>
+          ))}
+        </View>
 
         <Text style={styles.footerNote}>
           También puedes ser VIP acumulando 200 Buddy Coins en tus compras -- el Pase es solo un atajo opcional.
@@ -162,46 +210,66 @@ const styles = StyleSheet.create({
   sub: { marginTop: 4, color: "rgba(255,255,255,0.6)", fontSize: 13, fontWeight: "700", marginBottom: 18 },
 
   card: {
+    borderRadius: 22,
+    overflow: "hidden",
     backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: colors.primarySoft,
+    shadowColor: "#ffd977",
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
-  badgeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  banner: {
+    height: 110,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  crown: { fontSize: 44 },
+  launchBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "#4f9d69",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+  },
+  launchBadgeText: { color: "#fff", fontSize: 10.5, fontWeight: "900" },
+
+  body: { padding: 18 },
   badge: {
     alignSelf: "flex-start",
-    backgroundColor: colors.primary,
-    color: "#fff",
+    color: colors.primary,
     fontSize: 11.5,
     fontWeight: "900",
-    letterSpacing: 0.4,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 999,
+    letterSpacing: 1,
   },
-  launchBadge: {
-    backgroundColor: "#4f9d69",
-    color: "#fff",
-    fontSize: 11.5,
-    fontWeight: "900",
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
-  cardTitle: { marginTop: 10, color: "#111", fontSize: 18, fontWeight: "900" },
+  cardTitle: { marginTop: 4, color: "#111", fontSize: 19, fontWeight: "900" },
 
   benefitRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
   benefitCheck: { color: colors.primary, fontWeight: "900", fontSize: 14 },
   benefitText: { color: "#333", fontSize: 13, fontWeight: "700" },
 
-  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 8, marginTop: 16 },
+  priceRow: { flexDirection: "row", alignItems: "baseline", gap: 8, marginTop: 18 },
   priceStrike: { color: colors.textMuted, fontSize: 16, fontWeight: "800", textDecorationLine: "line-through" },
-  price: { color: colors.primary, fontSize: 30, fontWeight: "900" },
+  price: { color: colors.primary, fontSize: 34, fontWeight: "900" },
+  pricePeriod: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
   launchHint: { marginTop: 2, color: colors.textMuted, fontSize: 11.5, fontWeight: "700" },
 
-  buyBtn: { marginTop: 14, paddingVertical: 14, borderRadius: 999, backgroundColor: colors.primary, alignItems: "center" },
-  buyBtnText: { color: "#fff", fontWeight: "900", fontSize: 15 },
+  buyBtn: {
+    marginTop: 14,
+    paddingVertical: 15,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    shadowColor: colors.primary,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  buyBtnText: { color: "#fff", fontWeight: "900", fontSize: 15.5 },
 
   activeBanner: {
     marginTop: 16,
@@ -211,8 +279,30 @@ const styles = StyleSheet.create({
   },
   activeBannerText: { color: "#2f6b45", fontSize: 13, fontWeight: "800", textAlign: "center" },
 
+  sectionLabel: {
+    marginTop: 26,
+    marginBottom: 10,
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 11.5,
+    fontWeight: "900",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  comingRow: { flexDirection: "row", gap: 10 },
+  comingCard: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  comingEmoji: { fontSize: 26, opacity: 0.7 },
+  comingLabel: { marginTop: 6, color: "rgba(255,255,255,0.55)", fontSize: 10.5, fontWeight: "800", textAlign: "center" },
+
   footerNote: {
-    marginTop: 16,
+    marginTop: 20,
     color: "rgba(255,255,255,0.45)",
     fontSize: 11.5,
     fontWeight: "700",

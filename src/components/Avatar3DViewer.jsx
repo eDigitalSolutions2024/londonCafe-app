@@ -453,8 +453,31 @@ window.__updateAvatar = function (next) {
   }
 };
 window.__captureSnapshot = function () {
+  // El snapshot solo se USA chiquito en toda la app (78-150px: Home,
+  // PetDioramaCard, etc.) -- pero se estaba capturando al tamaño completo
+  // del visor EN VIVO (hasta 240 CSS px × devicePixelRatio, o sea hasta
+  // 480x480+ px reales), dando un PNG varias veces más pesado de lo que
+  // hace falta y tardando ~30s en subir. Se achica el buffer SOLO para
+  // esta captura (pixelRatio 1, tamaño fijo chico) y se restaura el
+  // tamaño real después para no afectar la vista interactiva.
+  var CAPTURE_SIZE = 320;
+  var prevWidth = renderer.domElement.width;
+  var prevHeight = renderer.domElement.height;
+  var prevAspect = camera.aspect;
+
+  renderer.setPixelRatio(1);
+  renderer.setSize(CAPTURE_SIZE, CAPTURE_SIZE, false);
+  camera.aspect = 1;
+  camera.updateProjectionMatrix();
   renderer.render(scene, camera);
   var dataUrl = renderer.domElement.toDataURL("image/png");
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(prevWidth, prevHeight, false);
+  camera.aspect = prevAspect;
+  camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+
   post({ type: "snapshot", dataUrl: dataUrl });
 };
 
