@@ -1170,8 +1170,16 @@ const moodEmoji = moodEmojiFromEnergy(energy);
               onPress={() => navigation.navigate("Pet")}
             />
 
-
-            
+            {/* ✅ Amigos -- gancho social: racha diaria COMPARTIDA con
+                amigos (ver AmigosScreen.jsx), no solo la solo de arriba. */}
+            <Pressable style={styles.amigosCard} onPress={() => navigation.navigate("Amigos")}>
+              <Text style={styles.amigosEmoji}>👥</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.amigosTitle}>Amigos</Text>
+                <Text style={styles.amigosSub}>Mantengan su racha juntos 🔥</Text>
+              </View>
+              <Text style={styles.amigosChevron}>›</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -1760,5 +1768,22 @@ recoverWarn: {
   color: "#ef4444",
   textAlign: "center",
 },
+
+amigosCard: {
+  marginTop: 12,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 12,
+  backgroundColor: colors.card,
+  borderRadius: 18,
+  paddingVertical: 14,
+  paddingHorizontal: 16,
+  borderWidth: 1,
+  borderColor: colors.primarySoft,
+},
+amigosEmoji: { fontSize: 26 },
+amigosTitle: { color: "#111", fontSize: 14, fontWeight: "900" },
+amigosSub: { marginTop: 2, color: colors.textMuted, fontSize: 11.5, fontWeight: "700" },
+amigosChevron: { color: colors.textMuted, fontSize: 22, fontWeight: "900" },
 });
 
