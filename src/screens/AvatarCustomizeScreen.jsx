@@ -5,7 +5,7 @@ import { colors } from "../theme/colors";
 import Avatar3DViewer from "../components/Avatar3DViewer";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
-import { CHARACTER_OPTIONS, SKIN_TONE_OPTIONS } from "../assets/avatar3dParts";
+import { CHARACTER_OPTIONS, SKIN_TONE_OPTIONS, SKIN_TONE_SUPPORTED_CHARACTERS } from "../assets/avatar3dParts";
 
 const PET_SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -18,7 +18,23 @@ const PET_SPECIES = [
 // ropa/outfit. Antes esto cambiaba de personaje por completo (confundía
 // tono de piel con "otro personaje distinto" -- ej. elegir "Moreno" te
 // mandaba a un policía con gorra en vez de solo oscurecer la piel).
-function SkinToneRow({ value, onChange }) {
+//
+// Solo se muestra con los personajes A (Chico/Chica) -- ver
+// SKIN_TONE_SUPPORTED_CHARACTERS en avatar3dParts.js: en los demás
+// personajes el color de piel comparte franja de la paleta con su pelo/
+// ropa y el recoloreo se ve mal (confirmado en pruebas). Mejor ocultar el
+// picker en esos que dejarlo prometiendo algo que no hace bien.
+function SkinToneRow({ value, onChange, character }) {
+  if (!SKIN_TONE_SUPPORTED_CHARACTERS.has(character)) {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Tono de piel</Text>
+        <Text style={styles.skinUnsupportedHint}>
+          Por ahora disponible solo con Chico A / Chica A -- para los demás personajes llega pronto.
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Tono de piel</Text>
@@ -253,7 +269,7 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
 
       <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
-          <SkinToneRow value={parts.skinTone} onChange={(v) => setPart("skinTone", v)} />
+          <SkinToneRow value={parts.skinTone} onChange={(v) => setPart("skinTone", v)} character={parts.character} />
           <CharacterRow options={CHARACTER_OPTIONS} value={parts.character} onChange={(v) => setPart("character", v)} />
 
           {/* Mascota VIP -- especie/nombre; cuidarla vive en PetScreen.
@@ -399,6 +415,7 @@ const styles = StyleSheet.create({
   skinSwatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.12)" },
   skinLabel: { marginTop: 4, color: "#111", fontSize: 10.5, fontWeight: "900" },
   skinLabelActive: { color: "#fff" },
+  skinUnsupportedHint: { color: colors.textMuted, fontSize: 11.5, fontWeight: "700", lineHeight: 16 },
 
   charRow: { flexDirection: "row" },
   charBtn: {

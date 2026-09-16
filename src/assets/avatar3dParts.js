@@ -52,3 +52,16 @@ export const SKIN_TONE_OPTIONS = [
   { id: "e", label: "Moreno oscuro", color: "#6e3f1e" },
   { id: "f", label: "Tostado", color: "#dfab82" },
 ];
+
+// El recoloreo de piel (applySkinTint en Avatar3DViewer.jsx) detecta "qué
+// es piel" por color en colormap.png, la textura COMPARTIDA por los 12
+// personajes. Se verificó (script offline + prueba en vivo) que solo en
+// los personajes A (Chico/Chica) el color de piel cae en una franja
+// limpia y aislada del resto de la paleta -- en B..F esa misma franja se
+// cruza con el color de pelo/ropa de ESE personaje en particular (cada
+// uno usa la paleta compartida de forma distinta), así que tiñe de más
+// (pelo, y en algunos hasta la ropa). Mientras no se cure esa mezcla
+// personaje por personaje, el picker de tono de piel solo aplica (y solo
+// se muestra) en los personajes A -- para los demás, cambiar de tono no
+// hace nada en vez de dejar un resultado roto.
+export const SKIN_TONE_SUPPORTED_CHARACTERS = new Set(["kenney_male_a", "kenney_female_a"]);

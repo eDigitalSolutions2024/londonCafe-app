@@ -2,7 +2,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, use
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { WebView } from "react-native-webview";
 import { colors } from "../theme/colors";
-import { CHARACTER_OPTIONS, BRAND_LOGO_URL, SKIN_TONE_OPTIONS } from "../assets/avatar3dParts";
+import { CHARACTER_OPTIONS, BRAND_LOGO_URL, SKIN_TONE_OPTIONS, SKIN_TONE_SUPPORTED_CHARACTERS } from "../assets/avatar3dParts";
 
 /**
  * Visor del avatar 3D "de verdad": WebView + three.js (0.160.0, ES modules
@@ -60,7 +60,14 @@ const Avatar3DViewer = forwardRef(function Avatar3DViewer(
   useEffect(() => {
     if (!loaded) return;
     const character = CHARACTER_OPTIONS.find((c) => c.id === parts?.character);
-    const tone = SKIN_TONE_OPTIONS.find((t) => t.id === parts?.skinTone);
+    // Gate por personaje ANTES de mandar nada al WebView -- ver nota en
+    // SKIN_TONE_SUPPORTED_CHARACTERS (avatar3dParts.js): solo en A..
+    // (Chico/Chica) el recoloreo por color detecta la piel sin arrastrar
+    // pelo/ropa. Se aplica aquí (no solo ocultando el picker) para que
+    // nunca se mande un tinte roto aunque quedara un skinTone guardado de
+    // antes en una cuenta que luego cambió de personaje.
+    const toneSupported = SKIN_TONE_SUPPORTED_CHARACTERS.has(parts?.character);
+    const tone = toneSupported ? SKIN_TONE_OPTIONS.find((t) => t.id === parts?.skinTone) : null;
     const payload = JSON.stringify({
       characterUrl: character ? character.glb : null,
       accessory: parts?.accessory || null,
