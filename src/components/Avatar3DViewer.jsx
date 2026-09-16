@@ -293,22 +293,43 @@ function applySkinTint(root, hex) {
   });
   materials.forEach(function (mat) {
     if (!mat.map || !mat.map.image) return;
-    // La imagen ORIGINAL (de fábrica) se guarda una sola vez por material
-    // -- así, elegir otro tono (o quitarlo) siempre parte del píxel
-    // original en vez de ir combinando tintes sobre un tinte anterior.
-    if (!mat.userData.__skinBaseCanvas) {
+    // La imagen ORIGINAL (de fábrica) y su ImageData se guardan UNA sola
+    // vez por material -- así, elegir otro tono (o quitarlo) siempre parte
+    // del píxel original en vez de ir combinando tintes sobre un tinte
+    // anterior, y no hay que volver a leer/decodificar la imagen cada vez.
+    if (!mat.userData.__skinBaseData) {
       var img = mat.map.image;
       var base = document.createElement("canvas");
       base.width = img.width; base.height = img.height;
-      base.getContext("2d").drawImage(img, 0, 0);
-      mat.userData.__skinBaseCanvas = base;
+      var baseCtx = base.getContext("2d");
+      baseCtx.drawImage(img, 0, 0);
+      var baseData = baseCtx.getImageData(0, 0, base.width, base.height);
+      mat.userData.__skinBaseData = baseData;
+      mat.userData.__origColorSpace = mat.map.colorSpace;
+      mat.userData.__origFlipY = mat.map.flipY;
+      // Luminosidad PROMEDIO de los píxeles de piel del personaje de
+      // fábrica -- se usa como referencia para anclar el tono elegido a
+      // SU luminosidad real (ver más abajo), conservando el degradado/
+      // sombreado relativo de cada píxel en vez de aplanarlo todo.
+      var bd = baseData.data;
+      var sum = 0, n = 0;
+      for (var bi = 0; bi < bd.length; bi += 4) {
+        if (isSkinLikeColor(bd[bi], bd[bi + 1], bd[bi + 2])) {
+          sum += rgbToHsl(bd[bi], bd[bi + 1], bd[bi + 2])[2];
+          n++;
+        }
+      }
+      mat.userData.__skinAvgL = n ? sum / n : 0.5;
     }
-    var baseCanvas = mat.userData.__skinBaseCanvas;
+    var baseData = mat.userData.__skinBaseData;
     if (!hex) {
       // Sin tono elegido: restaura el original tal cual (por si venía de
       // un tinte previo en esta misma sesión).
       if (mat.userData.__skinTinted) {
-        var origTex = new THREE.CanvasTexture(baseCanvas);
+        var restoreCanvas = document.createElement("canvas");
+        restoreCanvas.width = baseData.width; restoreCanvas.height = baseData.height;
+        restoreCanvas.getContext("2d").putImageData(baseData, 0, 0);
+        var origTex = new THREE.CanvasTexture(restoreCanvas);
         origTex.colorSpace = mat.userData.__origColorSpace;
         origTex.flipY = mat.userData.__origFlipY;
         mat.map = origTex;
@@ -317,26 +338,46 @@ function applySkinTint(root, hex) {
       }
       return;
     }
-    if (mat.userData.__origColorSpace === undefined) {
-      mat.userData.__origColorSpace = mat.map.colorSpace;
-      mat.userData.__origFlipY = mat.map.flipY;
-    }
-    var w = baseCanvas.width, h = baseCanvas.height;
+
+    var w = baseData.width, h = baseData.height;
     var out = document.createElement("canvas");
     out.width = w; out.height = h;
     var ctx = out.getContext("2d");
-    ctx.drawImage(baseCanvas, 0, 0);
-    var imgData = ctx.getImageData(0, 0, w, h);
-    var data = imgData.data;
+    var imgData = ctx.createImageData(w, h);
+    var src = baseData.data;
+    var dst = imgData.data;
+    dst.set(src); // copia rápida de todo -- solo se pisan los píxeles de piel abajo
+
     var target = hexToRgb(hex);
     var thsl = rgbToHsl(target.r, target.g, target.b);
-    for (var i = 0; i < data.length; i += 4) {
-      var r = data[i], g = data[i + 1], b = data[i + 2];
-      if (isSkinLikeColor(r, g, b)) {
+    var avgL = mat.userData.__skinAvgL;
+    // Memo por color ÚNICO -- colormap.png es una paleta de franjas planas
+    // (pocas decenas de colores distintos en total, ver nota arriba de
+    // isSkinLikeColor), así que el cálculo de HSL caro se hace como mucho
+    // unas cuantas veces en vez de una por cada uno de los 262,144 píxeles
+    // -- esto era el cuello de botella real que volvió a hacer lento el
+    // guardado (el WebView de Android corre JS bastante más lento que un
+    // V8 de escritorio para un loop así de grande).
+    var cache = {};
+    for (var i = 0; i < src.length; i += 4) {
+      var r = src[i], g = src[i + 1], b = src[i + 2];
+      if (!isSkinLikeColor(r, g, b)) continue;
+      var key = (r << 16) | (g << 8) | b;
+      var rgb = cache[key];
+      if (!rgb) {
         var hsl = rgbToHsl(r, g, b);
-        var rgb = hslToRgb(thsl[0], thsl[1], hsl[2]);
-        data[i] = rgb[0]; data[i + 1] = rgb[1]; data[i + 2] = rgb[2];
+        // Ancla la luminosidad al tono ELEGIDO (no al original) --
+        // conservando cuánto se aparta este píxel del promedio de fábrica,
+        // para no perder el sombreado/degradado del modelo. Antes se
+        // conservaba la luminosidad original completa y solo se cambiaba
+        // tono/saturación, lo que dejaba "Claro" y "Moreno oscuro" casi
+        // igual de claros/oscuros que el personaje de fábrica -- apenas
+        // notorio.
+        var newL = Math.max(0, Math.min(1, thsl[2] + (hsl[2] - avgL)));
+        rgb = hslToRgb(thsl[0], thsl[1], newL);
+        cache[key] = rgb;
       }
+      dst[i] = rgb[0]; dst[i + 1] = rgb[1]; dst[i + 2] = rgb[2];
     }
     ctx.putImageData(imgData, 0, 0);
     var tex = new THREE.CanvasTexture(out);
