@@ -5,13 +5,50 @@ import { colors } from "../theme/colors";
 import Avatar3DViewer from "../components/Avatar3DViewer";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
-import { CHARACTER_OPTIONS } from "../assets/avatar3dParts";
+import { CHARACTER_OPTIONS, SKIN_TONE_OPTIONS } from "../assets/avatar3dParts";
 
 const PET_SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
   { id: "dog", emoji: "🐶", label: "Perro" },
   { id: "hamster", emoji: "🐹", label: "Hámster" },
 ];
+
+// Selector de tono de piel basado en los 6 tonos reales de los modelos Kenney (A..F).
+// Al tocar un tono, actualiza automáticamente el personaje al modelo correspondiente
+// para el género actualmente seleccionado (Chico / Chica).
+function SkinToneRow({ currentCharacter, onChangeCharacter }) {
+  const isFemale = (currentCharacter || "").includes("female");
+  const genderPrefix = isFemale ? "kenney_female_" : "kenney_male_";
+  const currentVariant = (currentCharacter || "").split("_").pop() || "a";
+
+  const handleSelectSkin = (variantId) => {
+    const nextCharId = `${genderPrefix}${variantId}`;
+    onChangeCharacter(nextCharId);
+  };
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Tono de piel</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
+        <View style={styles.skinRow}>
+          {SKIN_TONE_OPTIONS.map((tone) => {
+            const active = currentVariant === tone.id;
+            return (
+              <Pressable
+                key={tone.id}
+                onPress={() => handleSelectSkin(tone.id)}
+                style={[styles.skinBtn, active && styles.skinBtnActive]}
+              >
+                <View style={[styles.skinSwatch, { backgroundColor: tone.color }]} />
+                <Text style={[styles.skinLabel, active && styles.skinLabelActive]}>{tone.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
 
 // Elige el personaje base (modelo .glb completo, ver avatar3dParts.js) --
 // reemplaza al viejo picker de 9 partes sueltas (pelo/cejas/nariz/etc)
@@ -222,6 +259,7 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
 
       <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
+          <SkinToneRow currentCharacter={parts.character} onChangeCharacter={(v) => setPart("character", v)} />
           <CharacterRow options={CHARACTER_OPTIONS} value={parts.character} onChange={(v) => setPart("character", v)} />
 
           {/* Mascota VIP -- especie/nombre; cuidarla vive en PetScreen.
@@ -351,6 +389,22 @@ const styles = StyleSheet.create({
   partEmoji: { fontSize: 22 },
   partLabel: { marginTop: 4, color: "#111", fontSize: 11, fontWeight: "900" },
   partLabelActive: { color: "#fff" },
+
+  skinRow: { flexDirection: "row", alignItems: "center" },
+  skinBtn: {
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.primarySoft,
+    backgroundColor: "#fff",
+    marginRight: 8,
+  },
+  skinBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  skinSwatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: "rgba(0,0,0,0.12)" },
+  skinLabel: { marginTop: 4, color: "#111", fontSize: 10.5, fontWeight: "900" },
+  skinLabelActive: { color: "#fff" },
 
   charRow: { flexDirection: "row" },
   charBtn: {

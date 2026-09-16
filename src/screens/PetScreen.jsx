@@ -11,10 +11,13 @@ import PetActor from "../components/PetActor";
 import PetMiniGame from "../components/PetMiniGame";
 import PetMatch3 from "../components/PetMatch3";
 import PetDoodleJump from "../components/PetDoodleJump";
+import PetBaristaNinja from "../components/PetBaristaNinja";
 import LevelMap from "../components/LevelMap";
 import { MATCH3_LEVELS } from "../assets/matchLevels";
 import { DOODLE_LEVELS } from "../assets/doodleLevels";
+import { NINJA_LEVELS } from "../assets/ninjaLevels";
 import PetLeaderboard from "../components/PetLeaderboard";
+import { savePetCache, loadPetCache, isNetworkFailure, queuePlay, flushQueuedPlays, getQueuedPlaysCount } from "../utils/offlineCache";
 
 const SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -80,12 +83,14 @@ export default function PetScreen({ navigation }) {
   // Mismo patrón exacto para "Salto Café" (Doodle Jump).
   const [doodleOpen, setDoodleOpen] = useState(false);
   const [doodleLevel, setDoodleLevel] = useState(null);
+  // Mismo patrón para "Barista Ninja" (Fruit Ninja).
+  const [ninjaOpen, setNinjaOpen] = useState(false);
+  const [ninjaLevel, setNinjaLevel] = useState(null);
   // null = cerrado, "tetris"/"doodle" = qué tabla mostrar (ver PetLeaderboard).
   const [leaderboardGame, setLeaderboardGame] = useState(null);
   // El #1 de cada juego (para que la tarjeta del minijuego presuma "a quién
-  // hay que superar" sin tener que abrir la tabla completa) -- solo
-  // Café Crush y Salto Café tienen tabla (Atrapa no guarda mejor puntaje).
-  const [top1, setTop1] = useState({ tetris: null, doodle: null });
+  // hay que superar" sin tener que abrir la tabla completa).
+  const [top1, setTop1] = useState({ tetris: null, doodle: null, ninja: null });
   // ✅ El sueño ya no es una animación cosmética de 2.6s -- el backend
   // devuelve `sleepSecondsLeft` (tiempo real restante del freeze, ver
   // pet.controller.js) y aquí solo lo hacemos "tickear" cada segundo en
@@ -94,13 +99,22 @@ export default function PetScreen({ navigation }) {
   const [reaction, setReaction] = useState({ type: null, id: 0 });
   const sleeping = sleepLeft > 0;
 
+  // ✅ Offline: si /pet no responde por falta de red (avión, túnel, etc.),
+  // se cae al último estado guardado localmente en vez de dejar la
+  // pantalla sin datos -- así los minijuegos se siguen pudiendo abrir y
+  // jugar. `offline` solo prende con una falla de RED real (sin `.status`
+  // en el error, ver isNetworkFailure), no con cualquier error del server.
+  const [offline, setOffline] = useState(false);
+  const [pendingPlays, setPendingPlays] = useState(0);
+
   const load = useCallback(async () => {
     try {
-      const [petRes, walletRes, tetrisTop, doodleTop] = await Promise.all([
+      const [petRes, walletRes, tetrisTop, doodleTop, ninjaTop] = await Promise.all([
         apiFetch("/pet"),
         apiFetch("/points/wallet").catch(() => null),
         apiFetch("/pet/leaderboard?game=tetris").catch(() => null),
         apiFetch("/pet/leaderboard?game=doodle").catch(() => null),
+        apiFetch("/pet/leaderboard?game=ninja").catch(() => null),
       ]);
       setState(petRes || null);
       setSleepLeft(Math.max(0, Number(petRes?.sleepSecondsLeft) || 0));
@@ -108,11 +122,33 @@ export default function PetScreen({ navigation }) {
       setTop1({
         tetris: tetrisTop?.top?.[0] || null,
         doodle: doodleTop?.top?.[0] || null,
+        ninja: ninjaTop?.top?.[0] || null,
       });
+      setOffline(false);
+      savePetCache(petRes);
+      // Ya hay conexión de nuevo -- manda las jugadas que se quedaron
+      // pendientes de cuando no había señal, y refresca una vez más para
+      // reflejar el resultado real (energía/xp ya aplicados en el server).
+      const hadQueued = (await getQueuedPlaysCount()) > 0;
+      if (hadQueued) {
+        await flushQueuedPlays();
+        setPendingPlays(await getQueuedPlaysCount());
+        if ((await getQueuedPlaysCount()) === 0) {
+          apiFetch("/pet").then((r) => r && setState(r)).catch(() => {});
+        }
+      }
     } catch (e) {
       console.log("❌ load pet:", e?.data || e?.message);
+      if (isNetworkFailure(e)) {
+        const cached = await loadPetCache();
+        if (cached) {
+          setState(cached);
+          setOffline(true);
+        }
+      }
     } finally {
       setLoading(false);
+      setPendingPlays(await getQueuedPlaysCount());
     }
   }, []);
 
@@ -154,6 +190,20 @@ export default function PetScreen({ navigation }) {
       applyResult(r);
       return r;
     } catch (e) {
+      // ✅ Offline durante un minijuego (/pet/play): en vez del alert de
+      // error de siempre, se encola la jugada para mandarla sola cuando
+      // vuelva la señal (ver load()) y se aplica un ajuste optimista de
+      // energía local -- así la partida no se "pierde" ni bloquea seguir
+      // jugando solo por no tener internet en ese momento.
+      if (path === "/pet/play" && isNetworkFailure(e)) {
+        queuePlay(body).then(() => getQueuedPlaysCount().then(setPendingPlays));
+        setState((s) => {
+          if (!s?.pet) return s;
+          return { ...s, pet: { ...s.pet, energy: Math.max(0, Number(s.pet.energy || 0) - 15) } };
+        });
+        return null;
+      }
+
       const err = e?.data?.error || e?.message;
       if (err === "PET_SLEEPING") {
         // El server dice que sigue dormida (pudo pasar si el conteo local
@@ -208,6 +258,11 @@ export default function PetScreen({ navigation }) {
   const onDoodleFinish = async (score, height, level, won) => {
     setDoodleLevel(null); // vuelve al mapa de niveles (doodleOpen sigue true)
     await call("/pet/play", { score, height, game: "doodle", level, won }, "play");
+  };
+
+  const onNinjaFinish = async (score, sliced, level, won) => {
+    setNinjaLevel(null); // vuelve al mapa de niveles (ninjaOpen sigue true)
+    await call("/pet/play", { score, sliced, game: "ninja", level, won }, "play");
   };
 
   const pet = state?.pet;
@@ -326,6 +381,19 @@ export default function PetScreen({ navigation }) {
     <View style={styles.gamesCard}>
       <Text style={styles.gamesTitle}>🎮 Minijuegos</Text>
       <Text style={styles.gamesSub}>Toca un juego · toca el top para ver la tabla completa</Text>
+      {offline ? (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerText}>
+            ✈️ Sin conexión -- puedes seguir jugando, tus puntajes se guardan y se suben solos al volver la señal.
+          </Text>
+        </View>
+      ) : pendingPlays > 0 ? (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerText}>
+            🔄 Sincronizando {pendingPlays} {pendingPlays === 1 ? "partida" : "partidas"}...
+          </Text>
+        </View>
+      ) : null}
       <MiniGameCard
         emoji="🍰"
         title="Café Crush"
@@ -345,6 +413,16 @@ export default function PetScreen({ navigation }) {
         top={top1.doodle ? `${top1.doodle.isMe ? "Tú vas 1° 👑" : `${top1.doodle.petName}: altura ${top1.doodle.best} 🦘`}` : null}
         onPress={() => setDoodleOpen(true)}
         onPressTop={() => setLeaderboardGame("doodle")}
+      />
+      <MiniGameCard
+        emoji="🥷"
+        title="Barista Ninja"
+        tint="#D90429"
+        blocked={!canPlay || !!busy || sleeping}
+        myBest={pet?.ninjaBest ? `${pet.ninjaBest} cortes` : null}
+        top={top1.ninja ? `${top1.ninja.isMe ? "Tú vas 1° 👑" : `${top1.ninja.petName}: ${top1.ninja.best} 🥷`}` : null}
+        onPress={() => setNinjaOpen(true)}
+        onPressTop={() => setLeaderboardGame("ninja")}
       />
       <MiniGameCard
         emoji="🎮"
@@ -486,6 +564,23 @@ export default function PetScreen({ navigation }) {
         petName={pet?.name || "tu mascota"}
         onClose={() => setDoodleLevel(null)}
         onFinish={onDoodleFinish}
+      />
+      <LevelMap
+        title="Barista Ninja 🥷"
+        visible={ninjaOpen && ninjaLevel == null}
+        levels={NINJA_LEVELS}
+        unlockedLevel={Number(pet?.ninjaLevel) || 1}
+        badge={(l) => `${l.targetSlices} ⚔️`}
+        onSelect={(lvl) => setNinjaLevel(lvl)}
+        onClose={() => setNinjaOpen(false)}
+      />
+      <PetBaristaNinja
+        visible={ninjaOpen && ninjaLevel != null}
+        level={ninjaLevel || 1}
+        species={pet?.species}
+        petName={pet?.name || "tu mascota"}
+        onClose={() => setNinjaLevel(null)}
+        onFinish={onNinjaFinish}
       />
       <PetLeaderboard
         visible={!!leaderboardGame}
@@ -662,6 +757,13 @@ const styles = StyleSheet.create({
   },
   gamesTitle: { color: "#fff", fontSize: 17, fontWeight: "900" },
   gamesSub: { marginTop: 2, marginBottom: 12, color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: "700" },
+  offlineBanner: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+  },
+  offlineBannerText: { color: "#fff", fontSize: 11.5, fontWeight: "700", textAlign: "center", lineHeight: 16 },
   gameCard: {
     flexDirection: "row",
     alignItems: "center",

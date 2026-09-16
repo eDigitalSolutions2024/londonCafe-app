@@ -149,7 +149,7 @@ export default function AmigosScreen({ navigation }) {
                 <Text style={styles.sectionLabel}>Solicitudes</Text>
                 {incoming.map((f) => (
                   <View key={f.friendshipId} style={styles.requestRow}>
-                    <Text style={styles.friendName} numberOfLines={1}>{f.name}</Text>
+                    <Text style={styles.requestName} numberOfLines={1}>{f.name}</Text>
                     <View style={{ flexDirection: "row", gap: 8 }}>
                       <Pressable
                         onPress={() => respond(f.friendshipId, "accept")}
@@ -197,7 +197,7 @@ export default function AmigosScreen({ navigation }) {
                 <Text style={styles.sectionLabel}>Solicitudes enviadas</Text>
                 {outgoing.map((f) => (
                   <View key={f.friendshipId} style={styles.requestRow}>
-                    <Text style={styles.friendName} numberOfLines={1}>{f.name}</Text>
+                    <Text style={styles.requestName} numberOfLines={1}>{f.name}</Text>
                     <Text style={styles.resultTag}>Esperando</Text>
                   </View>
                 ))}
@@ -264,11 +264,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 14,
     padding: 12,
     marginBottom: 8,
   },
+  // Texto claro para usar SOBRE el fondo oscuro de requestRow -- friendName
+  // es texto oscuro pensado para las tarjetas blancas (friendCard), se veía
+  // invisible (oscuro sobre oscuro) reusado aquí.
+  requestName: { flex: 1, color: "#fff", fontWeight: "900", fontSize: 14 },
   acceptBtn: { backgroundColor: colors.primary, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
   acceptBtnText: { color: "#fff", fontWeight: "900", fontSize: 11.5 },
   declineBtn: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.08)" },

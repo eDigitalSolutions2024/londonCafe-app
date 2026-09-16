@@ -12,6 +12,7 @@ const MEDAL = { 1: "🥇", 2: "🥈", 3: "🥉" };
 const GAME_META = {
   tetris: { title: "🏆 Top Café Crush", sub: "Las mascotas que más fichas juntaron en una sola partida", unit: "🍰", noun: "fichas" },
   doodle: { title: "🏆 Top Salto Café", sub: "Las mascotas que llegaron más alto en Salto Café", unit: "🦘", noun: "de altura" },
+  ninja: { title: "🏆 Top Barista Ninja", sub: "Las mascotas que más productos rebanaron en Barista Ninja", unit: "🥷", noun: "cortes" },
 };
 
 /**

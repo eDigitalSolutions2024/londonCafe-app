@@ -396,6 +396,26 @@ async function playPet(req, res) {
       }
     }
 
+    // "Barista Ninja" (Fruit Ninja) manda `sliced` (ingredientes rebanados) y
+    // `game:"ninja"` con sus campos ninjaBest y ninjaLevel.
+    let ninjaRecord = false;
+    let ninjaLevelUp = false;
+    if (req.body?.game === "ninja") {
+      const sliced = Math.max(0, Math.floor(Number(req.body?.sliced) || 0));
+      if (sliced > Number(user.pet.ninjaBest ?? 0)) {
+        user.pet.ninjaBest = sliced;
+        ninjaRecord = true;
+      }
+
+      const won = req.body?.won === true;
+      const level = Math.floor(Number(req.body?.level));
+      const current = Number(user.pet.ninjaLevel) || 1;
+      if (won && Number.isFinite(level) && level === current && current < 10) {
+        user.pet.ninjaLevel = current + 1;
+        ninjaLevelUp = true;
+      }
+    }
+
     const p = user.pet;
     const happyGain = Math.round(12 + score * 20); // 12..32
     const xpGain = Math.round(8 + score * 14); // 8..22
@@ -408,7 +428,7 @@ async function playPet(req, res) {
     user.markModified("pet");
     await user.save();
 
-    return res.json(petView(user, { action: "play", happyGain, xpGain, tetrisRecord, levelUp, doodleRecord, doodleLevelUp }));
+    return res.json(petView(user, { action: "play", happyGain, xpGain, tetrisRecord, levelUp, doodleRecord, doodleLevelUp, ninjaRecord, ninjaLevelUp }));
   } catch (err) {
     console.error("playPet ERROR:", err);
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
@@ -500,6 +520,7 @@ const LEADERBOARD_LIMIT = 10; // top 10 por lo pronto
 const LEADERBOARD_FIELDS = {
   tetris: "tetrisBest",
   doodle: "doodleBest",
+  ninja: "ninjaBest",
 };
 
 // GET /pet/leaderboard?game=tetris|doodle -- top mascotas por mejor

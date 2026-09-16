@@ -37,3 +37,12 @@ export const ACCESSORY_OPTIONS = [
   { id: "acc3d_01", label: "Lentes", emoji: "👓" },
   { id: "acc3d_02", label: "Gorra", emoji: "🧢" },
 ];
+
+export const SKIN_TONE_OPTIONS = [
+  { id: "a", label: "Claro", color: "#f5d7b5", variant: "A" },
+  { id: "b", label: "Medio claro", color: "#e8be91", variant: "B" },
+  { id: "c", label: "Apiñonado", color: "#d29b67", variant: "C" },
+  { id: "d", label: "Moreno", color: "#a5683b", variant: "D" },
+  { id: "e", label: "Moreno oscuro", color: "#6e3f1e", variant: "E" },
+  { id: "f", label: "Tostado", color: "#dfab82", variant: "F" },
+];
