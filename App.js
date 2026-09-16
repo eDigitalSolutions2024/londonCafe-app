@@ -19,6 +19,7 @@ import CartScreen from "./src/screens/CartScreen";
 import { CartProvider } from "./src/context/CartContext.js";
 import ScanScreen from "./src/screens/ScanScreen";
 import GiftsScreen from "./src/screens/GiftsScreen";
+import StoreScreen from "./src/screens/StoreScreen";
 
 // Pantallas internas del tab Inicio
 import AvatarCustomizeScreen from "./src/screens/AvatarCustomizeScreen";
@@ -114,6 +115,7 @@ function MainTabs() {
           let iconName = "home";
           if (route.name === "Ordena") iconName = "cart";
           if (route.name === "Escanear") iconName = "scan";
+          if (route.name === "Tienda") iconName = "storefront";
           if (route.name === "Regalos") iconName = "gift";
           if (route.name === "Ubicación") iconName = "location";
 
@@ -146,6 +148,7 @@ function MainTabs() {
       />
       <Tab.Screen name="Ordena" component={OrderStackNav} />
       <Tab.Screen name="Escanear" component={ScanScreen} />
+      <Tab.Screen name="Tienda" component={StoreScreen} />
       <Tab.Screen name="Regalos" component={GiftsScreen} />
       <Tab.Screen name="Ubicación" component={LocationScreen} />
     </Tab.Navigator>

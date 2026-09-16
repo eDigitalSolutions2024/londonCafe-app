@@ -242,6 +242,18 @@ const userSchema = new mongoose.Schema(
     // la próxima vez que abra la app (gate en el cliente vía getMe/login).
     avatar3d: { type: avatar3dSchema, default: () => ({}) },
 
+    // ✅ Pase VIP comprado en la Tienda -- vía Stripe, ver
+    // payments.controller.js (createVipPassSheet) y
+    // me.controller.js (confirmVipPass). isUserVIP() en me.controller.js
+    // revisa esto ADEMÁS del saldo real del POS y del mes gratis de cuenta
+    // nueva -- cualquiera de los tres da acceso VIP.
+    vipPass: {
+      active: { type: Boolean, default: false },
+      purchasedAt: { type: Date, default: null },
+      expiresAt: { type: Date, default: null },
+      lastPaymentIntentId: { type: String, default: null },
+    },
+
     // ✅ Puntos
     points: { type: Number, default: 0 }, // disponibles para canje
     lifetimePoints: { type: Number, default: 0 }, // acumulados históricos

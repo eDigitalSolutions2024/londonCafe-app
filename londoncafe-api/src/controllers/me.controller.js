@@ -405,17 +405,21 @@ const VIP_THRESHOLD = 200;
 const VIP_TRIAL_DAYS = 30;
 
 async function isUserVIP(uid) {
-  // ✅ Primer mes gratis: toda cuenta nueva es VIP automático durante sus
-  // primeros 30 días (createdAt viene de los timestamps de Mongoose en
-  // User.js) -- así prueban las funciones completas sin tener que juntar
-  // 200 Buddy Coins primero. Pasado el mes, cae al chequeo normal de abajo
-  // (saldo real vía POS) -- si no llegó a los 200, se le regresa a normal.
+  // ✅ Dos formas de ser VIP sin depender del saldo del POS:
+  // 1) Primer mes gratis de toda cuenta nueva (createdAt de los timestamps
+  //    de Mongoose) -- prueban todo sin juntar 200 Buddy Coins primero.
+  // 2) Pase VIP comprado en la Tienda (vipPass.active + no vencido, ver
+  //    confirmVipPass abajo).
+  // Si ninguna aplica, cae al chequeo normal de saldo real vía POS.
   try {
-    const user = await User.findById(uid).select("createdAt").lean();
+    const user = await User.findById(uid).select("createdAt vipPass").lean();
     const ageMs = user?.createdAt ? Date.now() - new Date(user.createdAt).getTime() : Infinity;
     if (ageMs < VIP_TRIAL_DAYS * 24 * 60 * 60 * 1000) return true;
+    if (user?.vipPass?.active && user.vipPass.expiresAt && new Date(user.vipPass.expiresAt) > new Date()) {
+      return true;
+    }
   } catch (err) {
-    console.log("isUserVIP trial check error:", err?.message);
+    console.log("isUserVIP trial/pass check error:", err?.message);
   }
 
   // Un solo blip de red al POS dejaba fuera a un VIP real (falla cerrado).

@@ -5,6 +5,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 const AppMenuItem = require("../models/AppMenuItem");
+const User = require("../models/User");
 
 /**
  * ✅ Recibe [{ _id, qty }]
@@ -149,6 +150,126 @@ exports.createPaymentSheet = async (req, res) => {
   } catch (e) {
     console.log("❌ createPaymentSheet:", e?.message || e);
     return res.status(500).json({ ok: false, error: "PAYMENT_INTENT_FAILED" });
+  }
+};
+
+// ✅ Tienda -- Pase VIP. $49 normal, $19 como promo de lanzamiento durante
+// el 2do mes de la cuenta (el 1er mes ya es VIP gratis solo, ver
+// isUserVIP en me.controller.js -- no tendría sentido cobrarles ahí).
+const VIP_PASS_PRICE_NORMAL_CENTS = 4900;
+const VIP_PASS_PRICE_LAUNCH_CENTS = 1900;
+const VIP_PASS_DURATION_DAYS = 30;
+
+function vipPassPriceForUser(createdAt) {
+  const ageDays = createdAt ? (Date.now() - new Date(createdAt).getTime()) / (24 * 60 * 60 * 1000) : Infinity;
+  const isSecondMonth = ageDays >= 30 && ageDays < 60;
+  return isSecondMonth ? VIP_PASS_PRICE_LAUNCH_CENTS : VIP_PASS_PRICE_NORMAL_CENTS;
+}
+
+// ✅ GET -- para que la pantalla de Tienda muestre el precio correcto
+// (normal vs promo del 2do mes) y si ya tiene un pase activo ANTES de
+// arrancar el flujo de pago.
+exports.getVipPassStatus = async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const user = await User.findById(uid).select("createdAt vipPass");
+    if (!user) return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
+
+    const active = !!(user.vipPass?.active && user.vipPass.expiresAt && new Date(user.vipPass.expiresAt) > new Date());
+    const priceCents = vipPassPriceForUser(user.createdAt);
+    const isLaunchPromo = priceCents === VIP_PASS_PRICE_LAUNCH_CENTS;
+
+    return res.json({
+      ok: true,
+      active,
+      expiresAt: user.vipPass?.expiresAt || null,
+      priceCents,
+      normalPriceCents: VIP_PASS_PRICE_NORMAL_CENTS,
+      isLaunchPromo,
+    });
+  } catch (e) {
+    console.log("❌ getVipPassStatus:", e?.message || e);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+};
+
+exports.createVipPassSheet = async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const user = await User.findById(uid).select("createdAt email vipPass");
+    if (!user) return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
+
+    if (user.vipPass?.active && user.vipPass.expiresAt && new Date(user.vipPass.expiresAt) > new Date()) {
+      return res.status(400).json({ ok: false, error: "ALREADY_ACTIVE" });
+    }
+
+    const amount = vipPassPriceForUser(user.createdAt);
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount,
+      currency: "mxn",
+      automatic_payment_methods: { enabled: true },
+      receipt_email: user.email || undefined,
+      metadata: { source: "vip-pass", userId: String(uid) },
+    });
+
+    return res.json({
+      ok: true,
+      paymentIntentClientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      amount,
+    });
+  } catch (e) {
+    console.log("❌ createVipPassSheet:", e?.message || e);
+    return res.status(500).json({ ok: false, error: "PAYMENT_INTENT_FAILED" });
+  }
+};
+
+// ✅ El cliente llama esto DESPUÉS de que presentPaymentSheet() confirma
+// éxito (mismo patrón que el checkout del carrito en CartScreen.jsx) --
+// pero acá SÍ se re-verifica con Stripe antes de activar nada (no basta
+// con que el cliente diga "ya pagué"): se recupera el PaymentIntent real,
+// se checa que su status sea "succeeded" y que el metadata (source +
+// userId) coincida con quien está pidiendo el pase, así nadie activa VIP
+// con el paymentIntentId de otra persona.
+exports.confirmVipPass = async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const { paymentIntentId } = req.body || {};
+    if (!paymentIntentId) return res.status(400).json({ ok: false, error: "MISSING_PAYMENT_INTENT" });
+
+    const user = await User.findById(uid);
+    if (!user) return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
+
+    // Reintento del mismo pago (ej. la app se cerró justo después de
+    // presentPaymentSheet) -- ya se procesó, responde ok sin duplicar.
+    if (user.vipPass?.lastPaymentIntentId === paymentIntentId && user.vipPass?.active) {
+      return res.json({ ok: true, vipPass: user.vipPass });
+    }
+
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (pi.status !== "succeeded") {
+      return res.status(400).json({ ok: false, error: "PAYMENT_NOT_COMPLETED" });
+    }
+    if (pi.metadata?.source !== "vip-pass" || pi.metadata?.userId !== String(uid)) {
+      return res.status(403).json({ ok: false, error: "PAYMENT_MISMATCH" });
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + VIP_PASS_DURATION_DAYS * 24 * 60 * 60 * 1000);
+    user.vipPass = { active: true, purchasedAt: now, expiresAt, lastPaymentIntentId: paymentIntentId };
+    await user.save();
+
+    return res.json({ ok: true, vipPass: user.vipPass });
+  } catch (e) {
+    console.log("❌ confirmVipPass:", e?.message || e);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
   }
 };
 
