@@ -37,6 +37,12 @@ const FREE_HAIR_OPTIONS = [
   { id: "hair_f_04", label: "Avatar 10" },
 ];
 
+const PET_SPECIES = [
+  { id: "cat", emoji: "🐱", label: "Gato" },
+  { id: "dog", emoji: "🐶", label: "Perro" },
+  { id: "hamster", emoji: "🐹", label: "Hámster" },
+];
+
 function isFemaleId(id) {
   return String(id || "").includes("_f_");
 }
@@ -132,6 +138,10 @@ export default function RegisterScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
   const [avatarHair, setAvatarHair] = useState("hair_01");
+  // ✅ Mascota VIP opcional -- válido de una vez porque toda cuenta nueva
+  // es VIP automática su primer mes (ver isUserVIP en me.controller.js).
+  const [petSpecies, setPetSpecies] = useState(null);
+  const [petName, setPetName] = useState("");
 
   const { token } = useContext(AuthContext) || {};
 
@@ -225,6 +235,17 @@ export default function RegisterScreen({ navigation }) {
 
       if (birthDate.trim() && isValidBirthDate(birthDate)) {
         payload.birthDate = birthDateToISO(birthDate);
+      }
+
+      // Mascota VIP: opcional -- si eligió especie, el nombre es
+      // obligatorio (mismo requisito que adoptPet en el backend).
+      if (petSpecies) {
+        if (!petName.trim()) {
+          setLoading(false);
+          return Alert.alert("Falta el nombre", "Ponle un nombre a tu mascota o quita la selección.");
+        }
+        payload.petSpecies = petSpecies;
+        payload.petName = petName.trim();
       }
 
       const res = await register(payload);
@@ -354,6 +375,55 @@ export default function RegisterScreen({ navigation }) {
               <Text style={styles.helper}>
                 ★ Hay estilos VIP exclusivos que se desbloquean con Buddy Coins -- puedes cambiar tu personaje cuando quieras tocando tu avatar.
               </Text>
+            </View>
+
+            {/* ✅ Mascota VIP -- opcional, se puede adoptar de una vez porque
+                toda cuenta nueva es VIP automática su primer mes (ver
+                isUserVIP en me.controller.js). Si no eligen nada acá, pueden
+                adoptar después desde Personalizar avatar mientras dure el
+                mes gratis, o cuando junten 200 Buddy Coins. */}
+            <View style={styles.field}>
+              <View style={styles.vipHeaderRow}>
+                <Text style={styles.label}>Mascota VIP (opcional)</Text>
+                <Text style={styles.vipBadge}>Exclusivo VIP</Text>
+              </View>
+              <Text style={styles.helper}>
+                🎁 Tu primer mes es VIP gratis -- puedes adoptar tu mascota desde ahora.
+              </Text>
+
+              <View style={[styles.avatarPickPillsWrap, { marginTop: 10 }]}>
+                {PET_SPECIES.map((s) => {
+                  const active = petSpecies === s.id;
+                  return (
+                    <TouchableOpacity
+                      key={s.id}
+                      onPress={() => setPetSpecies(active ? null : s.id)}
+                      activeOpacity={0.9}
+                      style={[styles.petPill, active && styles.avatarPillActive]}
+                    >
+                      <Text style={{ fontSize: 20 }}>{s.emoji}</Text>
+                      <Text style={[styles.avatarPillText, active && styles.avatarPillTextActive]}>
+                        {s.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {petSpecies ? (
+                <View style={{ marginTop: 10 }}>
+                  <GlassInput
+                    label="Nombre de tu mascota"
+                    value={petName}
+                    onChangeText={setPetName}
+                    placeholder="Ej. Latte"
+                    maxLength={20}
+                    focused={focusedField === "petName"}
+                    onFocus={() => setFocusedField("petName")}
+                    onBlur={() => setFocusedField(null)}
+                  />
+                </View>
+              ) : null}
             </View>
 
             <GlassInput
@@ -576,6 +646,27 @@ const styles = StyleSheet.create({
   },
   pillTextActive: {
     color: "#2A0E18",
+  },
+
+  // ✅ Mascota VIP
+  vipHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  vipBadge: {
+    color: colors.accent,
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  petPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   helper: {
     marginTop: 6,
