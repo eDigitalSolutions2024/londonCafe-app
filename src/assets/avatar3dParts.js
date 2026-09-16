@@ -38,11 +38,17 @@ export const ACCESSORY_OPTIONS = [
   { id: "acc3d_02", label: "Gorra", emoji: "🧢" },
 ];
 
+// Tono de piel REAL, independiente del personaje/outfit elegido en
+// "Personaje" -- ver applySkinTint() en Avatar3DViewer.jsx. `color` es el
+// tono objetivo (se le copian tono/saturación a los píxeles de piel de la
+// textura, conservando su luminosidad original para no perder el
+// sombreado). id=null significa "el tono de fábrica del personaje", sin
+// recoloreo.
 export const SKIN_TONE_OPTIONS = [
-  { id: "a", label: "Claro", color: "#f5d7b5", variant: "A" },
-  { id: "b", label: "Medio claro", color: "#e8be91", variant: "B" },
-  { id: "c", label: "Apiñonado", color: "#d29b67", variant: "C" },
-  { id: "d", label: "Moreno", color: "#a5683b", variant: "D" },
-  { id: "e", label: "Moreno oscuro", color: "#6e3f1e", variant: "E" },
-  { id: "f", label: "Tostado", color: "#dfab82", variant: "F" },
+  { id: "a", label: "Claro", color: "#f5d7b5" },
+  { id: "b", label: "Medio claro", color: "#e8be91" },
+  { id: "c", label: "Apiñonado", color: "#d29b67" },
+  { id: "d", label: "Moreno", color: "#a5683b" },
+  { id: "e", label: "Moreno oscuro", color: "#6e3f1e" },
+  { id: "f", label: "Tostado", color: "#dfab82" },
 ];

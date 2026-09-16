@@ -36,6 +36,11 @@ const avatar3dSchema = new mongoose.Schema(
     parts: {
       character: { type: String, default: null },
       accessory: { type: String, default: null },
+      // Tono de piel -- recoloreo real de los píxeles de piel de la
+      // textura del personaje (independiente de qué personaje/outfit se
+      // eligió), ver SKIN_TONE_OPTIONS en avatar3dParts.js del cliente y
+      // applySkinTint() en Avatar3DViewer.jsx. null = tono de fábrica.
+      skinTone: { type: String, default: null },
     },
     snapshotUrl: { type: String, default: null },
     createdAt: { type: Date, default: null },

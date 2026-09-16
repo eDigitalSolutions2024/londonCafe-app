@@ -13,30 +13,23 @@ const PET_SPECIES = [
   { id: "hamster", emoji: "🐹", label: "Hámster" },
 ];
 
-// Selector de tono de piel basado en los 6 tonos reales de los modelos Kenney (A..F).
-// Al tocar un tono, actualiza automáticamente el personaje al modelo correspondiente
-// para el género actualmente seleccionado (Chico / Chica).
-function SkinToneRow({ currentCharacter, onChangeCharacter }) {
-  const isFemale = (currentCharacter || "").includes("female");
-  const genderPrefix = isFemale ? "kenney_female_" : "kenney_male_";
-  const currentVariant = (currentCharacter || "").split("_").pop() || "a";
-
-  const handleSelectSkin = (variantId) => {
-    const nextCharId = `${genderPrefix}${variantId}`;
-    onChangeCharacter(nextCharId);
-  };
-
+// Selector de tono de piel -- recolorea SOLO la piel del personaje ya
+// elegido (ver applySkinTint() en Avatar3DViewer.jsx), sin tocar su pelo/
+// ropa/outfit. Antes esto cambiaba de personaje por completo (confundía
+// tono de piel con "otro personaje distinto" -- ej. elegir "Moreno" te
+// mandaba a un policía con gorra en vez de solo oscurecer la piel).
+function SkinToneRow({ value, onChange }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Tono de piel</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 8 }}>
         <View style={styles.skinRow}>
           {SKIN_TONE_OPTIONS.map((tone) => {
-            const active = currentVariant === tone.id;
+            const active = value === tone.id;
             return (
               <Pressable
                 key={tone.id}
-                onPress={() => handleSelectSkin(tone.id)}
+                onPress={() => onChange(active ? null : tone.id)}
                 style={[styles.skinBtn, active && styles.skinBtnActive]}
               >
                 <View style={[styles.skinSwatch, { backgroundColor: tone.color }]} />
@@ -132,6 +125,7 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
   const [parts, setParts] = useState({
     character: existing?.parts?.character || CHARACTER_OPTIONS[0].id,
     accessory: null,
+    skinTone: existing?.parts?.skinTone || null,
   });
 
   const viewerRef = useRef(null);
@@ -259,7 +253,7 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
 
       <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
-          <SkinToneRow currentCharacter={parts.character} onChangeCharacter={(v) => setPart("character", v)} />
+          <SkinToneRow value={parts.skinTone} onChange={(v) => setPart("skinTone", v)} />
           <CharacterRow options={CHARACTER_OPTIONS} value={parts.character} onChange={(v) => setPart("character", v)} />
 
           {/* Mascota VIP -- especie/nombre; cuidarla vive en PetScreen.

@@ -2,7 +2,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, use
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { WebView } from "react-native-webview";
 import { colors } from "../theme/colors";
-import { CHARACTER_OPTIONS, BRAND_LOGO_URL } from "../assets/avatar3dParts";
+import { CHARACTER_OPTIONS, BRAND_LOGO_URL, SKIN_TONE_OPTIONS } from "../assets/avatar3dParts";
 
 /**
  * Visor del avatar 3D "de verdad": WebView + three.js (0.160.0, ES modules
@@ -60,12 +60,14 @@ const Avatar3DViewer = forwardRef(function Avatar3DViewer(
   useEffect(() => {
     if (!loaded) return;
     const character = CHARACTER_OPTIONS.find((c) => c.id === parts?.character);
+    const tone = SKIN_TONE_OPTIONS.find((t) => t.id === parts?.skinTone);
     const payload = JSON.stringify({
       characterUrl: character ? character.glb : null,
       accessory: parts?.accessory || null,
+      skinColor: tone ? tone.color : null,
     });
     webRef.current?.injectJavaScript(`window.__updateAvatar && window.__updateAvatar(${payload}); true;`);
-  }, [parts?.character, parts?.accessory, loaded]);
+  }, [parts?.character, parts?.accessory, parts?.skinTone, loaded]);
 
   const html = useMemo(() => buildHtml(interactive), [interactive]);
 
@@ -190,7 +192,7 @@ var currentBrand = null; // logo del pecho + texto de la espalda, ver buildBrand
 var currentHeadInfo = null; // medición de la cabeza tomada UNA vez al cargar, ver nota en loadAndSwapCharacter
 var mixer = null;
 var clock = new THREE.Clock();
-var current = { characterUrl: null, accessory: null };
+var current = { characterUrl: null, accessory: null, skinColor: null };
 
 function loadCharacter(url) {
   return new Promise(function (resolve, reject) {
@@ -226,6 +228,126 @@ function measureMesh(obj, namePattern) {
 }
 function measureHead(obj) { return measureMesh(obj, /head/i); }
 function measureBody(obj) { return measureMesh(obj, /body/i); }
+
+// Tono de piel real -- recolorea SOLO los píxeles "color piel" de la
+// textura compartida (colormap.png, la MISMA imagen para los 12
+// personajes: es una paleta de franjas de color planas, no una textura por
+// personaje). Se identificó offline con un script (decodificando los
+// accessors UV del .glb + la imagen) que los píxeles de piel de TODOS los
+// personajes caen en una franja de tonos cálidos bien distinguible de las
+// franjas de ropa/pelo (azul/verde/morado/gris/blanco) -- ver
+// isSkinLikeColor(). Antes "tono de piel" cambiaba el personaje ENTERO
+// (otro modelo con otro pelo/outfit) porque los 12 personajes ya vienen
+// con un tono fijo horneado; esto en cambio conserva el personaje/outfit
+// elegido y solo tiñe su piel.
+function hexToRgb(hex) {
+  var v = parseInt(String(hex).replace("#", ""), 16);
+  return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+}
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  var max = Math.max(r, g, b), min = Math.min(r, g, b);
+  var h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    var d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h /= 6;
+  }
+  return [h, s, l];
+}
+function hue2rgb(p, q, t) {
+  if (t < 0) t += 1;
+  if (t > 1) t -= 1;
+  if (t < 1 / 6) return p + (q - p) * 6 * t;
+  if (t < 1 / 2) return q;
+  if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+  return p;
+}
+function hslToRgb(h, s, l) {
+  if (s === 0) { var v = Math.round(l * 255); return [v, v, v]; }
+  var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  var p = 2 * l - q;
+  return [
+    Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+    Math.round(hue2rgb(p, q, h) * 255),
+    Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+  ];
+}
+// Rango calibrado contra los 12 personajes reales (script offline): piel
+// cae en R>G>B, con R-B entre 35 y 140 -- valores más chicos son ropa/pelo
+// grisáceo/azulado, más grandes son acentos muy saturados (ej. naranja de
+// gorra/botón), que NO son piel.
+function isSkinLikeColor(r, g, b) {
+  return r > g && g >= b - 5 && (r - b) >= 35 && (r - b) <= 140 && r >= 100 && r <= 245 && g >= 60 && g <= 170 && b >= 40 && b <= 130;
+}
+
+function applySkinTint(root, hex) {
+  if (!root) return;
+  var materials = [];
+  root.traverse(function (c) {
+    if (c.isMesh && c.material && materials.indexOf(c.material) === -1) materials.push(c.material);
+  });
+  materials.forEach(function (mat) {
+    if (!mat.map || !mat.map.image) return;
+    // La imagen ORIGINAL (de fábrica) se guarda una sola vez por material
+    // -- así, elegir otro tono (o quitarlo) siempre parte del píxel
+    // original en vez de ir combinando tintes sobre un tinte anterior.
+    if (!mat.userData.__skinBaseCanvas) {
+      var img = mat.map.image;
+      var base = document.createElement("canvas");
+      base.width = img.width; base.height = img.height;
+      base.getContext("2d").drawImage(img, 0, 0);
+      mat.userData.__skinBaseCanvas = base;
+    }
+    var baseCanvas = mat.userData.__skinBaseCanvas;
+    if (!hex) {
+      // Sin tono elegido: restaura el original tal cual (por si venía de
+      // un tinte previo en esta misma sesión).
+      if (mat.userData.__skinTinted) {
+        var origTex = new THREE.CanvasTexture(baseCanvas);
+        origTex.colorSpace = mat.userData.__origColorSpace;
+        origTex.flipY = mat.userData.__origFlipY;
+        mat.map = origTex;
+        mat.needsUpdate = true;
+        mat.userData.__skinTinted = false;
+      }
+      return;
+    }
+    if (mat.userData.__origColorSpace === undefined) {
+      mat.userData.__origColorSpace = mat.map.colorSpace;
+      mat.userData.__origFlipY = mat.map.flipY;
+    }
+    var w = baseCanvas.width, h = baseCanvas.height;
+    var out = document.createElement("canvas");
+    out.width = w; out.height = h;
+    var ctx = out.getContext("2d");
+    ctx.drawImage(baseCanvas, 0, 0);
+    var imgData = ctx.getImageData(0, 0, w, h);
+    var data = imgData.data;
+    var target = hexToRgb(hex);
+    var thsl = rgbToHsl(target.r, target.g, target.b);
+    for (var i = 0; i < data.length; i += 4) {
+      var r = data[i], g = data[i + 1], b = data[i + 2];
+      if (isSkinLikeColor(r, g, b)) {
+        var hsl = rgbToHsl(r, g, b);
+        var rgb = hslToRgb(thsl[0], thsl[1], hsl[2]);
+        data[i] = rgb[0]; data[i + 1] = rgb[1]; data[i + 2] = rgb[2];
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    var tex = new THREE.CanvasTexture(out);
+    tex.colorSpace = mat.userData.__origColorSpace;
+    tex.flipY = mat.userData.__origFlipY;
+    tex.needsUpdate = true;
+    mat.map = tex;
+    mat.needsUpdate = true;
+    mat.userData.__skinTinted = true;
+  });
+}
 
 var logoTexture = null; // se cargaba acá; apagado junto con buildBrand() más abajo
 
@@ -437,6 +559,7 @@ function loadAndSwapCharacter(url) {
     }
 
     applyAccessory(current.accessory, currentHeadInfo);
+    applySkinTint(currentModel, current.skinColor);
     post({ type: "modelLoaded" });
   }).catch(function (err) {
     post({ type: "error", message: "GLB load falló: " + (err && err.message ? err.message : String(err)) });
@@ -445,11 +568,15 @@ function loadAndSwapCharacter(url) {
 
 window.__updateAvatar = function (next) {
   var prevUrl = current.characterUrl;
-  current = next || { characterUrl: null, accessory: null };
+  var prevSkin = current.skinColor;
+  current = next || { characterUrl: null, accessory: null, skinColor: null };
   if (current.characterUrl !== prevUrl) {
+    // loadAndSwapCharacter ya aplica el tono actual (current.skinColor) al
+    // terminar de cargar el modelo nuevo -- no hace falta repetirlo aquí.
     loadAndSwapCharacter(current.characterUrl);
   } else if (currentModel) {
     applyAccessory(current.accessory, currentHeadInfo);
+    if (current.skinColor !== prevSkin) applySkinTint(currentModel, current.skinColor);
   }
 };
 window.__captureSnapshot = function () {

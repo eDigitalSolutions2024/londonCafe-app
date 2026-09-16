@@ -505,6 +505,10 @@ const AVATAR3D_PART_IDS = {
     "kenney_female_a", "kenney_female_b", "kenney_female_c", "kenney_female_d", "kenney_female_e", "kenney_female_f",
   ]),
   accessory: new Set([null, "acc3d_01", "acc3d_02"]),
+  // Tono de piel real (recoloreo de textura, ver avatar3dParts.js del
+  // cliente) -- independiente del personaje elegido. null = tono de
+  // fábrica del personaje.
+  skinTone: new Set([null, "a", "b", "c", "d", "e", "f"]),
 };
 const AVATAR3D_SLOTS = Object.keys(AVATAR3D_PART_IDS);
 
