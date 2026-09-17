@@ -179,23 +179,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
-  // height 94 → 116: en iOS, Apple Color Emoji dibuja el emoji de la
-  // mascota (fontSize 40) notablemente más alto que Noto Color Emoji en
-  // Android con el mismo fontSize -- con overflow:hidden y el contenido
-  // anclado abajo (justifyContent:flex-end), esa diferencia se comía la
-  // parte de arriba del emoji en iPhone real aunque se viera bien en el
-  // emulador Android. Más alto le da margen sin tocar el layout del resto.
-  //
-  // El "halo" (glow ovalado detrás de los personajes) se quitó -- seguía
-  // viéndose cortado por arriba en iPhone real incluso con este alto, y
-  // era puramente decorativo.
-  //
-  // v2: toda la tarjeta (stage + emoji + avatar + paddings) se achicó
-  // ~14% pareja -- se veía muy grande/tipo "píldora" comparada con las
-  // demás tarjetas del Home (ej. Amigos). Se mantiene la MISMA proporción
-  // alto-del-stage/tamaño-del-emoji que arregló el corte en iOS (no solo
-  // se bajó el alto del stage, que hubiera vuelto a cortar el emoji).
-  stage: { width: 110, height: 100, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
+  // v3: el corte en iOS seguía pasando incluso con más alto de stage y sin
+  // halo -- las dos vueltas anteriores asumieron que el problema era
+  // "cuánto espacio le sobra al contenedor arriba del emoji" y subían el
+  // alto del stage en la MISMA proporción que el emoji, pero eso resultó
+  // ser la hipótesis equivocada (116/40 tampoco alcanzó). El sospechoso
+  // real: el <Text> del emoji en iOS puede calcular su propia caja de
+  // línea (lineHeight) más angosta que lo que Apple Color Emoji necesita
+  // para dibujarse completo, y esa caja se recorta ANTES de que el
+  // overflow:hidden del contenedor entre en juego. Se fija un lineHeight
+  // explícito y generoso en petEmoji (en vez de dejarlo automático) y,
+  // como respaldo, un alto de stage claramente holgado -- ya NO atado a
+  // ninguna proporción con el tamaño del emoji, para no repetir el mismo
+  // error si se vuelve a achicar la tarjeta más adelante.
+  stage: { width: 118, height: 128, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
   tilt: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -208,6 +205,7 @@ const styles = StyleSheet.create({
   avatarShadow: { shadowColor: "#3a1410", shadowOpacity: 0.32, shadowRadius: 4, shadowOffset: { width: 0, height: 4 } },
   petEmoji: {
     fontSize: 34,
+    lineHeight: 50,
     textShadowColor: "rgba(58,20,16,0.4)",
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 5,
