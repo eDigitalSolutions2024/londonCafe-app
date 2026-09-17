@@ -36,7 +36,6 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
 
   const bobA = useRef(new Animated.Value(0)).current;
   const bobP = useRef(new Animated.Value(0)).current;
-  const glow = useRef(new Animated.Value(0)).current;
   const alert = useRef(new Animated.Value(0)).current;
 
   // Se re-consulta cada vez que `refreshSignal` cambia (Home lo sube al
@@ -69,16 +68,13 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
       );
     const a = loop(bobA, 2100);
     const p = loop(bobP, 1650, 240);
-    const g = loop(glow, 1500);
     a.start();
     p.start();
-    g.start();
     return () => {
       a.stop();
       p.stop();
-      g.stop();
     };
-  }, [bobA, bobP, glow]);
+  }, [bobA, bobP]);
 
   useEffect(() => {
     if (!need || sleeping) {
@@ -103,8 +99,6 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
   const petRot = bobP.interpolate({ inputRange: [0, 1], outputRange: ["-5deg", "5deg"] });
   const petShadowSX = bobP.interpolate({ inputRange: [0, 1], outputRange: [2.1, 1.4] });
 
-  const haloOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.28, 0.6] });
-  const haloScale = glow.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.06] });
   const alertScale = alert.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1.15] });
 
   const owned = !!pet?.owned;
@@ -131,8 +125,6 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#petRoom)" />
         </Svg>
-
-        <Animated.View style={[styles.halo, { opacity: haloOpacity, transform: [{ scale: haloScale }] }]} />
 
         <View style={styles.tilt}>
           <View style={styles.slot}>
@@ -193,8 +185,11 @@ const styles = StyleSheet.create({
   // anclado abajo (justifyContent:flex-end), esa diferencia se comía la
   // parte de arriba del emoji en iPhone real aunque se viera bien en el
   // emulador Android. Más alto le da margen sin tocar el layout del resto.
+  //
+  // El "halo" (glow ovalado detrás de los personajes) se quitó -- seguía
+  // viéndose cortado por arriba en iPhone real incluso con este alto, y
+  // era puramente decorativo.
   stage: { width: 128, height: 116, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
-  halo: { position: "absolute", width: 116, height: 84, borderRadius: 999, backgroundColor: colors.accent, top: 6 },
   tilt: {
     flexDirection: "row",
     alignItems: "flex-end",
