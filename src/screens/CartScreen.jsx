@@ -266,44 +266,44 @@ function SuggestionCard({ item, onAdd }) {
     <Pressable
       onPress={() => onAdd(item)}
       style={{
-        width: 130,
+        width: 104,
         backgroundColor: "#fff",
-        borderRadius: 16,
+        borderRadius: 14,
         borderWidth: 1,
         borderColor: COLORS.border,
-        padding: 10,
-        marginRight: 10,
+        padding: 8,
+        marginRight: 8,
       }}
     >
       <Image
         source={item.imageUrl ? { uri: item.imageUrl } : require("../assets/promo_placeholder.png")}
-        style={{ width: "100%", height: 80, borderRadius: 12, backgroundColor: "#eee" }}
+        style={{ width: "100%", height: 62, borderRadius: 10, backgroundColor: "#eee" }}
       />
-      <Text style={{ marginTop: 8, fontWeight: "900", color: COLORS.ink, fontSize: 12 }} numberOfLines={2}>
+      <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.ink, fontSize: 10.5 }} numberOfLines={2}>
         {item.title}
       </Text>
       <View
         style={{
-          marginTop: 6,
+          marginTop: 5,
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
         }}
       >
-        <Text style={{ fontWeight: "900", color: COLORS.wine, fontSize: 12 }}>
+        <Text style={{ fontWeight: "900", color: COLORS.wine, fontSize: 10.5 }}>
           {money(item.price)}
         </Text>
         <View
           style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
+            width: 20,
+            height: 20,
+            borderRadius: 10,
             backgroundColor: COLORS.wine,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 14 }}>+</Text>
+          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>+</Text>
         </View>
       </View>
     </Pressable>
@@ -405,6 +405,7 @@ const tabBarHeight = useBottomTabBarHeight();
         EXPIRED: "Ese cupón ya venció.",
         USAGE_LIMIT_REACHED: "Ese cupón ya se agotó.",
         ALREADY_USED_BY_USER: "Ya usaste ese cupón antes.",
+        LOYALTY_ACCOUNT_REQUIRED: "Inicia sesión con tu cuenta para usar cupones.",
       };
       setAppliedCoupon(null);
       setCouponError(map[e?.data?.error || e?.message] || "No se pudo aplicar el cupón.");
