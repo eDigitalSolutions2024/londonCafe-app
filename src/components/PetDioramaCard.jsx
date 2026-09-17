@@ -131,7 +131,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
             <Animated.View style={[styles.groundShadow, { transform: [{ scaleX: avatarShadowSX }] }]} />
             <Animated.View style={{ transform: [{ translateY: avatarY }, { scale: avatarScale }] }}>
               <View style={styles.avatarShadow}>
-                <AvatarPreview config={avatarConfig} size={46} />
+                <AvatarPreview config={avatarConfig} size={40} />
               </View>
             </Animated.View>
           </View>
@@ -189,26 +189,32 @@ const styles = StyleSheet.create({
   // El "halo" (glow ovalado detrás de los personajes) se quitó -- seguía
   // viéndose cortado por arriba en iPhone real incluso con este alto, y
   // era puramente decorativo.
-  stage: { width: 128, height: 116, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
+  //
+  // v2: toda la tarjeta (stage + emoji + avatar + paddings) se achicó
+  // ~14% pareja -- se veía muy grande/tipo "píldora" comparada con las
+  // demás tarjetas del Home (ej. Amigos). Se mantiene la MISMA proporción
+  // alto-del-stage/tamaño-del-emoji que arregló el corte en iOS (no solo
+  // se bajó el alto del stage, que hubiera vuelto a cortar el emoji).
+  stage: { width: 110, height: 100, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
   tilt: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "center",
-    paddingBottom: 12,
+    paddingBottom: 10,
     transform: [{ perspective: 600 }, { rotateX: "12deg" }],
   },
-  slot: { alignItems: "center", justifyContent: "flex-end", width: 60, height: 64 },
-  groundShadow: { position: "absolute", bottom: 5, width: 26, height: 7, borderRadius: 999, backgroundColor: "rgba(58,20,10,0.30)" },
+  slot: { alignItems: "center", justifyContent: "flex-end", width: 52, height: 55 },
+  groundShadow: { position: "absolute", bottom: 5, width: 22, height: 6, borderRadius: 999, backgroundColor: "rgba(58,20,10,0.30)" },
   avatarShadow: { shadowColor: "#3a1410", shadowOpacity: 0.32, shadowRadius: 4, shadowOffset: { width: 0, height: 4 } },
   petEmoji: {
-    fontSize: 40,
+    fontSize: 34,
     textShadowColor: "rgba(58,20,16,0.4)",
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 5,
   },
-  poop: { position: "absolute", right: 2, bottom: 6, fontSize: 15 },
-  alert: { position: "absolute", top: 6, right: 10, fontSize: 20 },
-  meta: { flex: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  poop: { position: "absolute", right: 2, bottom: 6, fontSize: 13 },
+  alert: { position: "absolute", top: 6, right: 10, fontSize: 17 },
+  meta: { flex: 1, paddingHorizontal: 12, paddingVertical: 10 },
   title: { color: "#111", fontSize: 14, fontWeight: "900" },
   status: { color: colors.textMuted, fontSize: 11.5, fontWeight: "700", marginTop: 3, lineHeight: 15 },
   chevron: { color: colors.textMuted, fontSize: 22, fontWeight: "900", paddingRight: 14 },
