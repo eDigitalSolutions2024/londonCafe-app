@@ -406,6 +406,7 @@ const tabBarHeight = useBottomTabBarHeight();
         USAGE_LIMIT_REACHED: "Ese cupón ya se agotó.",
         ALREADY_USED_BY_USER: "Ya usaste ese cupón antes.",
         LOYALTY_ACCOUNT_REQUIRED: "Inicia sesión con tu cuenta para usar cupones.",
+        NOT_YOUR_COUPON: "Ese cupón es para otra cuenta.",
       };
       setAppliedCoupon(null);
       setCouponError(map[e?.data?.error || e?.message] || "No se pudo aplicar el cupón.");

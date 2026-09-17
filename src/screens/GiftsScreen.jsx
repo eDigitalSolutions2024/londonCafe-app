@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import {
   Alert,
+  Modal,
   ScrollView,
   Text,
   TextInput,
@@ -16,9 +17,11 @@ import {
   View,
   RefreshControl,
 } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 
 import { AuthContext } from "../context/AuthContext";
 import { fetchMyGiftCards, purchaseGiftCard, redeemGiftCard } from "../api/giftcards";
+import { posFetch } from "../api/client";
 import { colors } from "../theme/colors";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
@@ -426,6 +429,109 @@ function GiftPillCard({ item, variant = "received", onPress }) {
   );
 }
 
+const COUPON_STATUS_LABEL = {
+  available: "Disponible",
+  used: "Canjeado",
+  expired: "Expirado",
+  inactive: "Inactivo",
+};
+
+function couponDiscountLabel(c) {
+  return c.discountType === "percent" ? `${c.discountValue}% de descuento` : `$${c.discountValue} de descuento`;
+}
+
+// Cupones PERSONALES que el POS le manda a un username en específico (ej.
+// "1 London Cake Gratis") -- ver GET /coupons/mine en el backend del POS.
+// Distinto de los cupones de código abierto (CartScreen.jsx): estos ya
+// vienen asignados, sin que el cliente tenga que escribir nada.
+function MyCouponCard({ item, onPress }) {
+  const available = item.status === "available";
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() => available && onPress?.(item)}
+      disabled={!available}
+      style={{
+        borderRadius: 18,
+        padding: 14,
+        backgroundColor: available ? UI.primary : "rgba(0,0,0,0.06)",
+        marginTop: 10,
+        opacity: available ? 1 : 0.7,
+      }}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ color: available ? "#fff" : UI.text, fontWeight: "900", fontSize: 14 }} numberOfLines={2}>
+            🎟️ {item.title || item.code}
+          </Text>
+          <Text style={{ color: available ? "rgba(255,255,255,0.85)" : UI.muted, fontWeight: "800", fontSize: 12, marginTop: 3 }}>
+            {couponDiscountLabel(item)}
+          </Text>
+        </View>
+        <View
+          style={{
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: 999,
+            backgroundColor: available ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.08)",
+          }}
+        >
+          <Text style={{ color: available ? "#fff" : UI.muted, fontWeight: "900", fontSize: 11 }}>
+            {COUPON_STATUS_LABEL[item.status] || item.status}
+          </Text>
+        </View>
+      </View>
+
+      {available ? (
+        <Text style={{ color: "rgba(255,255,255,0.95)", marginTop: 10, fontWeight: "900", fontSize: 12 }}>
+          Toca para ver tu QR
+        </Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
+function CouponQrModal({ coupon, onClose }) {
+  if (!coupon) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.6)",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}
+      >
+        <View style={{ backgroundColor: "#fff", borderRadius: 20, padding: 20, width: "100%", maxWidth: 340, alignItems: "center" }}>
+          <Text style={{ color: UI.text, fontWeight: "900", fontSize: 16, textAlign: "center" }}>
+            🎟️ {coupon.title || coupon.code}
+          </Text>
+          <Text style={{ color: UI.muted, fontWeight: "700", fontSize: 12.5, marginTop: 4, textAlign: "center" }}>
+            {couponDiscountLabel(coupon)}
+          </Text>
+
+          <View style={{ marginTop: 16, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: UI.border }}>
+            <QRCode value={`lc_coupon:${coupon.code}`} size={180} />
+          </View>
+
+          <Text style={{ color: UI.text, fontWeight: "900", fontSize: 16, marginTop: 14, letterSpacing: 1 }}>
+            {coupon.code}
+          </Text>
+          <Text style={{ color: UI.muted, fontWeight: "700", fontSize: 12, marginTop: 8, textAlign: "center", lineHeight: 17 }}>
+            Muestra este QR en el Kiosk, o escribe el código al ordenar desde la app.
+          </Text>
+
+          <TouchableOpacity onPress={onClose} style={{ marginTop: 16 }}>
+            <Text style={{ color: UI.primary, fontWeight: "900", fontSize: 13 }}>Cerrar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function GiftsScreen() {
   const { token, user } = useContext(AuthContext);
 const tabBarHeight = useBottomTabBarHeight();
@@ -445,6 +551,9 @@ const tabBarHeight = useBottomTabBarHeight();
 
   const [redeemCode, setRedeemCode] = useState("");
 
+  const [myCoupons, setMyCoupons] = useState([]);
+  const [qrCoupon, setQrCoupon] = useState(null);
+
   const activeReceived = useMemo(
     () => received.filter((g) => g.status === "ACTIVE"),
     [received]
@@ -458,7 +567,16 @@ const tabBarHeight = useBottomTabBarHeight();
 
     setReceived(res.received || []);
     setSent(res.sent || []);
-  }, [token]);
+
+    // Cupones personales del POS (ver GET /coupons/mine) -- si falla, no
+    // rompe el resto de la pantalla (gift cards siguen funcionando).
+    const loyaltyUserId = user?._id || user?.id || "";
+    if (loyaltyUserId) {
+      posFetch(`/coupons/mine?loyaltyUserId=${encodeURIComponent(loyaltyUserId)}`)
+        .then((r) => setMyCoupons(r?.ok ? r.coupons || [] : []))
+        .catch((e) => console.log("❌ coupons/mine:", e?.data || e?.message));
+    }
+  }, [token, user]);
 
   useEffect(() => {
     (async () => {
@@ -644,6 +762,18 @@ const tabBarHeight = useBottomTabBarHeight();
         Regalos 🎁
       </Text>
 
+      {/* Cupones personales enviados desde el POS (ej. "1 London Cake
+          Gratis") -- solo aparece si tienes alguno, arriba de todo para
+          que no se pierda entre las secciones de gift cards. */}
+      {myCoupons.length > 0 && (
+        <Card>
+          <SectionTitle>Mis cupones</SectionTitle>
+          {myCoupons.map((c) => (
+            <MyCouponCard key={c.code} item={c} onPress={setQrCoupon} />
+          ))}
+        </Card>
+      )}
+
       {/* Preview tipo wallet con "De" + avatar */}
       <GiftPreview
         amount={amount}
@@ -768,6 +898,8 @@ const tabBarHeight = useBottomTabBarHeight();
           ))
         )}
       </Card>
+
+      <CouponQrModal coupon={qrCoupon} onClose={() => setQrCoupon(null)} />
     </ScrollView>
   );
 }
