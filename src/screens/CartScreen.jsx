@@ -48,7 +48,12 @@ function matchCrossSellSuggestions(cartItems, rules, catalog) {
   const seen = new Set();
   const items = [];
   const ruleIds = [];
-  let cap = 3;
+  // Antes era un techo fijo de 3 -- Math.min() de abajo solo puede BAJAR
+  // este número, nunca subirlo, así que aunque una regla configurara
+  // maxSuggestions más alto (ej. 6), nunca se mostraban más de 3. Se sube
+  // el techo para que las reglas sí puedan mostrar más si así se
+  // configuraron.
+  let cap = 6;
 
   const applicable = (rules || [])
     .filter((r) => r.type === "cross-sell" && ruleMatchesCart(r, cartItems))
@@ -266,38 +271,38 @@ function SuggestionCard({ item, onAdd }) {
     <Pressable
       onPress={() => onAdd(item)}
       style={{
-        width: 104,
+        width: 82,
         backgroundColor: "#fff",
-        borderRadius: 14,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: COLORS.border,
-        padding: 8,
-        marginRight: 8,
+        padding: 6,
+        marginRight: 7,
       }}
     >
       <Image
         source={item.imageUrl ? { uri: item.imageUrl } : require("../assets/promo_placeholder.png")}
-        style={{ width: "100%", height: 62, borderRadius: 10, backgroundColor: "#eee" }}
+        style={{ width: "100%", height: 46, borderRadius: 8, backgroundColor: "#eee" }}
       />
-      <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.ink, fontSize: 10.5 }} numberOfLines={2}>
+      <Text style={{ marginTop: 5, fontWeight: "900", color: COLORS.ink, fontSize: 9.5 }} numberOfLines={2}>
         {item.title}
       </Text>
       <View
         style={{
-          marginTop: 5,
+          marginTop: 4,
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
         }}
       >
-        <Text style={{ fontWeight: "900", color: COLORS.wine, fontSize: 10.5 }}>
+        <Text style={{ fontWeight: "900", color: COLORS.wine, fontSize: 9.5 }}>
           {money(item.price)}
         </Text>
         <View
           style={{
-            width: 20,
-            height: 20,
-            borderRadius: 10,
+            width: 17,
+            height: 17,
+            borderRadius: 9,
             backgroundColor: COLORS.wine,
             alignItems: "center",
             justifyContent: "center",
