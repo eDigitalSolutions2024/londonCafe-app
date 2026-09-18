@@ -86,6 +86,13 @@ export default function PetScreen({ navigation }) {
   // Mismo patrón para "Barista Ninja" (Fruit Ninja).
   const [ninjaOpen, setNinjaOpen] = useState(false);
   const [ninjaLevel, setNinjaLevel] = useState(null);
+  // Survival: un modo aparte por juego, sin mapa de niveles -- solo
+  // abre/cierra el propio minijuego con `survival` en true (ver
+  // PetMatch3/PetDoodleJump/PetBaristaNinja: sin meta fija, sin fin,
+  // dificultad que sube sola con el puntaje).
+  const [match3SurvivalOpen, setMatch3SurvivalOpen] = useState(false);
+  const [doodleSurvivalOpen, setDoodleSurvivalOpen] = useState(false);
+  const [ninjaSurvivalOpen, setNinjaSurvivalOpen] = useState(false);
   // null = cerrado, "tetris"/"doodle" = qué tabla mostrar (ver PetLeaderboard).
   const [leaderboardGame, setLeaderboardGame] = useState(null);
   // El #1 de cada juego (para que la tarjeta del minijuego presuma "a quién
@@ -265,6 +272,22 @@ export default function PetScreen({ navigation }) {
     await call("/pet/play", { score, sliced, game: "ninja", level, won }, "play");
   };
 
+  // Survival: mismo endpoint /pet/play, pero con mode:"survival" -- el
+  // backend guarda el récord en un campo aparte (tetrisSurvivalBest, etc.)
+  // y NO toca la progresión de niveles normal (ver pet.controller.js).
+  const onMatch3SurvivalFinish = async (score, cleared) => {
+    setMatch3SurvivalOpen(false);
+    await call("/pet/play", { score, cleared, game: "tetris", mode: "survival" }, "play");
+  };
+  const onDoodleSurvivalFinish = async (score, height) => {
+    setDoodleSurvivalOpen(false);
+    await call("/pet/play", { score, height, game: "doodle", mode: "survival" }, "play");
+  };
+  const onNinjaSurvivalFinish = async (score, sliced) => {
+    setNinjaSurvivalOpen(false);
+    await call("/pet/play", { score, sliced, game: "ninja", mode: "survival" }, "play");
+  };
+
   const pet = state?.pet;
   const owned = !!pet?.owned;
   // `state.isVIP` viene de isUserVIP() en el backend, que llama al POS y
@@ -400,8 +423,10 @@ export default function PetScreen({ navigation }) {
         tint="#7B1E3A"
         blocked={!canPlay || !!busy || sleeping}
         myBest={pet?.tetrisBest ? `${pet.tetrisBest} fichas` : null}
+        survivalBest={pet?.tetrisSurvivalBest ? `${pet.tetrisSurvivalBest} 🔥` : null}
         top={top1.tetris ? `${top1.tetris.isMe ? "Tú vas 1° 👑" : `${top1.tetris.petName}: ${top1.tetris.best} 🍰`}` : null}
         onPress={() => setMatch3Open(true)}
+        onPressSurvival={() => setMatch3SurvivalOpen(true)}
         onPressTop={() => setLeaderboardGame("tetris")}
       />
       <MiniGameCard
@@ -410,8 +435,10 @@ export default function PetScreen({ navigation }) {
         tint="#4f9d69"
         blocked={!canPlay || !!busy || sleeping}
         myBest={pet?.doodleBest ? `altura ${pet.doodleBest}` : null}
+        survivalBest={pet?.doodleSurvivalBest ? `altura ${pet.doodleSurvivalBest} 🔥` : null}
         top={top1.doodle ? `${top1.doodle.isMe ? "Tú vas 1° 👑" : `${top1.doodle.petName}: altura ${top1.doodle.best} 🦘`}` : null}
         onPress={() => setDoodleOpen(true)}
+        onPressSurvival={() => setDoodleSurvivalOpen(true)}
         onPressTop={() => setLeaderboardGame("doodle")}
       />
       <MiniGameCard
@@ -420,8 +447,10 @@ export default function PetScreen({ navigation }) {
         tint="#D90429"
         blocked={!canPlay || !!busy || sleeping}
         myBest={pet?.ninjaBest ? `${pet.ninjaBest} cortes` : null}
+        survivalBest={pet?.ninjaSurvivalBest ? `${pet.ninjaSurvivalBest} 🔥` : null}
         top={top1.ninja ? `${top1.ninja.isMe ? "Tú vas 1° 👑" : `${top1.ninja.petName}: ${top1.ninja.best} 🥷`}` : null}
         onPress={() => setNinjaOpen(true)}
+        onPressSurvival={() => setNinjaSurvivalOpen(true)}
         onPressTop={() => setLeaderboardGame("ninja")}
       />
       <MiniGameCard
@@ -587,6 +616,33 @@ export default function PetScreen({ navigation }) {
         game={leaderboardGame || "tetris"}
         onClose={() => setLeaderboardGame(null)}
       />
+
+      {/* Survival -- un modal directo por juego, sin mapa de niveles. */}
+      <PetMatch3
+        visible={match3SurvivalOpen}
+        survival
+        species={pet?.species}
+        petName={pet?.name || "tu mascota"}
+        avatarConfig={avatarConfig}
+        onClose={() => setMatch3SurvivalOpen(false)}
+        onFinish={onMatch3SurvivalFinish}
+      />
+      <PetDoodleJump
+        visible={doodleSurvivalOpen}
+        survival
+        species={pet?.species}
+        petName={pet?.name || "tu mascota"}
+        onClose={() => setDoodleSurvivalOpen(false)}
+        onFinish={onDoodleSurvivalFinish}
+      />
+      <PetBaristaNinja
+        visible={ninjaSurvivalOpen}
+        survival
+        species={pet?.species}
+        petName={pet?.name || "tu mascota"}
+        onClose={() => setNinjaSurvivalOpen(false)}
+        onFinish={onNinjaSurvivalFinish}
+      />
     </Screen>
   );
 }
@@ -596,7 +652,7 @@ export default function PetScreen({ navigation }) {
 // tocar un link aparte). `myBest`/`top` son opcionales: "Atrapa" no tiene
 // mejor puntaje guardado en el backend, así que se le pasa `subtitle` fijo
 // en vez de datos de tabla.
-function MiniGameCard({ emoji, title, tint, blocked, myBest, top, subtitle, onPress, onPressTop }) {
+function MiniGameCard({ emoji, title, tint, blocked, myBest, survivalBest, top, subtitle, onPress, onPressSurvival, onPressTop }) {
   return (
     <Pressable
       style={[styles.gameCard, blocked && { opacity: 0.45 }]}
@@ -608,7 +664,11 @@ function MiniGameCard({ emoji, title, tint, blocked, myBest, top, subtitle, onPr
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.gameTitle}>{title}</Text>
-        {myBest ? <Text style={styles.gameMyBest}>Tu mejor: {myBest}</Text> : null}
+        {myBest ? (
+          <Text style={styles.gameMyBest}>
+            Tu mejor: {myBest}{survivalBest ? ` · Survival: ${survivalBest}` : ""}
+          </Text>
+        ) : null}
         {top ? (
           <Pressable onPress={(e) => { e.stopPropagation?.(); onPressTop?.(); }} hitSlop={6}>
             <Text style={[styles.gameTop, { color: tint }]}>{top}</Text>
@@ -617,8 +677,19 @@ function MiniGameCard({ emoji, title, tint, blocked, myBest, top, subtitle, onPr
           <Text style={styles.gameMyBest}>{subtitle}</Text>
         ) : null}
       </View>
-      <View style={[styles.gamePlayBtn, { backgroundColor: tint }]}>
-        <Text style={styles.gamePlayText}>Jugar</Text>
+      <View style={{ alignItems: "center", gap: 6 }}>
+        <View style={[styles.gamePlayBtn, { backgroundColor: tint }]}>
+          <Text style={styles.gamePlayText}>Jugar</Text>
+        </View>
+        {onPressSurvival ? (
+          <Pressable
+            onPress={(e) => { e.stopPropagation?.(); if (!blocked) onPressSurvival(); }}
+            disabled={blocked}
+            style={[styles.gameSurvivalBtn, { borderColor: tint }]}
+          >
+            <Text style={[styles.gameSurvivalText, { color: tint }]}>Survival 🔥</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -785,6 +856,8 @@ const styles = StyleSheet.create({
   gameTop: { marginTop: 2, fontSize: 11.5, fontWeight: "900" },
   gamePlayBtn: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999 },
   gamePlayText: { color: "#fff", fontWeight: "900", fontSize: 12.5 },
+  gameSurvivalBtn: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1.5 },
+  gameSurvivalText: { fontWeight: "900", fontSize: 10 },
 
   tipText: { marginTop: 4, color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: "700", textAlign: "center", lineHeight: 16 },
   nudgeText: {

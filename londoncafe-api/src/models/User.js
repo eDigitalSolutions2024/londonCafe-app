@@ -154,6 +154,22 @@ const petSchema = new mongoose.Schema(
     doodleBest: { type: Number, default: 0, min: 0 },
     doodleLevel: { type: Number, default: 1, min: 1, max: 10 },
 
+    // Mismo patrón para "Barista Ninja" -- FALTABAN en el schema (el
+    // controller ya los leía/escribía desde que se agregó el juego, pero
+    // al no estar declarados acá Mongoose los ignoraba en strict mode: se
+    // veían bien en la MISMA respuesta de /pet/play porque el objeto en
+    // memoria sí los tenía, pero nunca se guardaban de verdad en Mongo --
+    // ninjaBest y la progresión de niveles se reseteaban en cada login).
+    ninjaBest: { type: Number, default: 0, min: 0 },
+    ninjaLevel: { type: Number, default: 1, min: 1, max: 10 },
+
+    // Survival: mejor puntaje del modo sin fin de cada juego (independiente
+    // de *Best/*Level de arriba, que son del modo por niveles) -- ver
+    // playPet() con mode:"survival".
+    tetrisSurvivalBest: { type: Number, default: 0, min: 0 },
+    doodleSurvivalBest: { type: Number, default: 0, min: 0 },
+    ninjaSurvivalBest: { type: Number, default: 0, min: 0 },
+
     // ✅ Anti-spam de notificaciones: se marca al avisar y se limpia cuando
     // la barra correspondiente se recupera (mismo patrón que
     // buddy.energyAlerts). Ver cron/pushJobs.js.

@@ -39,6 +39,21 @@ const CAFE_PRODUCTS = [
   { id: "golden_bean", emoji: "🫘", name: "Grano Oro", color: "#FFD700", pts: 50, special: true },
 ];
 
+// Survival: sin meta ni niveles fijos -- los cortes acumulados (sliced)
+// SON el puntaje, y la dificultad se recalcula en cada oleada nueva
+// (spawnWave) interpolando la misma curva que ya usan los 10 niveles
+// fijos (ver ninjaLevels.js) pero SIN toparla en el nivel 10.
+function survivalDifficultyAt(sliced) {
+  const s = Math.max(0, sliced);
+  return {
+    spawnIntervalMs: Math.max(380, 1400 - s * 9),
+    maxSimultaneous: Math.min(7, 2 + Math.floor(s / 12)),
+    bombChance: Math.min(0.5, s * 0.0045),
+    speedMult: Math.min(2.0, 1.0 + s * 0.0045),
+  };
+}
+const SURVIVAL_NINJA_DEF = { targetSlices: Infinity };
+
 function distToSegmentSquared(px, py, vx, vy, wx, wy) {
   const l2 = (vx - wx) * (vx - wx) + (vy - wy) * (vy - wy);
   if (l2 === 0) return (px - vx) * (px - vx) + (py - vy) * (py - vy);
@@ -52,12 +67,13 @@ function distToSegmentSquared(px, py, vx, vy, wx, wy) {
 export default function PetBaristaNinja({
   visible,
   level = 1,
+  survival = false,
   species = "cat",
   petName = "tu mascota",
   onClose,
   onFinish,
 }) {
-  const levelDef = getNinjaLevel(level);
+  const levelDef = survival ? SURVIVAL_NINJA_DEF : getNinjaLevel(level);
   const petEmoji = SPECIES_EMOJI[species] || "🐾";
 
   const [phase, setPhase] = useState("play"); // 'play' | 'over'
@@ -127,10 +143,11 @@ export default function PetBaristaNinja({
 
   // Lanzamiento de productos de café
   const spawnWave = (now) => {
-    const isBomb = Math.random() < levelDef.bombChance;
+    const d = survival ? survivalDifficultyAt(slicedCountRef.current) : levelDef;
+    const isBomb = Math.random() < d.bombChance;
     const count = Math.min(
-      levelDef.maxSimultaneous,
-      1 + Math.floor(Math.random() * levelDef.maxSimultaneous)
+      d.maxSimultaneous,
+      1 + Math.floor(Math.random() * d.maxSimultaneous)
     );
 
     for (let i = 0; i < count; i++) {
@@ -141,7 +158,7 @@ export default function PetBaristaNinja({
       // velocidad horizontal hacia el centro
       const vx = ((BOARD_WIDTH / 2 - x) / 70) + (Math.random() - 0.5) * 2.8;
       // velocidad vertical con parábola
-      const vy = -(11.8 + Math.random() * 3.2) * levelDef.speedMult;
+      const vy = -(11.8 + Math.random() * 3.2) * d.speedMult;
       const rot = Math.random() * 360;
       const vrot = (Math.random() - 0.5) * 10;
 
@@ -183,7 +200,7 @@ export default function PetBaristaNinja({
       }
     }
 
-    nextSpawnTimeRef.current = now + levelDef.spawnIntervalMs * (0.85 + Math.random() * 0.3);
+    nextSpawnTimeRef.current = now + d.spawnIntervalMs * (0.85 + Math.random() * 0.3);
   };
 
   // Detección de corte entre dos puntos del dedo
@@ -396,7 +413,9 @@ export default function PetBaristaNinja({
           <View style={styles.header}>
             <View>
               <Text style={styles.title}>Barista Ninja 🥷</Text>
-              <Text style={styles.sub}>Nivel {level} · Corta {levelDef.targetSlices} productos</Text>
+              <Text style={styles.sub}>
+                {survival ? "Survival 🔥 · ¡corta sin parar!" : `Nivel ${level} · Corta ${levelDef.targetSlices} productos`}
+              </Text>
             </View>
             <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
               <Text style={styles.closeText}>✕</Text>
@@ -407,7 +426,7 @@ export default function PetBaristaNinja({
           <View style={styles.hudRow}>
             <View style={styles.hudBadge}>
               <Text style={styles.hudLabel}>CORTES</Text>
-              <Text style={styles.hudValue}>{slicedCount} / {levelDef.targetSlices}</Text>
+              <Text style={styles.hudValue}>{slicedCount}{survival ? "" : ` / ${levelDef.targetSlices}`}</Text>
             </View>
             <View style={styles.hudBadge}>
               <Text style={styles.hudLabel}>PUNTOS</Text>
@@ -525,14 +544,14 @@ export default function PetBaristaNinja({
                   {won ? "🏆" : "💥"}
                 </Text>
                 <Text style={styles.overTitle}>
-                  {won ? "¡NIVEL COMPLETADO!" : "¡FIN DEL JUEGO!"}
+                  {survival ? `¡${slicedCount} cortes!` : won ? "¡NIVEL COMPLETADO!" : "¡FIN DEL JUEGO!"}
                 </Text>
                 <Text style={styles.overSub}>
                   {won
                     ? `¡Dominaste el corte barista! Rebanaste ${slicedCount} productos.`
                     : strikes >= MAX_STRIKES
-                    ? "Se te cayeron demasiados cafés ☕"
-                    : "¡Cortaste una bomba de vapor! 💣"}
+                    ? `Se te cayeron demasiados cafés ☕${survival ? " -- ¡a superar tu marca!" : ""}`
+                    : `¡Cortaste una bomba de vapor! 💣${survival ? " -- ¡a superar tu marca!" : ""}`}
                 </Text>
 
                 <View style={styles.scoreBox}>
@@ -542,7 +561,7 @@ export default function PetBaristaNinja({
 
                 <Pressable style={styles.actionBtn} onPress={handleFinish}>
                   <Text style={styles.actionBtnText}>
-                    {won ? "Continuar ⭐" : "Volver al mapa"}
+                    {survival ? "Salir" : won ? "Continuar ⭐" : "Volver al mapa"}
                   </Text>
                 </Pressable>
               </View>

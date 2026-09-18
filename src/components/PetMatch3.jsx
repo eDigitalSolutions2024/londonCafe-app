@@ -15,6 +15,17 @@ const SWAP_FRACTION = 0.42; // fracción de una celda que hay que arrastrar para
 const KINDS = ["☕", "🥐", "🍰", "🍪", "🫖", "🥯"];
 const CLEARING = -2;
 
+// Survival: sin niveles -- un solo cronómetro que nunca deja de correr
+// (cada combinación devuelve un poco de tiempo) y una dificultad que sube
+// SOLA con el puntaje: arranca con solo 3 sabores en juego (fácil armar
+// combinaciones) y va agregando sabores hasta los 6 completos de KINDS
+// mientras más fichas juntas -- ver kindsRef en el componente. `moves` e
+// `Infinity` para no limitar movimientos -- la única forma de perder es
+// que el cronómetro llegue a 0.
+const SURVIVAL_START_SECONDS = 40;
+const SURVIVAL_START_KINDS = 3;
+const SURVIVAL_LEVEL_DEF = { kinds: SURVIVAL_START_KINDS, moves: Infinity, timeLimit: SURVIVAL_START_SECONDS, target: Infinity };
+
 const rndKind = (kindsCount) => Math.floor(Math.random() * kindsCount);
 const emptyRow = () => new Array(COLS).fill(null);
 
@@ -171,10 +182,15 @@ function reshuffleBoard(g) {
   return best || g; // tras 40 intentos, lo que haya salido (rarísimo llegar aquí)
 }
 
-export default function PetMatch3({ visible, level = 1, species = "cat", petName = "tu mascota", avatarConfig, onClose, onFinish }) {
-  const levelDef = getMatch3Level(level);
+export default function PetMatch3({ visible, level = 1, survival = false, species = "cat", petName = "tu mascota", avatarConfig, onClose, onFinish }) {
+  const levelDef = survival ? SURVIVAL_LEVEL_DEF : getMatch3Level(level);
 
-  const [grid, setGrid] = useState(() => makeFullGrid(levelDef.kinds));
+  // Dificultad dinámica de Survival: cuántos sabores (de KINDS) están en
+  // juego AHORA MISMO -- sube según clearedRef.current, ver runResolve.
+  // En modo por niveles se queda fija en levelDef.kinds toda la partida.
+  const kindsRef = useRef(levelDef.kinds);
+
+  const [grid, setGrid] = useState(() => makeFullGrid(kindsRef.current));
   const [cleared, setCleared] = useState(0);
   const [movesLeft, setMovesLeft] = useState(levelDef.moves);
   const [combo, setCombo] = useState(0);
@@ -243,7 +259,8 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
   ).current;
 
   function resetLevel() {
-    const g0 = makeFullGrid(levelDef.kinds);
+    kindsRef.current = survival ? SURVIVAL_START_KINDS : levelDef.kinds;
+    const g0 = makeFullGrid(kindsRef.current);
     setGrid(g0);
     gridRef.current = g0;
     setCleared(0);
@@ -332,6 +349,14 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
       chain += 1;
       total += m.size;
 
+      // Survival: cada combinación devuelve tiempo al cronómetro -- así
+      // una buena racha te compra más partida, en vez de que el reloj
+      // corra parejo sin importar qué tan bien juegues.
+      if (survival) {
+        timeLeftRef.current += Math.max(1, Math.floor(m.size / 3));
+        setTimeLeft(timeLeftRef.current);
+      }
+
       const marking = g.map((row) => row.slice());
       m.forEach((key) => {
         const [r, c] = key.split(",").map(Number);
@@ -353,7 +378,7 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
 
       await wait(120);
       const g2 = applyGravity(gridRef.current);
-      const g3 = refillTop(g2, levelDef.kinds);
+      const g3 = refillTop(g2, kindsRef.current);
       setGrid(g3);
       gridRef.current = g3;
       await wait(100);
@@ -362,6 +387,12 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
     if (total > 0) {
       clearedRef.current += total;
       setCleared(clearedRef.current);
+      // Sube la dificultad con el puntaje: más sabores en juego = más
+      // difícil encontrar la siguiente combinación. Tope en KINDS.length
+      // (los 6 sabores completos).
+      if (survival) {
+        kindsRef.current = Math.min(KINDS.length, SURVIVAL_START_KINDS + Math.floor(clearedRef.current / 25));
+      }
     }
     resolving.current = false;
 
@@ -614,7 +645,12 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
   }
   const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 
-  const score = Math.max(0, Math.min(1, cleared / levelDef.target));
+  // Survival no tiene target (Infinity) -- el puntaje que se manda al
+  // backend (alimenta happiness/xp ganados, ver pet.controller.js) escala
+  // con las fichas juntadas en vez de con "% del nivel completado".
+  const score = survival
+    ? Math.min(1, 0.4 + clearedRef.current / 150)
+    : Math.max(0, Math.min(1, cleared / levelDef.target));
   const finish = () => onFinish?.(score, cleared, level, won);
 
   const avatarScale = avatarBounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
@@ -633,7 +669,9 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
           {phase === "play" ? (
             <>
               <View style={styles.hdr}>
-                <Text style={styles.hdrTitle}>Café Crush 🍰 · Nivel {level}</Text>
+                <Text style={styles.hdrTitle}>
+                  Café Crush 🍰 · {survival ? "Survival 🔥" : `Nivel ${level}`}
+                </Text>
                 <Pressable
                   onPress={() => setCompact((v) => !v)}
                   style={styles.zoomBtn}
@@ -643,17 +681,29 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
                 </Pressable>
               </View>
               <View style={styles.goalRow}>
-                <Text style={styles.goalText}>🎯 {cleared}/{levelDef.target}</Text>
-                <Text style={[styles.goalText, movesLeft <= 3 && styles.goalDanger]}>
-                  🔁 {movesLeft}
-                </Text>
-                <Text style={[styles.goalText, timeLeft <= 10 && styles.goalDanger]}>
-                  ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
-                </Text>
+                {survival ? (
+                  <>
+                    <Text style={styles.goalText}>🍰 {cleared}</Text>
+                    <Text style={[styles.goalText, timeLeft <= 10 && styles.goalDanger]}>
+                      ⏱ {timeLeft}s
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.goalText}>🎯 {cleared}/{levelDef.target}</Text>
+                    <Text style={[styles.goalText, movesLeft <= 3 && styles.goalDanger]}>
+                      🔁 {movesLeft}
+                    </Text>
+                    <Text style={[styles.goalText, timeLeft <= 10 && styles.goalDanger]}>
+                      ⏱ {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, "0")}
+                    </Text>
+                  </>
+                )}
               </View>
               <Text style={styles.hdrSub}>
-                Arrastra una ficha (↔ ↕) para acomodarla · junta 3 o más
-                {compact ? "" : " · 🔎 para ver todo el tablero"}
+                {survival
+                  ? "Sin fin -- cada combinación te regala tiempo, entre más juntas más sube la dificultad"
+                  : `Arrastra una ficha (↔ ↕) para acomodarla · junta 3 o más${compact ? "" : " · 🔎 para ver todo el tablero"}`}
               </Text>
 
               <View style={styles.stageRow}>
@@ -756,12 +806,18 @@ export default function PetMatch3({ visible, level = 1, species = "cat", petName
             </>
           ) : (
             <View style={styles.doneWrap}>
-              <Text style={styles.doneEmoji}>{won ? "🎉" : "😿"}</Text>
+              <Text style={styles.doneEmoji}>{survival ? "🔥" : won ? "🎉" : "😿"}</Text>
               <Text style={styles.doneTitle}>
-                {won ? `¡Nivel ${level} completo!` : `${cleared}/${levelDef.target} fichas`}
+                {survival
+                  ? `¡${cleared} fichas!`
+                  : won
+                  ? `¡Nivel ${level} completo!`
+                  : `${cleared}/${levelDef.target} fichas`}
               </Text>
               <Text style={styles.doneSub}>
-                {won
+                {survival
+                  ? `¡${petName} aguantó hasta el final! Se acabó el tiempo -- ¡a superar tu marca!`
+                  : won
                   ? `¡${petName} está feliz! 🎉${level < MAX_MATCH3_LEVEL ? " Ya se abrió el siguiente nivel." : " ¡Completaste todos los niveles!"}`
                   : `Te faltaron ${Math.max(0, levelDef.target - cleared)} -- ${
                       loseReason === "time" ? "se acabó el tiempo" : "sin movimientos"

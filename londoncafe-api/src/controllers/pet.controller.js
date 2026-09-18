@@ -350,6 +350,13 @@ async function playPet(req, res) {
     if (!Number.isFinite(score)) score = 0.5;
     score = clamp(score, 0, 1);
 
+    // Survival: mismo body que el modo normal pero con mode:"survival" --
+    // no manda `level`/`won` (no hay niveles), así que la progresión
+    // secuencial de abajo se salta entera y el "mejor puntaje" se guarda
+    // en su propio campo (*SurvivalBest) para no mezclarse con el mejor
+    // puntaje del modo por niveles (*Best).
+    const isSurvival = req.body?.mode === "survival";
+
     // El Café Tetris manda además `cleared` (fichas juntadas, número crudo)
     // y `game:"tetris"` -- alimenta el leaderboard (GET /pet/leaderboard).
     // El mini-juego de atrapar no manda esto y no toca tetrisBest.
@@ -357,20 +364,27 @@ async function playPet(req, res) {
     let levelUp = false;
     if (req.body?.game === "tetris") {
       const cleared = Math.max(0, Math.floor(Number(req.body?.cleared) || 0));
-      if (cleared > Number(user.pet.tetrisBest ?? 0)) {
-        user.pet.tetrisBest = cleared;
-        tetrisRecord = true;
-      }
+      if (isSurvival) {
+        if (cleared > Number(user.pet.tetrisSurvivalBest ?? 0)) {
+          user.pet.tetrisSurvivalBest = cleared;
+          tetrisRecord = true;
+        }
+      } else {
+        if (cleared > Number(user.pet.tetrisBest ?? 0)) {
+          user.pet.tetrisBest = cleared;
+          tetrisRecord = true;
+        }
 
-      // Progresión de niveles: SOLO avanza si ganaste justo el nivel que
-      // tenías abierto (match3Level) -- así un cliente no puede "mandar"
-      // un nivel más alto para saltarse el desbloqueo secuencial.
-      const won = req.body?.won === true;
-      const level = Math.floor(Number(req.body?.level));
-      const current = Number(user.pet.match3Level) || 1;
-      if (won && Number.isFinite(level) && level === current && current < 10) {
-        user.pet.match3Level = current + 1;
-        levelUp = true;
+        // Progresión de niveles: SOLO avanza si ganaste justo el nivel que
+        // tenías abierto (match3Level) -- así un cliente no puede "mandar"
+        // un nivel más alto para saltarse el desbloqueo secuencial.
+        const won = req.body?.won === true;
+        const level = Math.floor(Number(req.body?.level));
+        const current = Number(user.pet.match3Level) || 1;
+        if (won && Number.isFinite(level) && level === current && current < 10) {
+          user.pet.match3Level = current + 1;
+          levelUp = true;
+        }
       }
     }
 
@@ -382,17 +396,24 @@ async function playPet(req, res) {
     let doodleLevelUp = false;
     if (req.body?.game === "doodle") {
       const height = Math.max(0, Math.floor(Number(req.body?.height) || 0));
-      if (height > Number(user.pet.doodleBest ?? 0)) {
-        user.pet.doodleBest = height;
-        doodleRecord = true;
-      }
+      if (isSurvival) {
+        if (height > Number(user.pet.doodleSurvivalBest ?? 0)) {
+          user.pet.doodleSurvivalBest = height;
+          doodleRecord = true;
+        }
+      } else {
+        if (height > Number(user.pet.doodleBest ?? 0)) {
+          user.pet.doodleBest = height;
+          doodleRecord = true;
+        }
 
-      const won = req.body?.won === true;
-      const level = Math.floor(Number(req.body?.level));
-      const current = Number(user.pet.doodleLevel) || 1;
-      if (won && Number.isFinite(level) && level === current && current < 10) {
-        user.pet.doodleLevel = current + 1;
-        doodleLevelUp = true;
+        const won = req.body?.won === true;
+        const level = Math.floor(Number(req.body?.level));
+        const current = Number(user.pet.doodleLevel) || 1;
+        if (won && Number.isFinite(level) && level === current && current < 10) {
+          user.pet.doodleLevel = current + 1;
+          doodleLevelUp = true;
+        }
       }
     }
 
@@ -402,17 +423,24 @@ async function playPet(req, res) {
     let ninjaLevelUp = false;
     if (req.body?.game === "ninja") {
       const sliced = Math.max(0, Math.floor(Number(req.body?.sliced) || 0));
-      if (sliced > Number(user.pet.ninjaBest ?? 0)) {
-        user.pet.ninjaBest = sliced;
-        ninjaRecord = true;
-      }
+      if (isSurvival) {
+        if (sliced > Number(user.pet.ninjaSurvivalBest ?? 0)) {
+          user.pet.ninjaSurvivalBest = sliced;
+          ninjaRecord = true;
+        }
+      } else {
+        if (sliced > Number(user.pet.ninjaBest ?? 0)) {
+          user.pet.ninjaBest = sliced;
+          ninjaRecord = true;
+        }
 
-      const won = req.body?.won === true;
-      const level = Math.floor(Number(req.body?.level));
-      const current = Number(user.pet.ninjaLevel) || 1;
-      if (won && Number.isFinite(level) && level === current && current < 10) {
-        user.pet.ninjaLevel = current + 1;
-        ninjaLevelUp = true;
+        const won = req.body?.won === true;
+        const level = Math.floor(Number(req.body?.level));
+        const current = Number(user.pet.ninjaLevel) || 1;
+        if (won && Number.isFinite(level) && level === current && current < 10) {
+          user.pet.ninjaLevel = current + 1;
+          ninjaLevelUp = true;
+        }
       }
     }
 
@@ -521,6 +549,10 @@ const LEADERBOARD_FIELDS = {
   tetris: "tetrisBest",
   doodle: "doodleBest",
   ninja: "ninjaBest",
+  // Survival: mismas 3 tablas, mejor puntaje del modo sin fin.
+  tetris_survival: "tetrisSurvivalBest",
+  doodle_survival: "doodleSurvivalBest",
+  ninja_survival: "ninjaSurvivalBest",
 };
 
 // GET /pet/leaderboard?game=tetris|doodle -- top mascotas por mejor

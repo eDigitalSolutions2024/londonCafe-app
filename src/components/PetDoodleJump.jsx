@@ -76,8 +76,24 @@ const TILT_SENSITIVITY = 16; // px/frame por cada 1.0 de inclinación
 const TILT_DEADZONE = 0.06;
 const TILT_SMOOTHING = 0.25; // 0..1, más alto = responde más rápido/tiembla más
 
-export default function PetDoodleJump({ visible, level = 1, species = "cat", petName = "tu mascota", onClose, onFinish }) {
-  const levelDef = getDoodleLevel(level);
+// Survival: sin meta ni niveles fijos -- la altura alcanzada (heightRef)
+// ES el puntaje, y la dificultad de las plataformas se recalcula cada vez
+// que se genera una tanda nueva (ensurePlatformsAbove), interpolando la
+// misma curva que ya usan los 10 niveles fijos (ver doodleLevels.js) pero
+// SIN toparla en el nivel 10 -- sigue subiendo mientras más alto llegues.
+function survivalDifficultyAt(height) {
+  const h = Math.max(0, height);
+  return {
+    platformWidth: Math.max(34, 74 - h * 0.006),
+    gapMin: Math.min(130, 70 + h * 0.0055),
+    gapMax: Math.min(170, 100 + h * 0.007),
+    breakableChance: Math.min(0.55, h * 0.000105),
+  };
+}
+const SURVIVAL_DOODLE_DEF = { targetHeight: Infinity };
+
+export default function PetDoodleJump({ visible, level = 1, survival = false, species = "cat", petName = "tu mascota", onClose, onFinish }) {
+  const levelDef = survival ? SURVIVAL_DOODLE_DEF : getDoodleLevel(level);
   const emoji = SPECIES_EMOJI[species] || "🐾";
 
   const [phase, setPhase] = useState("play");
@@ -112,11 +128,12 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
   function ensurePlatformsAbove() {
     const targetTop = charRef.current.y - BOARD_HEIGHT;
     while (topmostYRef.current > targetTop) {
-      const gap = levelDef.gapMin + Math.random() * (levelDef.gapMax - levelDef.gapMin);
-      const w = levelDef.platformWidth;
+      const d = survival ? survivalDifficultyAt(heightRef.current) : levelDef;
+      const gap = d.gapMin + Math.random() * (d.gapMax - d.gapMin);
+      const w = d.platformWidth;
       const y = topmostYRef.current - gap;
       const x = w / 2 + Math.random() * (BOARD_WIDTH - w);
-      const breakable = Math.random() < (levelDef.breakableChance || 0);
+      const breakable = Math.random() < (d.breakableChance || 0);
       platformsRef.current.push({ id: platformPid.current++, x, y, w, breakable, state: "ok" });
       topmostYRef.current = y;
 
@@ -163,7 +180,7 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
     // Plataforma inicial justo debajo del personaje -- primer rebote
     // inmediato, sin caída libre al arrancar. Nunca es quebradiza (sería
     // injusto que se rompa antes de que el jugador entienda el juego).
-    const w0 = levelDef.platformWidth;
+    const w0 = survival ? survivalDifficultyAt(0).platformWidth : levelDef.platformWidth;
     const y0 = startY + CHAR_HALF + 4;
     platformsRef.current = [{ id: platformPid.current++, x: startX, y: y0, w: w0, breakable: false, state: "ok" }];
     itemsRef.current = [];
@@ -324,10 +341,15 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
 
   // Los ítems dan un empujoncito extra al puntaje (además de la altura),
   // con tope en 1 -- una recompensa chica, no el objetivo principal.
-  const score = Math.max(
-    0,
-    Math.min(1, heightRef.current / levelDef.targetHeight + (coffeeRef.current + breadRef.current) * 0.01)
-  );
+  // Survival no tiene targetHeight (Infinity) -- el puntaje escala con la
+  // altura alcanzada directamente, igual que Café Crush Survival con las
+  // fichas juntadas.
+  const score = survival
+    ? Math.min(1, 0.4 + heightRef.current / 3000)
+    : Math.max(
+        0,
+        Math.min(1, heightRef.current / levelDef.targetHeight + (coffeeRef.current + breadRef.current) * 0.01)
+      );
   const finish = () => onFinish?.(score, Math.round(heightRef.current), level, won);
 
   const ch = charRef.current;
@@ -342,11 +364,14 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
           {phase === "play" ? (
             <>
               <View style={styles.hdr}>
-                <Text style={styles.hdrTitle}>Salto Café 🦘 · Nivel {level}</Text>
+                <Text style={styles.hdrTitle}>
+                  Salto Café 🦘 · {survival ? "Survival 🔥" : `Nivel ${level}`}
+                </Text>
               </View>
               <View style={styles.goalRow}>
                 <Text style={styles.goalText}>
-                  📏 {Math.max(0, Math.round(heightRef.current))}/{levelDef.targetHeight}
+                  📏 {Math.max(0, Math.round(heightRef.current))}
+                  {survival ? "" : `/${levelDef.targetHeight}`}
                 </Text>
                 {(coffeeRef.current > 0 || breadRef.current > 0) && (
                   <Text style={styles.goalText}>
@@ -354,7 +379,11 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
                   </Text>
                 )}
               </View>
-              <Text style={styles.hdrSub}>Arrastra a la mascota o inclina el celular a los lados -- rebota sola</Text>
+              <Text style={styles.hdrSub}>
+                {survival
+                  ? "Sin fin -- entre más subes, más angostas y separadas las plataformas"
+                  : "Arrastra a la mascota o inclina el celular a los lados -- rebota sola"}
+              </Text>
 
               <View style={styles.boardWrap} {...panResponder.panHandlers}>
                 {platformsRef.current.map((p) => {
@@ -407,12 +436,18 @@ export default function PetDoodleJump({ visible, level = 1, species = "cat", pet
             </>
           ) : (
             <View style={styles.doneWrap}>
-              <Text style={styles.doneEmoji}>{won ? "🎉" : "😿"}</Text>
+              <Text style={styles.doneEmoji}>{survival ? "🔥" : won ? "🎉" : "😿"}</Text>
               <Text style={styles.doneTitle}>
-                {won ? `¡Nivel ${level} completo!` : `${Math.round(heightRef.current)}/${levelDef.targetHeight}`}
+                {survival
+                  ? `¡Subiste ${Math.round(heightRef.current)}!`
+                  : won
+                  ? `¡Nivel ${level} completo!`
+                  : `${Math.round(heightRef.current)}/${levelDef.targetHeight}`}
               </Text>
               <Text style={styles.doneSub}>
-                {won
+                {survival
+                  ? `${petName} se cayó -- ¡a superar tu marca! 🔥`
+                  : won
                   ? `¡${petName} llegó hasta arriba! 🎉${level < MAX_DOODLE_LEVEL ? " Ya se abrió el siguiente nivel." : " ¡Completaste todos los niveles!"}`
                   : `${petName} se cayó -- ¡inténtalo de nuevo!`}
               </Text>
