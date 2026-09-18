@@ -429,13 +429,6 @@ function GiftPillCard({ item, variant = "received", onPress }) {
   );
 }
 
-const COUPON_STATUS_LABEL = {
-  available: "Disponible",
-  used: "Canjeado",
-  expired: "Expirado",
-  inactive: "Inactivo",
-};
-
 function couponDiscountLabel(c) {
   return c.discountType === "percent" ? `${c.discountValue}% de descuento` : `$${c.discountValue} de descuento`;
 }
@@ -444,49 +437,33 @@ function couponDiscountLabel(c) {
 // "1 London Cake Gratis") -- ver GET /coupons/mine en el backend del POS.
 // Distinto de los cupones de código abierto (CartScreen.jsx): estos ya
 // vienen asignados, sin que el cliente tenga que escribir nada.
+//
+// v2: solo se listan los DISPONIBLES aquí (ver load()), así que ya no
+// hace falta el estado "inactivo" -- se compacta a una chip horizontal
+// chica en vez de una tarjeta ancha apilada, para que no le quite
+// protagonismo a "Enviar tarjeta" (lo principal de esta pantalla).
 function MyCouponCard({ item, onPress }) {
-  const available = item.status === "available";
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => available && onPress?.(item)}
-      disabled={!available}
+      onPress={() => onPress?.(item)}
       style={{
-        borderRadius: 18,
-        padding: 14,
-        backgroundColor: available ? UI.primary : "rgba(0,0,0,0.06)",
-        marginTop: 10,
-        opacity: available ? 1 : 0.7,
+        width: 168,
+        borderRadius: 14,
+        padding: 10,
+        backgroundColor: UI.primary,
+        marginRight: 8,
       }}
     >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ color: available ? "#fff" : UI.text, fontWeight: "900", fontSize: 14 }} numberOfLines={2}>
-            🎟️ {item.title || item.code}
-          </Text>
-          <Text style={{ color: available ? "rgba(255,255,255,0.85)" : UI.muted, fontWeight: "800", fontSize: 12, marginTop: 3 }}>
-            {couponDiscountLabel(item)}
-          </Text>
-        </View>
-        <View
-          style={{
-            paddingVertical: 6,
-            paddingHorizontal: 10,
-            borderRadius: 999,
-            backgroundColor: available ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.08)",
-          }}
-        >
-          <Text style={{ color: available ? "#fff" : UI.muted, fontWeight: "900", fontSize: 11 }}>
-            {COUPON_STATUS_LABEL[item.status] || item.status}
-          </Text>
-        </View>
-      </View>
-
-      {available ? (
-        <Text style={{ color: "rgba(255,255,255,0.95)", marginTop: 10, fontWeight: "900", fontSize: 12 }}>
-          Toca para ver tu QR
-        </Text>
-      ) : null}
+      <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12.5 }} numberOfLines={1}>
+        🎟️ {item.title || item.code}
+      </Text>
+      <Text style={{ color: "rgba(255,255,255,0.85)", fontWeight: "800", fontSize: 11, marginTop: 2 }}>
+        {couponDiscountLabel(item)}
+      </Text>
+      <Text style={{ color: "rgba(255,255,255,0.7)", fontWeight: "700", fontSize: 10, marginTop: 4 }}>
+        Toca para ver tu QR
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -568,12 +545,14 @@ const tabBarHeight = useBottomTabBarHeight();
     setReceived(res.received || []);
     setSent(res.sent || []);
 
-    // Cupones personales del POS (ver GET /coupons/mine) -- si falla, no
-    // rompe el resto de la pantalla (gift cards siguen funcionando).
+    // Cupones personales del POS (ver GET /coupons/mine) -- solo los
+    // DISPONIBLES (igual que Cart/Kiosk); los usados/expirados/inactivos
+    // no aportan nada aquí y solo saturaban la pantalla. Si falla, no
+    // rompe el resto (gift cards siguen funcionando).
     const loyaltyUserId = user?._id || user?.id || "";
     if (loyaltyUserId) {
       posFetch(`/coupons/mine?loyaltyUserId=${encodeURIComponent(loyaltyUserId)}`)
-        .then((r) => setMyCoupons(r?.ok ? r.coupons || [] : []))
+        .then((r) => setMyCoupons(r?.ok ? (r.coupons || []).filter((c) => c.status === "available") : []))
         .catch((e) => console.log("❌ coupons/mine:", e?.data || e?.message));
     }
   }, [token, user]);
@@ -763,15 +742,21 @@ const tabBarHeight = useBottomTabBarHeight();
       </Text>
 
       {/* Cupones personales enviados desde el POS (ej. "1 London Cake
-          Gratis") -- solo aparece si tienes alguno, arriba de todo para
-          que no se pierda entre las secciones de gift cards. */}
+          Gratis") -- franja horizontal chica y discreta (no un Card
+          completo como el resto) para no competir con "Enviar tarjeta",
+          que sigue siendo lo principal de esta pantalla. Solo lista
+          disponibles (ver load()), así que normalmente son 0-2 chips. */}
       {myCoupons.length > 0 && (
-        <Card>
-          <SectionTitle>Mis cupones</SectionTitle>
-          {myCoupons.map((c) => (
-            <MyCouponCard key={c.code} item={c} onPress={setQrCoupon} />
-          ))}
-        </Card>
+        <View style={{ marginBottom: 14 }}>
+          <Text style={{ color: UI.pageTitle, fontSize: 13, fontWeight: "900", marginBottom: 8, opacity: 0.85 }}>
+            Mis cupones
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {myCoupons.map((c) => (
+              <MyCouponCard key={c.code} item={c} onPress={setQrCoupon} />
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       {/* Preview tipo wallet con "De" + avatar */}
