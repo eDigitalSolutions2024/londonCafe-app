@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Animated, Easing } from "react-native";
+import { View, Text, StyleSheet, Pressable, Animated, Easing, Platform } from "react-native";
 import Svg, { Defs, RadialGradient, Stop, Rect } from "react-native-svg";
 import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
@@ -187,12 +187,21 @@ const styles = StyleSheet.create({
   // real: el <Text> del emoji en iOS puede calcular su propia caja de
   // línea (lineHeight) más angosta que lo que Apple Color Emoji necesita
   // para dibujarse completo, y esa caja se recorta ANTES de que el
-  // overflow:hidden del contenedor entre en juego. Se fija un lineHeight
-  // explícito y generoso en petEmoji (en vez de dejarlo automático) y,
-  // como respaldo, un alto de stage claramente holgado -- ya NO atado a
-  // ninguna proporción con el tamaño del emoji, para no repetir el mismo
-  // error si se vuelve a achicar la tarjeta más adelante.
-  stage: { width: 118, height: 128, justifyContent: "flex-end", alignItems: "center", overflow: "hidden" },
+  // overflow:hidden del contenedor entre en juego -- se fija un lineHeight
+  // explícito y generoso en petEmoji para eso.
+  //
+  // v4: el alto extra de respaldo (100->128) SOLO hace falta en iOS -- en
+  // Android nunca hubo corte, y traía de vuelta el problema de "se ve muy
+  // grande" que ya se había resuelto para esta plataforma. Se separa por
+  // Platform.OS en vez de un solo valor para las dos, así ninguna de las
+  // dos correcciones deshace a la otra la próxima vez que se toque esto.
+  stage: {
+    width: 118,
+    height: Platform.OS === "ios" ? 128 : 100,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    overflow: "hidden",
+  },
   tilt: {
     flexDirection: "row",
     alignItems: "flex-end",
