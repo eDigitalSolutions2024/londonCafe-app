@@ -379,8 +379,23 @@ const tabBarHeight = useBottomTabBarHeight();
   const [appliedCoupon, setAppliedCoupon] = useState(null); // { code, discountType, discountValue }
   const [couponBusy, setCouponBusy] = useState(false);
   const [couponError, setCouponError] = useState("");
+  const [myCoupons, setMyCoupons] = useState([]); // cupones PERSONALES (ver GET /coupons/mine) -- se muestran solos, sin escribir código
 
   const loyaltyUserId = user?._id || user?.id || "";
+
+  useEffect(() => {
+    if (!loyaltyUserId) {
+      setMyCoupons([]);
+      return;
+    }
+    let alive = true;
+    posFetch(`/coupons/mine?loyaltyUserId=${encodeURIComponent(loyaltyUserId)}`)
+      .then((r) => alive && setMyCoupons(r?.ok ? (r.coupons || []).filter((c) => c.status === "available") : []))
+      .catch(() => alive && setMyCoupons([]));
+    return () => {
+      alive = false;
+    };
+  }, [loyaltyUserId]);
 
   const couponDiscountPreview = appliedCoupon
     ? appliedCoupon.discountType === "percent"
@@ -389,8 +404,8 @@ const tabBarHeight = useBottomTabBarHeight();
     : 0;
   const estimatedTotal = Math.max(0, subtotal - couponDiscountPreview);
 
-  const onApplyCoupon = async () => {
-    const code = couponInput.trim().toUpperCase();
+  const onApplyCoupon = async (codeOverride) => {
+    const code = (codeOverride || couponInput).trim().toUpperCase();
     if (!code) return;
     try {
       setCouponBusy(true);
@@ -805,6 +820,43 @@ showsVerticalScrollIndicator={false}
     backgroundColor: COLORS.bg,
   }}
 >
+  {/* ✅ Cupones personales -- ver GET /coupons/mine, mismo patrón que el
+      Kiosk (KioskOrderPage.tsx): si tienes alguno asignado, aparece solo
+      aquí para tocar y aplicar, sin tener que copiar/escribir el código. */}
+  {!appliedCoupon && myCoupons.length > 0 ? (
+    <View style={{ marginBottom: 10 }}>
+      {myCoupons.map((c) => (
+        <Pressable
+          key={c.code}
+          onPress={() => onApplyCoupon(c.code)}
+          disabled={couponBusy}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor: COLORS.wineSoft,
+            borderRadius: 12,
+            paddingVertical: 10,
+            paddingHorizontal: 12,
+            marginBottom: 8,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: COLORS.wine, fontWeight: "900", fontSize: 12.5 }} numberOfLines={1}>
+              🎟️ {c.title || c.code}
+            </Text>
+            <Text style={{ color: COLORS.wine, fontWeight: "700", fontSize: 11, marginTop: 2, opacity: 0.8 }}>
+              {c.discountType === "percent" ? `${c.discountValue}%` : money(c.discountValue)} de descuento
+            </Text>
+          </View>
+          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 11.5, backgroundColor: COLORS.wine, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 }}>
+            Usar
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  ) : null}
+
   {/* ✅ Cupón */}
   {appliedCoupon ? (
     <View
@@ -847,7 +899,7 @@ showsVerticalScrollIndicator={false}
         }}
       />
       <Pressable
-        onPress={onApplyCoupon}
+        onPress={() => onApplyCoupon()}
         disabled={!couponInput.trim() || couponBusy}
         style={{
           paddingHorizontal: 16,
