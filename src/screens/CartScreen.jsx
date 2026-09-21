@@ -734,10 +734,10 @@ navigation.navigate("Order", {
           borderRadius: 12,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: COLORS.wineSoft,
+          backgroundColor: "rgba(122,30,58,0.35)",
         }}
       >
-        <Text style={{ color: COLORS.wine, fontWeight: "900" }}>Vaciar</Text>
+        <Text style={{ color: COLORS.pageText, fontWeight: "900" }}>Vaciar</Text>
       </Pressable>
     ) : (
       <View style={{ width: 82 }} />
@@ -839,7 +839,12 @@ showsVerticalScrollIndicator={false}
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
-            backgroundColor: COLORS.wineSoft,
+            // ✅ wineSoft (12% opacity) + texto wine oscuro se diseñó para
+            // una tarjeta BLANCA -- sobre el fondo oscuro de la pantalla
+            // (COLORS.bg) quedaba casi invisible ("casi no se ve"). Mismo
+            // tratamiento que ya usa el botón "Aplicar": tinte más fuerte +
+            // texto blanco, legible sobre negro.
+            backgroundColor: "rgba(122,30,58,0.35)",
             borderRadius: 12,
             paddingVertical: 10,
             paddingHorizontal: 12,
@@ -847,10 +852,10 @@ showsVerticalScrollIndicator={false}
           }}
         >
           <View style={{ flex: 1 }}>
-            <Text style={{ color: COLORS.wine, fontWeight: "900", fontSize: 12.5 }} numberOfLines={1}>
+            <Text style={{ color: COLORS.pageText, fontWeight: "900", fontSize: 12.5 }} numberOfLines={1}>
               🎟️ {c.title || c.code}
             </Text>
-            <Text style={{ color: COLORS.wine, fontWeight: "700", fontSize: 11, marginTop: 2, opacity: 0.8 }}>
+            <Text style={{ color: COLORS.pageMuted, fontWeight: "700", fontSize: 11, marginTop: 2 }}>
               {c.discountType === "percent" ? `${c.discountValue}%` : money(c.discountValue)} de descuento
             </Text>
           </View>
@@ -869,18 +874,18 @@ showsVerticalScrollIndicator={false}
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: COLORS.wineSoft,
+        backgroundColor: "rgba(122,30,58,0.35)",
         borderRadius: 12,
         paddingVertical: 10,
         paddingHorizontal: 12,
         marginBottom: 10,
       }}
     >
-      <Text style={{ color: COLORS.wine, fontWeight: "900", fontSize: 12.5, flex: 1 }} numberOfLines={1}>
+      <Text style={{ color: COLORS.pageText, fontWeight: "900", fontSize: 12.5, flex: 1 }} numberOfLines={1}>
         🎟️ {appliedCoupon.code}{appliedCoupon.title ? ` · ${appliedCoupon.title}` : ""}
       </Text>
       <Pressable onPress={removeCoupon} hitSlop={8}>
-        <Text style={{ color: COLORS.wine, fontWeight: "900", fontSize: 12.5 }}>Quitar</Text>
+        <Text style={{ color: COLORS.pageText, fontWeight: "900", fontSize: 12.5 }}>Quitar</Text>
       </Pressable>
     </View>
   ) : (
@@ -960,10 +965,10 @@ showsVerticalScrollIndicator={false}
           paddingHorizontal: 10,
           paddingVertical: 6,
           borderRadius: 999,
-          backgroundColor: COLORS.wineSoft,
+          backgroundColor: "rgba(122,30,58,0.35)",
         }}
       >
-        <Text style={{ color: COLORS.wine, fontWeight: "900", fontSize: 12 }}>
+        <Text style={{ color: COLORS.pageText, fontWeight: "900", fontSize: 12 }}>
           {items.length} producto{items.length > 1 ? "s" : ""}
         </Text>
       </View>

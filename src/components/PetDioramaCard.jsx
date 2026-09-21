@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Animated, Easing, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, Animated, Easing } from "react-native";
 import Svg, { Defs, RadialGradient, Stop, Rect } from "react-native-svg";
 import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
@@ -131,7 +131,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
             <Animated.View style={[styles.groundShadow, { transform: [{ scaleX: avatarShadowSX }] }]} />
             <Animated.View style={{ transform: [{ translateY: avatarY }, { scale: avatarScale }] }}>
               <View style={styles.avatarShadow}>
-                <AvatarPreview config={avatarConfig} size={40} />
+                <AvatarPreview config={avatarConfig} size={32} />
               </View>
             </Animated.View>
           </View>
@@ -139,7 +139,18 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
           <View style={styles.slot}>
             <Animated.View style={[styles.groundShadow, { transform: [{ scaleX: petShadowSX }] }]} />
             <Animated.View style={{ transform: [{ translateY: petY }, { rotateZ: petRot }] }}>
-              <Text style={styles.petEmoji}>{speciesEmoji}</Text>
+              {/* v5: las 4 vueltas anteriores intentaban centrar el emoji
+                  con lineHeight en el propio <Text> -- eso depende de cómo
+                  cada plataforma calcule la caja de línea de Apple Color
+                  Emoji (que en iOS no es igual que en Android), y por eso
+                  seguía cortándose por más que se subiera el número. Acá
+                  se centra con flexbox en una caja de tamaño fijo, que no
+                  depende para nada de esos metrics -- la caja nunca se
+                  sale de sus límites sin importar cómo dibuje el glifo
+                  cada plataforma. */}
+              <View style={styles.petEmojiBox}>
+                <Text style={styles.petEmoji}>{speciesEmoji}</Text>
+              </View>
             </Animated.View>
             {pet?.mess ? <Text style={styles.poop}>💩</Text> : null}
           </View>
@@ -179,25 +190,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
-  // v3: el corte en iOS seguía pasando incluso con más alto de stage y sin
-  // halo -- las dos vueltas anteriores asumieron que el problema era
-  // "cuánto espacio le sobra al contenedor arriba del emoji" y subían el
-  // alto del stage en la MISMA proporción que el emoji, pero eso resultó
-  // ser la hipótesis equivocada (116/40 tampoco alcanzó). El sospechoso
-  // real: el <Text> del emoji en iOS puede calcular su propia caja de
-  // línea (lineHeight) más angosta que lo que Apple Color Emoji necesita
-  // para dibujarse completo, y esa caja se recorta ANTES de que el
-  // overflow:hidden del contenedor entre en juego -- se fija un lineHeight
-  // explícito y generoso en petEmoji para eso.
-  //
-  // v4: el alto extra de respaldo (100->128) SOLO hace falta en iOS -- en
-  // Android nunca hubo corte, y traía de vuelta el problema de "se ve muy
-  // grande" que ya se había resuelto para esta plataforma. Se separa por
-  // Platform.OS en vez de un solo valor para las dos, así ninguna de las
-  // dos correcciones deshace a la otra la próxima vez que se toque esto.
+  // v5: tarjeta más chica (pedido explícito) Y ya no depende de un alto de
+  // respaldo por plataforma para no cortar el emoji -- ver nota de
+  // petEmojiBox más abajo. Con eso, Android e iOS pueden compartir el
+  // mismo alto de stage otra vez.
   stage: {
-    width: 118,
-    height: Platform.OS === "ios" ? 128 : 100,
+    width: 100,
+    height: 84,
     justifyContent: "flex-end",
     alignItems: "center",
     overflow: "hidden",
@@ -206,15 +205,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "center",
-    paddingBottom: 10,
+    paddingBottom: 8,
     transform: [{ perspective: 600 }, { rotateX: "12deg" }],
   },
-  slot: { alignItems: "center", justifyContent: "flex-end", width: 52, height: 55 },
-  groundShadow: { position: "absolute", bottom: 5, width: 22, height: 6, borderRadius: 999, backgroundColor: "rgba(58,20,10,0.30)" },
+  slot: { alignItems: "center", justifyContent: "flex-end", width: 44, height: 46 },
+  groundShadow: { position: "absolute", bottom: 4, width: 18, height: 5, borderRadius: 999, backgroundColor: "rgba(58,20,10,0.30)" },
   avatarShadow: { shadowColor: "#3a1410", shadowOpacity: 0.32, shadowRadius: 4, shadowOffset: { width: 0, height: 4 } },
+  // Caja de tamaño fijo que centra el emoji con flexbox (alignItems/
+  // justifyContent), no con lineHeight -- ver comentario junto al <View>
+  // que la usa arriba. El tamaño de la caja (36) es a propósito más
+  // grande que el emoji (26) para darle margen real sin tocar cuánto se
+  // ve el emoji mismo.
+  petEmojiBox: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   petEmoji: {
-    fontSize: 34,
-    lineHeight: 50,
+    fontSize: 26,
+    textAlign: "center",
     textShadowColor: "rgba(58,20,16,0.4)",
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 5,
