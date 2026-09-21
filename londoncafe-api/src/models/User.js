@@ -211,10 +211,15 @@ const userSchema = new mongoose.Schema(
     },
 
     // ✅ NUEVO: Teléfono (E.164 recomendado, ej: +16561234567)
+    // Sin `default: null` a propósito -- el índice unique+sparse de abajo
+    // solo ignora el campo cuando está AUSENTE, no cuando vale null. Con
+    // el default, Mongoose guardaba phone:null en cada cuenta sin
+    // teléfono, y la segunda cuenta así chocaba con "PHONE_ALREADY_EXISTS"
+    // (E11000 dup key: { phone: null }) aunque ninguna de las dos hubiera
+    // puesto un número.
     phone: {
       type: String,
       trim: true,
-      default: null,
       // opcional: validación básica de E.164 (puedes aflojarla si quieres)
       match: /^\+?[0-9]{10,16}$/,
     },

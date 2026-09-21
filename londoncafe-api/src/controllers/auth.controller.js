@@ -234,7 +234,21 @@ async function register(req, res) {
     if (process.env.NODE_ENV === "development" && showOtp) {
       console.log(`🟣 [DEV OTP] Email: ${user.email} | Code: ${code}`);
     } else {
-      await sendVerificationEmail({ to: user.email, code, name: user.name });
+      // ✅ Si el correo no se puede entregar (dominio inválido, SMTP
+      // caído, etc.), NO dejar la cuenta a medias: se borra el usuario y
+      // su registro de verificación recién creados para que el registro
+      // se pueda reintentar limpio (si no, EMAIL_ALREADY_EXISTS bloquea
+      // cualquier reintento con ese correo, aunque nunca haya llegado el
+      // código). Antes esto tronaba sin capturarse y devolvía un
+      // SERVER_ERROR crudo dejando la cuenta huérfana.
+      try {
+        await sendVerificationEmail({ to: user.email, code, name: user.name });
+      } catch (mailErr) {
+        console.error("REGISTER EMAIL SEND ERROR:", mailErr);
+        await EmailVerification.deleteMany({ userId: user._id });
+        await User.deleteOne({ _id: user._id });
+        return res.status(502).json({ error: "EMAIL_SEND_FAILED" });
+      }
     }
 
     return res.json({
@@ -325,7 +339,12 @@ async function resendVerification(req, res) {
     if (process.env.NODE_ENV === "development" && showOtp) {
       console.log(`🟣 [DEV OTP - RESEND] Email: ${user.email} | Code: ${code}`);
     } else {
-      await sendVerificationEmail({ to: user.email, code, name: user.name });
+      try {
+        await sendVerificationEmail({ to: user.email, code, name: user.name });
+      } catch (mailErr) {
+        console.error("RESEND EMAIL SEND ERROR:", mailErr);
+        return res.status(502).json({ error: "EMAIL_SEND_FAILED" });
+      }
     }
 
     return res.json({ ok: true, cooldown: RESEND_COOLDOWN_SEC });
