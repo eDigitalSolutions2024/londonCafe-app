@@ -119,11 +119,26 @@ async function validateCouponServerSide(couponCode, loyaltyUserId) {
     const res = await fetch(url);
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data?.ok) return null;
-    return data.coupon; // { code, title, discountType, discountValue, expiresAt }
+    return data.coupon; // { code, title, discountType, discountValue, expiresAt, requiresProductId, requiresQty }
   } catch (e) {
     console.log("⚠️ validateCouponServerSide error:", e?.message);
     return null;
   }
+}
+
+// "Requiere producto + cantidad" (ej. CREPAS2X1: solo aplica si el
+// carrito trae 2+ Crepa Dulce) -- ANTES no existía este chequeo, así que
+// un cupón "2x1" descontaba el monto fijo sin importar cuántas unidades
+// traía el carrito (bug real: 1 sola unidad quedaba en $0). Acá `items`
+// SÍ referencia AppMenuItem._id directo (el mismo catálogo del que sale
+// requiresProductId), a diferencia del POS -- no hace falta resolver
+// ningún vínculo.
+function cartMeetsProductRequirement(items, coupon) {
+  if (!coupon?.requiresProductId || !coupon?.requiresQty) return true;
+  const qtyInCart = (Array.isArray(items) ? items : []).reduce((sum, it) => {
+    return String(it?._id || "") === String(coupon.requiresProductId) ? sum + (Number(it?.qty) || 0) : sum;
+  }, 0);
+  return qtyInCart >= coupon.requiresQty;
 }
 
 exports.createPaymentSheet = async (req, res) => {
@@ -154,6 +169,14 @@ exports.createPaymentSheet = async (req, res) => {
 
     let discountCents = 0;
     const validCoupon = await validateCouponServerSide(couponCode, loyaltyUserId);
+    if (validCoupon && !cartMeetsProductRequirement(items, validCoupon)) {
+      return res.status(400).json({
+        ok: false,
+        error: "COUPON_REQUIRES_PRODUCT_QTY",
+        requiresQty: validCoupon.requiresQty,
+        requiresProductName: validCoupon.requiresProductName || null,
+      });
+    }
     if (validCoupon) {
       discountCents =
         validCoupon.discountType === "percent"

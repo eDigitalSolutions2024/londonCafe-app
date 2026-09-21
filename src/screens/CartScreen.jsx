@@ -417,6 +417,28 @@ const tabBarHeight = useBottomTabBarHeight();
       setCouponError("");
       const r = await posFetch(`/coupons/${encodeURIComponent(code)}/validate?loyaltyUserId=${encodeURIComponent(loyaltyUserId)}`);
       if (!r?.ok) throw new Error(r?.error || "INVALID");
+
+      // ✅ Aviso temprano si el cupón exige cierta cantidad de un producto
+      // (ej. CREPAS2X1) -- el chequeo real/autoritativo sigue viviendo en
+      // el servidor (/payments/sheet), esto es solo para no dejar que la
+      // persona llegue hasta el botón de pagar sin saber por qué falla.
+      const { requiresProductId, requiresQty, requiresProductName } = r.coupon || {};
+      if (requiresProductId && requiresQty) {
+        const qtyInCart = (items || []).reduce((sum, it) => {
+          const id = String(it.productId || it._id || it.id || "");
+          return id === String(requiresProductId) ? sum + Number(it.qty || 0) : sum;
+        }, 0);
+        if (qtyInCart < requiresQty) {
+          setAppliedCoupon(null);
+          setCouponError(
+            requiresProductName
+              ? `Necesitas ${requiresQty} ${requiresProductName} en tu carrito para usar este cupón.`
+              : `Necesitas ${requiresQty} unidades del producto para usar este cupón.`
+          );
+          return;
+        }
+      }
+
       setAppliedCoupon(r.coupon);
     } catch (e) {
       const map = {
@@ -675,6 +697,18 @@ navigation.navigate("Order", {
     console.log("[CartScreen] STATUS:", e?.status);
     console.log("[CartScreen] DATA:", e?.data);
 */
+    // ✅ Cupón "2x1"-like que exige cierta cantidad de un producto (ej.
+    // CREPAS2X1) -- mensaje claro en vez del código crudo del servidor.
+    if (e?.data?.error === "COUPON_REQUIRES_PRODUCT_QTY") {
+      const need = e?.data?.requiresQty;
+      const name = e?.data?.requiresProductName;
+      alert(
+        need && name
+          ? `Ese cupón necesita ${need} ${name} en tu carrito.`
+          : "Ese cupón necesita más cantidad del producto en tu carrito."
+      );
+      return;
+    }
     alert(
       e?.data?.posData?.error ||
       e?.data?.posData?.details ||
