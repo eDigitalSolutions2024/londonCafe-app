@@ -210,19 +210,25 @@ cron.schedule("0 19 * * *", async () => {
 });
 
 // 🟠 TODOS LOS DÍAS 11AM → recuperar usuarios inactivos.
-// Dos avisos, cada uno UNA sola vez por episodio de inactividad (no uno
+// Tres avisos, cada uno UNA sola vez por episodio de inactividad (no uno
 // por cada corrida del cron mientras sigue sin volver -- ver reengageFlags
 // en User.js, que se resetean en getMe en cuanto la persona vuelve a
 // abrir la app de verdad):
 //   - 1 día sin abrir la app: empuje suave (racha / Buddy Coins).
 //   - 7 días sin abrir la app: un solo intento de "recuperación", con
 //     otro tono -- ya se perdió la racha, así que no tiene caso mencionarla.
+//   - 30 días sin abrir la app: ya no tiene caso hablar de racha ni de
+//     Buddy Coins (para entonces cualquiera de los dos avisos de arriba
+//     ya se mandó y no funcionó) -- en vez de insistir con lo mismo,
+//     invita a redescubrir la app (hay cosas nuevas: cupones, Survival en
+//     los minijuegos, etc.).
 cron.schedule("0 11 * * *", async () => {
   console.log("⏰ Revisando usuarios inactivos...");
 
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   try {
     const inactive1d = await User.find({
@@ -271,6 +277,29 @@ cron.schedule("0 11 * * *", async () => {
         await user.save();
       } catch (err) {
         console.log(`⚠️ reengage 7d push (${user._id}):`, err?.message);
+      }
+    }
+
+    const inactive30d = await User.find({
+      expoPushToken: { $exists: true, $ne: "" },
+      lastActiveAt: { $ne: null, $lte: thirtyDaysAgo },
+      "reengageFlags.day30": { $ne: true },
+    });
+
+    for (const user of inactive30d) {
+      if (user.notificationPrefs?.reengage === false) continue;
+      try {
+        await sendExpoPushNotification(
+          user.expoPushToken,
+          "¡Hace un mes que no te vemos! 👋",
+          "Hemos agregado cosas nuevas -- date una vuelta a London Café y pruébalas.",
+          { type: "reengage-30d" }
+        );
+        user.reengageFlags.day30 = true;
+        user.markModified("reengageFlags");
+        await user.save();
+      } catch (err) {
+        console.log(`⚠️ reengage 30d push (${user._id}):`, err?.message);
       }
     }
   } catch (err) {

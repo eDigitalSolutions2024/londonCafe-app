@@ -207,9 +207,10 @@ async function getMe(req, res) {
     // actividad real y se resetean los avisos de "te extrañamos" -- si se
     // vuelve a quedar inactiva, puede recibirlos de nuevo más adelante.
     user.lastActiveAt = now;
-    if (user.reengageFlags?.day1 || user.reengageFlags?.day7) {
+    if (user.reengageFlags?.day1 || user.reengageFlags?.day7 || user.reengageFlags?.day30) {
       user.reengageFlags.day1 = false;
       user.reengageFlags.day7 = false;
+      user.reengageFlags.day30 = false;
       user.markModified("reengageFlags");
     }
 

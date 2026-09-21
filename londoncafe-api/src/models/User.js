@@ -323,6 +323,7 @@ const userSchema = new mongoose.Schema(
     reengageFlags: {
       day1: { type: Boolean, default: false },
       day7: { type: Boolean, default: false },
+      day30: { type: Boolean, default: false },
     },
   },
   { timestamps: true }
