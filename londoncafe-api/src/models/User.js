@@ -312,6 +312,20 @@ const userSchema = new mongoose.Schema(
       reengage: { type: Boolean, default: true },
     },
 
+    // ✅ "Amigos en el café ahora" -- opt-in (apagado por default), sin
+    // NINGÚN historial: solo se guarda el estado ACTUAL, se sobreescribe
+    // en cada ping y nunca se acumula. El cliente calcula la distancia al
+    // café él mismo (ver LocationScreen.jsx para las coordenadas) y solo
+    // manda un booleano -- el servidor nunca recibe ni guarda coordenadas
+    // GPS reales de nadie. atCafeUpdatedAt sirve para expirar solo el
+    // estado si la app dejó de mandar pings (se fue sin que se detectara
+    // la salida) -- ver STALE_MS en friends.controller.js.
+    presence: {
+      shareEnabled: { type: Boolean, default: false },
+      atCafe: { type: Boolean, default: false },
+      atCafeUpdatedAt: { type: Date, default: null },
+    },
+
     // ✅ Recuperar usuarios inactivos: se toca SOLO en getMe (cada vez que
     // la app abre con sesión ya iniciada, ver AuthContext.jsx) -- no sirve
     // usar `updatedAt` (cambia con cualquier guardado de fondo, como el

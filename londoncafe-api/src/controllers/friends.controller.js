@@ -42,6 +42,18 @@ function publicProfile(u) {
   };
 }
 
+// "Amigos en el café ahora" -- opt-in (presence.shareEnabled), y se
+// expira solo si dejó de mandar pings (la app se cerró sin detectar la
+// salida) en vez de quedarse pegado en "aquí" para siempre. Ver
+// updatePresence en me.controller.js -- el servidor nunca ve coordenadas
+// GPS reales, solo este booleano.
+const PRESENCE_STALE_MS = 20 * 60 * 1000; // 20 min sin ping = ya no cuenta como "aquí"
+function isHereNow(u) {
+  if (!u?.presence?.shareEnabled || !u?.presence?.atCafe) return false;
+  const updatedAt = u.presence.atCafeUpdatedAt ? new Date(u.presence.atCafeUpdatedAt).getTime() : 0;
+  return Date.now() - updatedAt < PRESENCE_STALE_MS;
+}
+
 // GET /friends/search?q=username -- busca por username exacto/parcial
 // (no por email, no por nombre completo -- evita que cualquiera encuentre
 // a alguien solo sabiendo su nombre real).
@@ -174,7 +186,7 @@ async function listFriends(req, res) {
     const docs = await Friendship.find({ $or: [{ userA: uid }, { userB: uid }] }).lean();
     const otherIds = docs.map((f) => (String(f.userA) === String(uid) ? f.userB : f.userA));
     const others = await User.find({ _id: { $in: otherIds } })
-      .select("username name avatar3d.snapshotUrl buddy")
+      .select("username name avatar3d.snapshotUrl buddy presence")
       .lean();
     const othersById = new Map(others.map((u) => [String(u._id), u]));
 
@@ -192,6 +204,7 @@ async function listFriends(req, res) {
           friendshipId: String(f._id),
           ...publicProfile(other),
           sharedStreak: computeSharedStreak(me, other),
+          here: isHereNow(other),
         });
       } else if (String(f.requestedBy) === String(uid)) {
         outgoing.push({ friendshipId: String(f._id), ...publicProfile(other) });
@@ -200,7 +213,9 @@ async function listFriends(req, res) {
       }
     }
 
-    friends.sort((a, b) => b.sharedStreak - a.sharedStreak);
+    // Quién está en el café ahora primero (lo más accionable) -- empate
+    // se rompe por racha compartida, como ya era.
+    friends.sort((a, b) => (b.here ? 1 : 0) - (a.here ? 1 : 0) || b.sharedStreak - a.sharedStreak);
 
     return res.json({ ok: true, friends, incoming, outgoing });
   } catch (err) {

@@ -16,6 +16,7 @@ const {
   sendLowEnergyPush,
   sendStreakReminderPush,
   deleteMe,
+  updatePresence,
 } = require("../controllers/me.controller");
 
 router.get("/me", requireAuth, getMe);
@@ -41,5 +42,6 @@ router.post("/me/push-token", requireAuth, savePushToken);
 router.post("/me/test-push", requireAuth, testPush);
 router.post("/me/push/low-energy", requireAuth, sendLowEnergyPush);
 router.post("/me/push/streak-reminder", requireAuth, sendStreakReminderPush);
+router.put("/me/presence", requireAuth, updatePresence);
 
 module.exports = router;

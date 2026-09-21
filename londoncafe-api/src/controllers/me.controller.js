@@ -868,7 +868,48 @@ async function deleteMe(req, res) {
   }
 }
 
+// ✅ PUT /me/presence  body: { shareEnabled?, atCafe? }
+// El cliente calcula la distancia al café él mismo (ver LocationScreen.jsx)
+// y solo manda un booleano -- este endpoint NUNCA recibe coordenadas GPS.
+// Apagar shareEnabled oculta de inmediato (fuerza atCafe a false), para
+// que "dejar de compartir" sea instantáneo y no dependa de que expire el
+// último ping.
+async function updatePresence(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const { shareEnabled, atCafe } = req.body || {};
+    const user = await User.findById(uid).select("presence");
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    if (!user.presence) user.presence = { shareEnabled: false, atCafe: false, atCafeUpdatedAt: null };
+
+    if (typeof shareEnabled === "boolean") {
+      user.presence.shareEnabled = shareEnabled;
+      if (!shareEnabled) {
+        user.presence.atCafe = false;
+        user.presence.atCafeUpdatedAt = new Date();
+      }
+    }
+
+    if (typeof atCafe === "boolean" && user.presence.shareEnabled) {
+      user.presence.atCafe = atCafe;
+      user.presence.atCafeUpdatedAt = new Date();
+    }
+
+    user.markModified("presence");
+    await user.save();
+
+    return res.json({ ok: true, presence: user.presence });
+  } catch (err) {
+    console.error("updatePresence error:", err);
+    return res.status(500).json({ error: "SERVER_ERROR" });
+  }
+}
+
 module.exports = {
+  updatePresence,
   getMe,
   updateMe,
   confirmEmailChange,
