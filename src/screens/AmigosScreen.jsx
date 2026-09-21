@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, TextInput, FlatList, ActivityIndicator, Alert } from "react-native";
+import React, { useCallback, useContext, useEffect, useState } from "react";
+import { View, Text, StyleSheet, Pressable, TextInput, FlatList, ActivityIndicator, Alert, Switch } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
+import { AuthContext } from "../context/AuthContext";
 
 /**
  * "Gancho social" v1: amigos + racha COMPARTIDA. La racha compartida no
@@ -14,6 +15,7 @@ import { apiFetch } from "../api/client";
  * build, no solo Metro).
  */
 export default function AmigosScreen({ navigation }) {
+  const { user, setUser } = useContext(AuthContext);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState([]);
@@ -22,6 +24,25 @@ export default function AmigosScreen({ navigation }) {
   const [outgoing, setOutgoing] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+
+  // ✅ "Amigos en el café ahora" -- opt-in, apagado por default. El
+  // servidor nunca recibe coordenadas GPS reales, solo este booleano (ver
+  // CafePresenceTracker.jsx, que hace el ping mientras está activado).
+  const [presenceBusy, setPresenceBusy] = useState(false);
+  const shareEnabled = !!user?.presence?.shareEnabled;
+  const hereCount = friends.filter((f) => f.here).length;
+
+  const togglePresence = async (next) => {
+    try {
+      setPresenceBusy(true);
+      const r = await apiFetch("/me/presence", { method: "PUT", body: JSON.stringify({ shareEnabled: next }) });
+      setUser((u) => (u ? { ...u, presence: r?.presence || { ...u.presence, shareEnabled: next } } : u));
+    } catch (e) {
+      Alert.alert("Error", e?.data?.error || e?.message || "No se pudo actualizar.");
+    } finally {
+      setPresenceBusy(false);
+    }
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -97,6 +118,35 @@ export default function AmigosScreen({ navigation }) {
           <Text style={styles.sub}>Mantengan viva su racha juntos 🔥</Text>
         </View>
       </View>
+
+      <View style={styles.presenceRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.presenceTitle}>Amigos en el café</Text>
+          <Text style={styles.presenceSub}>
+            {shareEnabled
+              ? "Tus amigos ven cuando estás en London Café ahora mismo."
+              : "Actívalo para que tus amigos sepan cuando estás aquí (y ver cuándo ellos están)."}
+          </Text>
+        </View>
+        {presenceBusy ? (
+          <ActivityIndicator size="small" color={colors.accent} />
+        ) : (
+          <Switch
+            value={shareEnabled}
+            onValueChange={togglePresence}
+            trackColor={{ false: "rgba(255,255,255,0.15)", true: colors.primary }}
+            thumbColor="#fff"
+          />
+        )}
+      </View>
+
+      {hereCount > 0 ? (
+        <View style={styles.hereBanner}>
+          <Text style={styles.hereBannerText}>
+            🟢 {hereCount} {hereCount === 1 ? "amigo está" : "amigos están"} en London Café ahora
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.searchWrap}>
         <TextInput
@@ -174,8 +224,13 @@ export default function AmigosScreen({ navigation }) {
           renderItem={({ item }) => (
             <View style={styles.friendCard}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.friendName} numberOfLines={1}>{item.name}</Text>
-                {outgoing.length === 0 && item.sharedStreak === 0 ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={styles.friendName} numberOfLines={1}>{item.name}</Text>
+                  {item.here ? <View style={styles.hereDot} /> : null}
+                </View>
+                {item.here ? (
+                  <Text style={styles.friendHereText}>En London Café ahora</Text>
+                ) : outgoing.length === 0 && item.sharedStreak === 0 ? (
                   <Text style={styles.friendHint}>Reclamen su racha diaria el mismo día para empezar 🔥</Text>
                 ) : null}
               </View>
@@ -217,6 +272,29 @@ const styles = StyleSheet.create({
   backText: { color: "#fff", fontSize: 20, fontWeight: "900", marginTop: -2 },
   title: { color: "#fff", fontSize: 20, fontWeight: "900" },
   sub: { color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: "700", marginTop: 2 },
+
+  presenceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 20,
+    marginTop: 16,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 14,
+    padding: 12,
+  },
+  presenceTitle: { color: "#fff", fontWeight: "900", fontSize: 13 },
+  presenceSub: { marginTop: 2, color: "rgba(255,255,255,0.5)", fontSize: 10.5, fontWeight: "700", lineHeight: 14 },
+
+  hereBanner: {
+    marginHorizontal: 20,
+    marginTop: 10,
+    backgroundColor: "rgba(79,157,105,0.15)",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  hereBannerText: { color: "#4f9d69", fontWeight: "900", fontSize: 12 },
 
   searchWrap: { flexDirection: "row", alignItems: "center", marginHorizontal: 20, marginTop: 16 },
   searchInput: {
@@ -290,6 +368,8 @@ const styles = StyleSheet.create({
   },
   friendName: { color: "#111", fontWeight: "900", fontSize: 14 },
   friendHint: { marginTop: 2, color: colors.textMuted, fontSize: 10.5, fontWeight: "700" },
+  friendHereText: { marginTop: 2, color: "#4f9d69", fontSize: 10.5, fontWeight: "800" },
+  hereDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#4f9d69" },
   streakPill: { backgroundColor: "rgba(122,30,58,0.1)", paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
   streakPillText: { color: colors.primary, fontWeight: "900", fontSize: 13 },
 

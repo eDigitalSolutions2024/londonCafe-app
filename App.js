@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import BootScreen from "./src/components/BootScreen";
 import OnboardingTour from "./src/components/OnboardingTour";
+import CafePresenceTracker from "./src/components/CafePresenceTracker";
 import { NavigationContainer, CommonActions } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -252,6 +253,7 @@ function AppContent() {
       <NavigationContainer>
         <RootNav />
       </NavigationContainer>
+      <CafePresenceTracker />
     </SafeAreaProvider>
   );
 }

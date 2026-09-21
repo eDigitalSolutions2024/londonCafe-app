@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "buildNumber": "18",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte tu posición en el mapa.",
+        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación mientras usas la app para mostrarte tu posición en el mapa y, si activas \"Amigos en el café\", para avisar a tus amigos cuando estás en London Café.",
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Usamos la cámara para escanear tarjetas de pago al realizar compras en la app."
       },
@@ -44,6 +44,14 @@
     },
     "plugins": [
       "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Usamos tu ubicación mientras usas la app para mostrarte tu posición en el mapa y, si activas \"Amigos en el café\", para avisar a tus amigos cuando estás en London Café.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
       [
         "@stripe/stripe-react-native",
         {
