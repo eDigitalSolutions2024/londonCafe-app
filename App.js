@@ -1,5 +1,7 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import BootScreen from "./src/components/BootScreen";
+import OnboardingTour from "./src/components/OnboardingTour";
 import { NavigationContainer, CommonActions } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -171,9 +173,43 @@ function RootNav() {
   );
 }
 
+const ONBOARDING_VERSION = "v1"; // subir esto si se rediseña el tour a fondo, para que se vuelva a mostrar
+
 // Handles loading splash before mounting NavigationContainer
 function AppContent() {
   const { loading, user, token } = useContext(AuthContext);
+
+  // Tutorial de bienvenida: una vez por CUENTA (no por dispositivo, por si
+  // varias personas comparten el mismo celular) -- se checa en
+  // AsyncStorage apenas hay user+token y ya pasó el gate del avatar 3D
+  // (mismo orden que ve un usuario nuevo: primero crea su avatar, luego el
+  // tour). `onboardingChecked` evita un parpadeo mostrando la app normal
+  // mientras se resuelve esa lectura async.
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const avatarReady = !!(token && user && user.avatar3d?.owned);
+
+  useEffect(() => {
+    if (!avatarReady) {
+      setOnboardingChecked(false);
+      return;
+    }
+    let alive = true;
+    AsyncStorage.getItem(`onboarding_seen_${ONBOARDING_VERSION}_${user._id}`).then((v) => {
+      if (!alive) return;
+      setShowOnboarding(!v);
+      setOnboardingChecked(true);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avatarReady, user?._id]);
+
+  const finishOnboarding = () => {
+    if (user?._id) AsyncStorage.setItem(`onboarding_seen_${ONBOARDING_VERSION}_${user._id}`, "1");
+    setShowOnboarding(false);
+  };
 
   if (loading) {
     return (
@@ -191,6 +227,22 @@ function AppContent() {
     return (
       <SafeAreaProvider>
         <Avatar3DGateScreen />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (avatarReady && !onboardingChecked) {
+    return (
+      <SafeAreaProvider>
+        <BootScreen />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (avatarReady && showOnboarding) {
+    return (
+      <SafeAreaProvider>
+        <OnboardingTour onDone={finishOnboarding} />
       </SafeAreaProvider>
     );
   }
