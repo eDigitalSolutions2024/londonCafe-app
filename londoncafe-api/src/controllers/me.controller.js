@@ -221,7 +221,7 @@ async function getMe(req, res) {
     await user.save();
 
     const sanitizedUser = await User.findById(uid).select(
-      "name gender username email pendingEmail isEmailVerified avatarConfig avatar3d createdAt buddy points lifetimePoints"
+      "name gender username email pendingEmail isEmailVerified avatarConfig avatar3d createdAt buddy points lifetimePoints phone"
     );
 
     const canRecover = calcCanRecover(user);
@@ -258,7 +258,7 @@ async function updateMe(req, res) {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
 
-    const { name, username, email, gender } = req.body || {};
+    const { name, username, email, gender, phone } = req.body || {};
     const patch = {};
     let emailChangePending = false;
 
@@ -320,8 +320,36 @@ async function updateMe(req, res) {
       patch.gender = g;
     }
 
-    const updated = await User.findByIdAndUpdate(uid, patch, { new: true }).select(
-      "name gender username email pendingEmail isEmailVerified avatarConfig createdAt"
+    // ✅ Teléfono: se agregó como requerido en el registro nuevo, pero las
+    // cuentas viejas no lo tienen -- esto les da forma de sumarlo después
+    // (para que también puedan buscarse por teléfono en POS/Kiosk). Mismo
+    // formato/validación que en el registro.
+    if (typeof phone === "string") {
+      const p = phone.trim();
+      if (p.length === 0) {
+        patch.phone = undefined;
+      } else {
+        if (!/^\+?[0-9]{10,16}$/.test(p)) {
+          return res.status(400).json({ error: "INVALID_PHONE" });
+        }
+        const taken = await User.findOne({ phone: p, _id: { $ne: uid } });
+        if (taken) return res.status(409).json({ error: "PHONE_ALREADY_EXISTS" });
+        patch.phone = p;
+      }
+    }
+
+    // findByIdAndUpdate con $set no borra un campo si el valor es
+    // `undefined` (Mongo lo ignora) -- para "quitar" el teléfono hay que
+    // pasarlo explícito por $unset en vez de meterlo en el mismo patch.
+    const unset = {};
+    if (patch.phone === undefined && "phone" in patch) {
+      delete patch.phone;
+      unset.phone = "";
+    }
+    const update = Object.keys(unset).length ? { $set: patch, $unset: unset } : patch;
+
+    const updated = await User.findByIdAndUpdate(uid, update, { new: true }).select(
+      "name gender username email pendingEmail isEmailVerified avatarConfig phone createdAt"
     );
 
     return res.json({ ok: true, user: updated, emailChangePending });

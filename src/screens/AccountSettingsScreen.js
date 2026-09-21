@@ -21,6 +21,7 @@ export default function AccountSettingsScreen({ navigation }) {
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
 
   // ✅ Confirmación de cambio de correo -- el backend ya no aplica el
   // correo directo, manda un código a la dirección nueva primero.
@@ -50,6 +51,7 @@ export default function AccountSettingsScreen({ navigation }) {
       setFullName(u?.name || "");
       setUsername(u?.username || "");
       setEmail(u?.email || "");
+      setPhone(u?.phone || "");
       setPendingEmail(u?.pendingEmail || null);
       setAvatarConfig(
         u?.avatarConfig || {
@@ -81,7 +83,7 @@ export default function AccountSettingsScreen({ navigation }) {
       const r = await apiFetch("/me", {
         method: "PUT",
         headers: authHeaders,
-        body: JSON.stringify({ name: fullName, username, email }),
+        body: JSON.stringify({ name: fullName, username, email, phone }),
       });
 
       // 2) Avatar
@@ -108,6 +110,9 @@ export default function AccountSettingsScreen({ navigation }) {
       if (e?.status === 409) return Alert.alert("Duplicado", "Ese usuario o correo ya existe.");
       if (e?.status === 400 && e?.data?.error === "BAD_USERNAME") {
         return Alert.alert("Usuario inválido", "Usa 3-20 caracteres: letras, números o _");
+      }
+      if (e?.status === 400 && e?.data?.error === "INVALID_PHONE") {
+        return Alert.alert("Teléfono inválido", "Revisa el número -- solo dígitos, 10 a 16 caracteres.");
       }
 
       Alert.alert("Error", "No se pudieron guardar los cambios.");
@@ -267,6 +272,20 @@ export default function AccountSettingsScreen({ navigation }) {
             placeholderTextColor={colors.textMuted}
             keyboardType="email-address"
             autoCapitalize="none"
+            style={styles.input}
+          />
+
+          {/* ✅ Cuentas creadas antes de que el teléfono fuera requerido
+              pueden no tenerlo -- esto les da forma de sumarlo, para
+              poder acumular puntos en caja/Kiosk buscando por número sin
+              abrir la app. */}
+          <Text style={styles.label}>Teléfono</Text>
+          <TextInput
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="6561234567 o +1..."
+            placeholderTextColor={colors.textMuted}
+            keyboardType="phone-pad"
             style={styles.input}
           />
 

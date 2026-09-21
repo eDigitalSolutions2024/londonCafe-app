@@ -219,19 +219,19 @@ export default function RegisterScreen({ navigation }) {
       if (!password.trim()) {
         return Alert.alert("Falta contraseña", "Escribe tu contraseña.");
       }
+      // ✅ Ahora requerido -- lo usamos para que puedas acumular puntos en
+      // caja o el Kiosk buscando por tu número, sin necesidad de abrir la
+      // app ni escanear tu QR.
+      const phoneNorm = normalizePhone(phone);
+      if (!phone.trim() || phoneNorm.replace("+", "").length < 10) {
+        return Alert.alert("Falta teléfono", "Escribe tu número -- lo usamos para que puedas acumular puntos en caja sin la app.");
+      }
 
       setLoading(true);
 
-      const payload = { name: name.trim(), email: email.trim(), password, avatarHair };
+      const payload = { name: name.trim(), email: email.trim(), password, avatarHair, phone: phoneNorm };
 
       if (gender) payload.gender = gender;
-
-      if (phone.trim()) {
-        const phoneNorm = normalizePhone(phone);
-        if (phoneNorm.replace("+", "").length >= 10) {
-          payload.phone = phoneNorm;
-        }
-      }
 
       if (birthDate.trim() && isValidBirthDate(birthDate)) {
         payload.birthDate = birthDateToISO(birthDate);
@@ -442,7 +442,7 @@ export default function RegisterScreen({ navigation }) {
             />
 
             <GlassInput
-              label="Teléfono (opcional)"
+              label="Teléfono"
               value={phone}
               onChangeText={(v) => setPhone(normalizePhone(v))}
               placeholder="6561234567 o +1..."

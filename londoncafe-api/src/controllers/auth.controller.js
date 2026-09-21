@@ -128,17 +128,20 @@ async function register(req, res) {
       return res.status(400).json({ error: "WEAK_PASSWORD" });
     }
 
-    // ✅ Phone — optional
+    // ✅ Phone — ahora requerido (antes opcional): lo necesitamos como
+    // llave alterna de búsqueda en POS/Kiosk para clientes que pagan sin
+    // traer la app a la mano. Las cuentas ya existentes sin teléfono no
+    // se ven afectadas -- solo se exige desde aquí en adelante.
     const phoneStr = String(phone || "").trim();
-    let validPhone = null;
-    if (phoneStr) {
-      if (!/^\+?[0-9]{10,16}$/.test(phoneStr)) {
-        return res.status(400).json({ error: "INVALID_PHONE" });
-      }
-      const phoneExists = await User.findOne({ phone: phoneStr });
-      if (phoneExists) return res.status(409).json({ error: "PHONE_ALREADY_EXISTS" });
-      validPhone = phoneStr;
+    if (!phoneStr) {
+      return res.status(400).json({ error: "MISSING_PHONE" });
     }
+    if (!/^\+?[0-9]{10,16}$/.test(phoneStr)) {
+      return res.status(400).json({ error: "INVALID_PHONE" });
+    }
+    const phoneExists = await User.findOne({ phone: phoneStr });
+    if (phoneExists) return res.status(409).json({ error: "PHONE_ALREADY_EXISTS" });
+    const validPhone = phoneStr;
 
     // ✅ birthDate — optional
     let bd = null;
