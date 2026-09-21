@@ -208,3 +208,72 @@ cron.schedule("0 19 * * *", async () => {
     }
   }
 });
+
+// 🟠 TODOS LOS DÍAS 11AM → recuperar usuarios inactivos.
+// Dos avisos, cada uno UNA sola vez por episodio de inactividad (no uno
+// por cada corrida del cron mientras sigue sin volver -- ver reengageFlags
+// en User.js, que se resetean en getMe en cuanto la persona vuelve a
+// abrir la app de verdad):
+//   - 1 día sin abrir la app: empuje suave (racha / Buddy Coins).
+//   - 7 días sin abrir la app: un solo intento de "recuperación", con
+//     otro tono -- ya se perdió la racha, así que no tiene caso mencionarla.
+cron.schedule("0 11 * * *", async () => {
+  console.log("⏰ Revisando usuarios inactivos...");
+
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  try {
+    const inactive1d = await User.find({
+      expoPushToken: { $exists: true, $ne: "" },
+      lastActiveAt: { $ne: null, $lte: oneDayAgo },
+      "reengageFlags.day1": { $ne: true },
+    });
+
+    for (const user of inactive1d) {
+      if (user.notificationPrefs?.reengage === false) continue;
+      try {
+        const coins = Math.max(0, Math.floor(Number(user.points) || 0));
+        await sendExpoPushNotification(
+          user.expoPushToken,
+          "Te extrañamos en London Café ☕",
+          coins > 0
+            ? `Recupera tu racha 🔥 y aprovecha tus ${coins} Buddy Coins antes de que se enfríen.`
+            : "Recupera tu racha 🔥 -- vuelve hoy y no la pierdas.",
+          { type: "reengage-1d" }
+        );
+        user.reengageFlags.day1 = true;
+        user.markModified("reengageFlags");
+        await user.save();
+      } catch (err) {
+        console.log(`⚠️ reengage 1d push (${user._id}):`, err?.message);
+      }
+    }
+
+    const inactive7d = await User.find({
+      expoPushToken: { $exists: true, $ne: "" },
+      lastActiveAt: { $ne: null, $lte: sevenDaysAgo },
+      "reengageFlags.day7": { $ne: true },
+    });
+
+    for (const user of inactive7d) {
+      if (user.notificationPrefs?.reengage === false) continue;
+      try {
+        await sendExpoPushNotification(
+          user.expoPushToken,
+          "¿Todo bien? 🥺",
+          "Ya casi una semana sin verte por London Café -- tus Buddy Coins siguen ahí, esperándote.",
+          { type: "reengage-7d" }
+        );
+        user.reengageFlags.day7 = true;
+        user.markModified("reengageFlags");
+        await user.save();
+      } catch (err) {
+        console.log(`⚠️ reengage 7d push (${user._id}):`, err?.message);
+      }
+    }
+  } catch (err) {
+    console.log("⚠️ reengage cron:", err?.message);
+  }
+});

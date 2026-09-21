@@ -309,6 +309,20 @@ const userSchema = new mongoose.Schema(
       lowEnergy: { type: Boolean, default: true },
       streak: { type: Boolean, default: true },
       pet: { type: Boolean, default: true },
+      reengage: { type: Boolean, default: true },
+    },
+
+    // ✅ Recuperar usuarios inactivos: se toca SOLO en getMe (cada vez que
+    // la app abre con sesión ya iniciada, ver AuthContext.jsx) -- no sirve
+    // usar `updatedAt` (cambia con cualquier guardado de fondo, como el
+    // cron de energía, sin que la persona haya abierto la app de verdad).
+    lastActiveAt: { type: Date, default: null },
+    // Un aviso por episodio de inactividad, no uno por cada corrida del
+    // cron mientras sigue inactivo -- se resetean los dos en getMe en
+    // cuanto vuelve a abrir la app (ver pushJobs.js).
+    reengageFlags: {
+      day1: { type: Boolean, default: false },
+      day7: { type: Boolean, default: false },
     },
   },
   { timestamps: true }

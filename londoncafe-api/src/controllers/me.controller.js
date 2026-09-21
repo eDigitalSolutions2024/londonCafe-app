@@ -202,6 +202,17 @@ async function getMe(req, res) {
     normalizeStreakAutoReset(user, now); // ✅ AQUÍ
     user.markModified("buddy"); // ✅ recomendado
 
+    // ✅ Recuperar usuarios inactivos (ver pushJobs.js): esto SÍ significa
+    // que la persona abrió la app de verdad, así que se marca como
+    // actividad real y se resetean los avisos de "te extrañamos" -- si se
+    // vuelve a quedar inactiva, puede recibirlos de nuevo más adelante.
+    user.lastActiveAt = now;
+    if (user.reengageFlags?.day1 || user.reengageFlags?.day7) {
+      user.reengageFlags.day1 = false;
+      user.reengageFlags.day7 = false;
+      user.markModified("reengageFlags");
+    }
+
     // Cambio de correo abandonado: si pasaron 24h sin confirmarlo, se
     // cancela solo (mismo enfoque "lazy, al leer" que normalizeStreakAutoReset
     // arriba) -- si no, el banner "Confirma tu correo nuevo" se queda
