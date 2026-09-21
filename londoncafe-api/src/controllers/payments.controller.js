@@ -203,6 +203,30 @@ function vipPassPriceForUser(createdAt) {
   return isSecondMonth ? VIP_PASS_PRICE_LAUNCH_CENTS : VIP_PASS_PRICE_NORMAL_CENTS;
 }
 
+// ✅ Activación del pase, compartida entre confirmVipPass (el cliente la
+// llama justo después de presentPaymentSheet) y el webhook de Stripe
+// (payment_intent.succeeded) -- ANTES solo confirmVipPass activaba el
+// pase, así que si la app se cerraba/perdía red justo entre el cobro
+// exitoso y esa llamada, quedaba un cliente cobrado sin VIP y nada del
+// lado del servidor lo reparaba solo. El webhook es la red de respaldo:
+// llega de Stripe directo aunque el cliente nunca vuelva a llamar nada.
+// Idempotente por `lastPaymentIntentId` -- no reinicia los 30 días si ya
+// se activó con ESE mismo pago (confirmVipPass ya corrió, o Stripe
+// reintentó la entrega del webhook).
+async function activateVipPassForPaymentIntent(pi) {
+  const uid = pi?.metadata?.userId;
+  if (!uid) return;
+
+  const user = await User.findById(uid);
+  if (!user) return;
+  if (user.vipPass?.lastPaymentIntentId === pi.id && user.vipPass?.active) return;
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + VIP_PASS_DURATION_DAYS * 24 * 60 * 60 * 1000);
+  user.vipPass = { active: true, purchasedAt: now, expiresAt, lastPaymentIntentId: pi.id };
+  await user.save();
+}
+
 // ✅ GET -- para que la pantalla de Tienda muestre el precio correcto
 // (normal vs promo del 2do mes) y si ya tiene un pase activo ANTES de
 // arrancar el flujo de pago.
@@ -298,12 +322,10 @@ exports.confirmVipPass = async (req, res) => {
       return res.status(403).json({ ok: false, error: "PAYMENT_MISMATCH" });
     }
 
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + VIP_PASS_DURATION_DAYS * 24 * 60 * 60 * 1000);
-    user.vipPass = { active: true, purchasedAt: now, expiresAt, lastPaymentIntentId: paymentIntentId };
-    await user.save();
+    await activateVipPassForPaymentIntent(pi);
 
-    return res.json({ ok: true, vipPass: user.vipPass });
+    const fresh = await User.findById(uid).select("vipPass");
+    return res.json({ ok: true, vipPass: fresh.vipPass });
   } catch (e) {
     console.log("❌ confirmVipPass:", e?.message || e);
     return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
@@ -330,6 +352,14 @@ exports.handleStripeWebhook = async (req, res) => {
       const pi = event.data.object;
       console.log("✅ payment_intent.succeeded:", pi.id, pi.metadata);
       // TODO: marcar orden pagada en DB usando pi.metadata.orderId
+
+      // Red de respaldo del pase VIP: si el cliente nunca llama
+      // /vip-pass/confirm (app cerrada/sin red justo después del cobro),
+      // este webhook -- que llega directo de Stripe, no depende del
+      // cliente -- activa el pase de todos modos.
+      if (pi.metadata?.source === "vip-pass") {
+        await activateVipPassForPaymentIntent(pi);
+      }
     }
 
     if (event.type === "payment_intent.payment_failed") {
