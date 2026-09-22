@@ -240,13 +240,32 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    // ✅ Registro rápido en POS/Kiosk (solo teléfono, sin correo): required
+    // es una función en vez de `true` fijo -- cualquier cuenta normal
+    // (isGuest:false, el default) lo sigue exigiendo igual que siempre,
+    // pero una cuenta invitada (isGuest:true) puede crearse sin él. El
+    // índice unique vive APARTE como sparse (ver userSchema.index más
+    // abajo, mismo patrón ya usado para `phone`) -- sin sparse, la
+    // SEGUNDA cuenta invitada sin correo chocaría con "ya existe" contra
+    // la primera (ambas indexan como null).
     email: {
       type: String,
-      required: true,
-      unique: true,
+      required: function () {
+        return !this.isGuest;
+      },
       lowercase: true,
       trim: true,
     },
+
+    // ✅ Cuenta creada desde POS/Kiosk con solo el teléfono ("¿guardamos tu
+    // compra para cuando bajes la app?"). Ya gana puntos y acumula
+    // historial como cualquier cuenta, solo le falta correo/contraseña.
+    // Cuando esa persona se registre en la app con el MISMO teléfono, esa
+    // cuenta se completa (se le agrega correo/contraseña, isGuest pasa a
+    // false) en vez de crear una cuenta nueva -- mismo historial desde el
+    // día 1, sin fusionar nada. (La lógica de "completar" vive del lado
+    // de auth.controller.js -- register -- cuando se retome ese trabajo.)
+    isGuest: { type: Boolean, default: false },
 
     // ✅ Cambiar de correo desde Configuración ya no se aplica directo --
     // se guarda aquí hasta que se confirme con un código enviado al
@@ -262,7 +281,14 @@ const userSchema = new mongoose.Schema(
     // si la persona nunca vuelve a esa pantalla.
     pendingEmailRequestedAt: { type: Date, default: null },
 
-    passwordHash: { type: String, required: true },
+    // Igual que email: exigido para cuentas normales, opcional para
+    // invitadas (todavía no eligen contraseña hasta que bajen la app).
+    passwordHash: {
+      type: String,
+      required: function () {
+        return !this.isGuest;
+      },
+    },
     isEmailVerified: { type: Boolean, default: false },
 
     // ✅ Avatar (plano, legado -- se mantiene solo como fallback transitorio
@@ -345,5 +371,11 @@ const userSchema = new mongoose.Schema(
 
 // ✅ Índice unique para phone pero sin romper si está null
 userSchema.index({ phone: 1 }, { unique: true, sparse: true });
+// sparse: sin esto, la segunda cuenta invitada sin correo (isGuest:true)
+// chocaría con E11000 contra la primera -- ver comentario en el campo
+// `email` arriba. El índice viejo (unique SIN sparse) hay que migrarlo
+// a mano en Atlas, autoIndex no reconcilia índices ya existentes con
+// opciones distintas.
+userSchema.index({ email: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("User", userSchema);
