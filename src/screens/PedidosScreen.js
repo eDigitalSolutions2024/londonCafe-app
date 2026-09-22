@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import Screen from "../components/Screen";
 import { AuthContext } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
@@ -64,6 +65,7 @@ function formatOrderItems(order) {
 
 export default function PedidosScreen() {
   const navigation = useNavigation();
+  const tabBarHeight = useBottomTabBarHeight();
   const { user, token } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -171,6 +173,7 @@ const [showOrderModal, setShowOrderModal] = useState(false);
           <FlatList
             data={orders}
             keyExtractor={(item) => String(item._id)}
+            contentContainerStyle={{ paddingBottom: 20 + tabBarHeight }}
             renderItem={({ item }) => {
   const status = getStatusConfig(item.status);
 

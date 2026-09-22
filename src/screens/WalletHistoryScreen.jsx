@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
@@ -58,6 +59,7 @@ function TransactionRow({ tx }) {
 
 export default function WalletHistoryScreen({ navigation }) {
   const { token } = useContext(AuthContext);
+  const tabBarHeight = useBottomTabBarHeight();
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [error, setError] = useState(null);
@@ -104,7 +106,7 @@ export default function WalletHistoryScreen({ navigation }) {
         data={transactions}
         keyExtractor={(tx) => tx.id}
         renderItem={({ item }) => <TransactionRow tx={item} />}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 40 + tabBarHeight }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchHistory} />}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={

@@ -1,6 +1,7 @@
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable, TextInput, FlatList, ActivityIndicator, Alert, Switch } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import Screen from "../components/Screen";
 import AvatarPreview from "../components/AvatarPreview";
 import { colors } from "../theme/colors";
@@ -17,6 +18,7 @@ import { AuthContext } from "../context/AuthContext";
  */
 export default function AmigosScreen({ navigation }) {
   const { user, setUser } = useContext(AuthContext);
+  const tabBarHeight = useBottomTabBarHeight();
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState([]);
@@ -196,7 +198,7 @@ export default function AmigosScreen({ navigation }) {
         <FlatList
           data={friends}
           keyExtractor={(f) => f.friendshipId}
-          contentContainerStyle={{ padding: 20, paddingTop: 6 }}
+          contentContainerStyle={{ padding: 20, paddingTop: 6, paddingBottom: 20 + tabBarHeight }}
           ListHeaderComponent={
             incoming.length > 0 ? (
               <View style={{ marginBottom: 18 }}>

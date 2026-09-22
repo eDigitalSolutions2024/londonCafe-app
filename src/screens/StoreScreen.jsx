@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useStripe } from "@stripe/stripe-react-native";
 import Svg, { Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import Screen from "../components/Screen";
@@ -61,6 +62,7 @@ function CrownGlow({ size = 130 }) {
  */
 export default function StoreScreen() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const tabBarHeight = useBottomTabBarHeight();
   const [status, setStatus] = useState(null); // { active, expiresAt, priceCents, normalPriceCents, isLaunchPromo }
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
@@ -117,7 +119,7 @@ export default function StoreScreen() {
 
   return (
     <Screen safeStyle={styles.safeDark}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 40 + tabBarHeight }]} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Tienda</Text>
         <Text style={styles.sub}>Potencia tu experiencia en London Café</Text>
 

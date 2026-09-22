@@ -8,6 +8,7 @@ import {
   ScrollView,
   RefreshControl,
 } from "react-native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
 import Screen from "../components/Screen";
 import { colors } from "../theme/colors";
@@ -19,6 +20,7 @@ import { GuestLockCard } from "../components/GuestPrompt";
 
 export default function RewardsScreen({ navigation }) {
   const { token, user } = useContext(AuthContext);
+  const tabBarHeight = useBottomTabBarHeight();
 
   const VIP_THRESHOLD = 200;
 
@@ -114,7 +116,7 @@ export default function RewardsScreen({ navigation }) {
   if (!token) {
     return (
       <Screen safeStyle={styles.safeDark}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 + tabBarHeight }}>
           <View style={styles.headerTop}>
             <Text style={styles.pageTitle}>Recompensas</Text>
           </View>
@@ -182,6 +184,7 @@ export default function RewardsScreen({ navigation }) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchAll} />}
+        contentContainerStyle={{ paddingBottom: 40 + tabBarHeight }}
       >
         {/* Header top */}
         <View style={styles.headerTop}>
