@@ -324,6 +324,24 @@ function normalizeStreakAutoReset(user, now = new Date()) {
   ensureDailyReward(user); // ✅ asegura defaults (incluye recovery)
 
   const today = dayKeyLocal(now);
+
+  // ✅ La oferta de "recuperar tu racha" solo vive 1 día extra después del
+  // día en que se detectó la ruptura (streakBrokenDay) -- antes se
+  // quedaba ofreciéndose para siempre mientras no se usara, sin importar
+  // cuántos días hubieran pasado. Si el usuario no la acepta a la primera
+  // vista, se le da un día más; si sigue sin usarla, se cierra sola (no
+  // vuelve a aparecer) en vez de seguir insistiendo indefinidamente.
+  // Corre en cada llamada (independiente de si hoy se rompe una racha
+  // nueva), para limpiar una oferta vieja sin usar apenas se abra la app.
+  if (
+    user.buddy.streakBrokenDay &&
+    user.buddy.streakRecoveryUsed === false &&
+    gapBetweenKeys(user.buddy.streakBrokenDay, today) > 1
+  ) {
+    user.buddy.streakBrokenDay = "";
+    user.buddy.streakPrevCount = 0;
+  }
+
   const last = user.buddy.lastStreakDay || user.buddy.lastClaimDay || "";
   if (!last) return;
 
