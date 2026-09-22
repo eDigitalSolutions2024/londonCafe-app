@@ -2,6 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable, TextInput, FlatList, ActivityIndicator, Alert, Switch } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../components/Screen";
+import AvatarPreview from "../components/AvatarPreview";
 import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
@@ -165,6 +166,9 @@ export default function AmigosScreen({ navigation }) {
         <View style={styles.resultsBox}>
           {results.map((u) => (
             <View key={u.userId} style={styles.resultRow}>
+              <View style={styles.smallAvatarWrap}>
+                <AvatarPreview config={{ avatar3dSnapshotUrl: u.snapshotUrl }} size={32} />
+              </View>
               <Text style={styles.resultName} numberOfLines={1}>{u.name}</Text>
               {u.friendStatus === "accepted" ? (
                 <Text style={styles.resultTag}>Ya son amigos</Text>
@@ -199,6 +203,9 @@ export default function AmigosScreen({ navigation }) {
                 <Text style={styles.sectionLabel}>Solicitudes</Text>
                 {incoming.map((f) => (
                   <View key={f.friendshipId} style={styles.requestRow}>
+                    <View style={styles.smallAvatarWrap}>
+                      <AvatarPreview config={{ avatar3dSnapshotUrl: f.snapshotUrl }} size={32} />
+                    </View>
                     <Text style={styles.requestName} numberOfLines={1}>{f.name}</Text>
                     <View style={{ flexDirection: "row", gap: 8 }}>
                       <Pressable
@@ -222,7 +229,26 @@ export default function AmigosScreen({ navigation }) {
             ) : null
           }
           renderItem={({ item }) => (
-            <View style={styles.friendCard}>
+            <Pressable
+              style={styles.friendCard}
+              onPress={() =>
+                navigation.navigate("Chat", {
+                  friendshipId: item.friendshipId,
+                  name: item.name,
+                  snapshotUrl: item.snapshotUrl,
+                })
+              }
+            >
+              <View style={styles.avatarOuter}>
+                <View style={[styles.avatarWrap, item.here && styles.avatarWrapHere]}>
+                  <AvatarPreview config={{ avatar3dSnapshotUrl: item.snapshotUrl }} size={44} />
+                </View>
+                {item.unreadCount > 0 ? (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{item.unreadCount > 9 ? "9+" : item.unreadCount}</Text>
+                  </View>
+                ) : null}
+              </View>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                   <Text style={styles.friendName} numberOfLines={1}>{item.name}</Text>
@@ -232,14 +258,16 @@ export default function AmigosScreen({ navigation }) {
                   <Text style={styles.friendHereText}>En London Café ahora</Text>
                 ) : outgoing.length === 0 && item.sharedStreak === 0 ? (
                   <Text style={styles.friendHint}>Reclamen su racha diaria el mismo día para empezar 🔥</Text>
-                ) : null}
+                ) : (
+                  <Text style={styles.friendHint}>Toca para chatear 💬</Text>
+                )}
               </View>
               {item.sharedStreak > 0 ? (
                 <View style={styles.streakPill}>
                   <Text style={styles.streakPillText}>🔥 {item.sharedStreak}</Text>
                 </View>
               ) : null}
-            </View>
+            </Pressable>
           )}
           ListEmptyComponent={
             <Text style={styles.emptyText}>
@@ -320,10 +348,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 10,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  smallAvatarWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   resultName: { color: "#fff", fontWeight: "800", fontSize: 13, flex: 1 },
   resultTag: { color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: "800" },
@@ -361,11 +397,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
     backgroundColor: colors.card,
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
   },
+  avatarOuter: { width: 44, height: 44 },
+  avatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: "rgba(0,0,0,0.06)",
+  },
+  avatarWrapHere: {
+    borderWidth: 2,
+    borderColor: "#4f9d69",
+  },
+  unreadBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unreadBadgeText: { color: "#fff", fontSize: 9.5, fontWeight: "900" },
   friendName: { color: "#111", fontWeight: "900", fontSize: 14 },
   friendHint: { marginTop: 2, color: colors.textMuted, fontSize: 10.5, fontWeight: "700" },
   friendHereText: { marginTop: 2, color: "#4f9d69", fontSize: 10.5, fontWeight: "800" },

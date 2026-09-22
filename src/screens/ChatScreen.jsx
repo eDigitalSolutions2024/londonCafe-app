@@ -1,0 +1,200 @@
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  FlatList,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import Screen from "../components/Screen";
+import AvatarPreview from "../components/AvatarPreview";
+import { colors } from "../theme/colors";
+import { apiFetch } from "../api/client";
+
+// Chat 1:1 con un amigo. Sin websockets -- se hace polling cada 4s
+// mientras la pantalla está enfocada (mismo patrón "REST + polling" que
+// ya usa el resto de la app, ver el debounce de búsqueda en
+// AmigosScreen.jsx). Para ~40 usuarios no vale la pena meter
+// infraestructura de sockets solo por esto.
+const POLL_MS = 4000;
+
+export default function ChatScreen({ route, navigation }) {
+  const { friendshipId, name, snapshotUrl } = route.params || {};
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const listRef = useRef(null);
+
+  const load = useCallback(
+    (opts = {}) => {
+      if (!friendshipId) return;
+      return apiFetch(`/friends/${friendshipId}/messages`)
+        .then((r) => setMessages(r?.messages || []))
+        .catch((e) => console.log("❌ chat load:", e?.data || e?.message))
+        .finally(() => opts.silent || setLoading(false));
+    },
+    [friendshipId]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      const t = setInterval(() => load({ silent: true }), POLL_MS);
+      return () => clearInterval(t);
+    }, [load])
+  );
+
+  const send = async () => {
+    const value = text.trim();
+    if (!value || sending) return;
+    setSending(true);
+    setText("");
+    try {
+      await apiFetch(`/friends/${friendshipId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ text: value }),
+      });
+      await load({ silent: true });
+      requestAnimationFrame(() => listRef.current?.scrollToEnd?.({ animated: true }));
+    } catch (e) {
+      setText(value); // regresa el texto si falló, para no perder lo escrito
+      console.log("❌ chat send:", e?.data || e?.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Screen safeStyle={styles.safeDark} withPadding={false}>
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backText}>‹</Text>
+        </Pressable>
+        <View style={styles.headerAvatarWrap}>
+          <AvatarPreview config={{ avatar3dSnapshotUrl: snapshotUrl }} size={36} />
+        </View>
+        <Text style={styles.title} numberOfLines={1}>{name || "Chat"}</Text>
+      </View>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        {loading ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(m) => m._id}
+            contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+            onContentSizeChange={() => listRef.current?.scrollToEnd?.({ animated: false })}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                Todavía no hay mensajes. Manda el primero 👋
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <View style={[styles.bubbleRow, item.mine && styles.bubbleRowMine]}>
+                <View style={[styles.bubble, item.mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                  <Text style={[styles.bubbleText, item.mine && styles.bubbleTextMine]}>{item.text}</Text>
+                </View>
+              </View>
+            )}
+          />
+        )}
+
+        <View style={styles.inputRow}>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder="Escribe un mensaje..."
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            style={styles.input}
+            multiline
+            maxLength={500}
+          />
+          <Pressable
+            onPress={send}
+            disabled={!text.trim() || sending}
+            style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.5 }]}
+          >
+            <Text style={styles.sendBtnText}>➤</Text>
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeDark: { backgroundColor: "#0b0709" },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  backBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.08)" },
+  backText: { color: "#fff", fontSize: 20, fontWeight: "900", marginTop: -2 },
+  headerAvatarWrap: { width: 36, height: 36, borderRadius: 18, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.08)" },
+  title: { color: "#fff", fontSize: 16, fontWeight: "900", flex: 1 },
+
+  emptyText: {
+    color: "rgba(255,255,255,0.45)",
+    textAlign: "center",
+    marginTop: 40,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  bubbleRow: { flexDirection: "row", marginBottom: 8 },
+  bubbleRowMine: { justifyContent: "flex-end" },
+  bubble: { maxWidth: "78%", borderRadius: 16, paddingVertical: 9, paddingHorizontal: 13 },
+  bubbleTheirs: { backgroundColor: "rgba(255,255,255,0.08)", borderBottomLeftRadius: 4 },
+  bubbleMine: { backgroundColor: colors.primary, borderBottomRightRadius: 4 },
+  bubbleText: { color: "#fff", fontSize: 14, fontWeight: "600", lineHeight: 19 },
+  bubbleTextMine: { color: "#fff" },
+
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.08)",
+  },
+  input: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.16)",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: "#fff",
+    fontWeight: "600",
+    maxHeight: 100,
+  },
+  sendBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendBtnText: { color: "#fff", fontSize: 17, fontWeight: "900" },
+});

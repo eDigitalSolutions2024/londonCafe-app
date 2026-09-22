@@ -1,7 +1,10 @@
 // src/controllers/friends.controller.js
+const mongoose = require("mongoose");
 const User = require("../models/User");
 const Friendship = require("../models/Friendship");
+const Message = require("../models/Message");
 const { dayKeyLocal } = require("../utils/buddy");
+const { sendExpoPushNotification } = require("../utils/push");
 
 // Copiado de utils/buddy.js (no exportada de ahí) -- misma implementación
 // exacta, para no tocar ese archivo por esto.
@@ -190,6 +193,15 @@ async function listFriends(req, res) {
       .lean();
     const othersById = new Map(others.map((u) => [String(u._id), u]));
 
+    // Mensajes sin leer por conversación -- una sola agregación en vez de
+    // una query por amigo, para no pegarle N veces a Mongo en una lista
+    // que puede tener varias decenas de amigos.
+    const unreadRows = await Message.aggregate([
+      { $match: { to: new mongoose.Types.ObjectId(uid), readAt: null } },
+      { $group: { _id: "$friendshipId", count: { $sum: 1 } } },
+    ]);
+    const unreadByFriendship = new Map(unreadRows.map((r) => [String(r._id), r.count]));
+
     const friends = [];
     const incoming = [];
     const outgoing = [];
@@ -205,6 +217,7 @@ async function listFriends(req, res) {
           ...publicProfile(other),
           sharedStreak: computeSharedStreak(me, other),
           here: isHereNow(other),
+          unreadCount: unreadByFriendship.get(String(f._id)) || 0,
         });
       } else if (String(f.requestedBy) === String(uid)) {
         outgoing.push({ friendshipId: String(f._id), ...publicProfile(other) });
@@ -224,10 +237,110 @@ async function listFriends(req, res) {
   }
 }
 
+// Confirma que uid sea parte de la amistad :id y que ya esté aceptada --
+// mismo chequeo que ya hacían acceptRequest/declineOrRemove, reusado acá
+// como guard compartido para los dos endpoints de chat.
+async function loadAcceptedFriendshipForUser(friendshipId, uid) {
+  const fr = await Friendship.findById(friendshipId);
+  if (!fr) return { error: "NOT_FOUND", status: 404 };
+  const isParty = String(fr.userA) === String(uid) || String(fr.userB) === String(uid);
+  if (!isParty) return { error: "FORBIDDEN", status: 403 };
+  if (fr.status !== "accepted") return { error: "NOT_FRIENDS", status: 400 };
+  return { fr };
+}
+
+// GET /friends/:id/messages -- últimos mensajes de la conversación (más
+// viejo primero, como cualquier chat) y de paso marca como leídos los que
+// me mandaron a mí -- "leer" es simplemente abrir el chat, no hace falta
+// un endpoint aparte para eso.
+async function listMessages(req, res) {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const { fr, error, status } = await loadAcceptedFriendshipForUser(req.params.id, uid);
+    if (error) return res.status(status).json({ ok: false, error });
+
+    const messages = await Message.find({ friendshipId: fr._id })
+      .sort({ createdAt: 1 })
+      .limit(200)
+      .lean();
+
+    await Message.updateMany(
+      { friendshipId: fr._id, to: uid, readAt: null },
+      { $set: { readAt: new Date() } }
+    );
+
+    return res.json({
+      ok: true,
+      messages: messages.map((m) => ({
+        _id: String(m._id),
+        from: String(m.from),
+        text: m.text,
+        createdAt: m.createdAt,
+        mine: String(m.from) === String(uid),
+      })),
+    });
+  } catch (err) {
+    console.error("listMessages ERROR:", err);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+}
+
+// POST /friends/:id/messages   body: { text }
+async function sendMessage(req, res) {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const text = String(req.body?.text || "").trim();
+    if (!text) return res.status(400).json({ ok: false, error: "EMPTY_MESSAGE" });
+    if (text.length > 500) return res.status(400).json({ ok: false, error: "MESSAGE_TOO_LONG" });
+
+    const { fr, error, status } = await loadAcceptedFriendshipForUser(req.params.id, uid);
+    if (error) return res.status(status).json({ ok: false, error });
+
+    const toId = String(fr.userA) === String(uid) ? fr.userB : fr.userA;
+
+    const msg = await Message.create({ friendshipId: fr._id, from: uid, to: toId, text });
+
+    // El push es "mejor esfuerzo" -- si falla (sin token, Expo caído,
+    // etc.) el mensaje ya quedó guardado, no tiene sentido tumbar la
+    // respuesta por esto.
+    try {
+      const [me, recipient] = await Promise.all([
+        User.findById(uid).select("username name").lean(),
+        User.findById(toId).select("expoPushToken").lean(),
+      ]);
+      if (recipient?.expoPushToken) {
+        const senderName = me?.username || me?.name || "Un amigo";
+        await sendExpoPushNotification(
+          recipient.expoPushToken,
+          `💬 ${senderName} (London Café)`,
+          text.length > 120 ? `${text.slice(0, 117)}...` : text,
+          { type: "friend-message", friendshipId: String(fr._id) }
+        );
+      }
+    } catch (pushErr) {
+      console.error("sendMessage push ERROR:", pushErr?.message || pushErr);
+    }
+
+    return res.json({
+      ok: true,
+      message: { _id: String(msg._id), from: String(uid), text: msg.text, createdAt: msg.createdAt, mine: true },
+    });
+  } catch (err) {
+    console.error("sendMessage ERROR:", err);
+    return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
+  }
+}
+
 module.exports = {
   searchUsers,
   sendRequest,
   acceptRequest,
   declineOrRemove,
   listFriends,
+  listMessages,
+  sendMessage,
 };

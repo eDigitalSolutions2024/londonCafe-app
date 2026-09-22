@@ -15,5 +15,9 @@ router.post("/request", requireAuth, friends.sendRequest);
 router.post("/:id/accept", requireAuth, friends.acceptRequest);
 // POST /friends/:id/decline -- también cancela una solicitud propia o borra una amistad
 router.post("/:id/decline", requireAuth, friends.declineOrRemove);
+// GET /friends/:id/messages -- chat de esa amistad, marca como leído al abrir
+router.get("/:id/messages", requireAuth, friends.listMessages);
+// POST /friends/:id/messages   body: { text }
+router.post("/:id/messages", requireAuth, friends.sendMessage);
 
 module.exports = router;
