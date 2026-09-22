@@ -31,6 +31,18 @@ export default function ChatScreen({ route, navigation }) {
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
 
+  // El tab bar de abajo es `position: absolute` (App.js) -- flota SOBRE
+  // el contenido en vez de empujarlo, así que tapaba el input del chat.
+  // Se oculta mientras el chat está enfocado y se regresa al salir, mismo
+  // patrón estándar de React Navigation para pantallas anidadas.
+  useFocusEffect(
+    useCallback(() => {
+      const parent = navigation.getParent();
+      parent?.setOptions({ tabBarStyle: { display: "none" } });
+      return () => parent?.setOptions({ tabBarStyle: { position: "absolute", backgroundColor: "#111118", borderTopColor: "#222230" } });
+    }, [navigation])
+  );
+
   const load = useCallback(
     (opts = {}) => {
       if (!friendshipId) return;

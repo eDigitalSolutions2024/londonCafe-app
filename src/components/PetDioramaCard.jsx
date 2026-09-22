@@ -194,12 +194,19 @@ const styles = StyleSheet.create({
   // respaldo por plataforma para no cortar el emoji -- ver nota de
   // petEmojiBox más abajo. Con eso, Android e iOS pueden compartir el
   // mismo alto de stage otra vez.
+  // v6: el propio `stage` tenía overflow:"hidden" ADEMÁS del `card` de
+  // afuera (que ya recorta todo a las esquinas redondeadas). En iOS,
+  // ese overflow extra + el transform 3D de `tilt` (perspective+rotateX)
+  // recortaba el avatar y la mascota a media figura -- Android es más
+  // permisivo con contenido transformado que se sale del bounding box
+  // "de antes del transform" y no lo recortaba, por eso solo se veía
+  // roto en iPhone real. `card` ya se encarga del recorte visual (bordes
+  // redondeados), así que este segundo overflow era puro riesgo.
   stage: {
     width: 100,
     height: 84,
     justifyContent: "flex-end",
     alignItems: "center",
-    overflow: "hidden",
   },
   tilt: {
     flexDirection: "row",
