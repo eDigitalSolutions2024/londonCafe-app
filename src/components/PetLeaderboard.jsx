@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Modal, ActivityIndicator, ScrollView } from "react-native";
 import { colors } from "../theme/colors";
 import { apiFetch } from "../api/client";
@@ -20,6 +20,11 @@ const GAME_META = {
  * usuario actual (aunque quede fuera del top) para que tenga claro a
  * cuánto está de subir -- "alguien a quien superar".
  */
+// Mismo patrón "REST + polling" que ya usa el chat (ChatScreen.jsx) --
+// no vale la pena meter websockets solo para que el top se sienta "en
+// vivo" mientras el modal está abierto.
+const POLL_MS = 4000;
+
 export default function PetLeaderboard({ visible, game = "tetris", onClose }) {
   const [loading, setLoading] = useState(true);
   const [top, setTop] = useState([]);
@@ -27,23 +32,29 @@ export default function PetLeaderboard({ visible, game = "tetris", onClose }) {
   const [err, setErr] = useState(false);
   const meta = GAME_META[game] || GAME_META.tetris;
 
+  const load = useCallback(
+    (opts = {}) => {
+      if (!opts.silent) {
+        setLoading(true);
+        setErr(false);
+      }
+      return apiFetch(`/pet/leaderboard?game=${game}`)
+        .then((r) => {
+          setTop(Array.isArray(r?.top) ? r.top : []);
+          setMe(r?.me || null);
+        })
+        .catch(() => opts.silent || setErr(true))
+        .finally(() => opts.silent || setLoading(false));
+    },
+    [game]
+  );
+
   useEffect(() => {
     if (!visible) return;
-    let alive = true;
-    setLoading(true);
-    setErr(false);
-    apiFetch(`/pet/leaderboard?game=${game}`)
-      .then((r) => {
-        if (!alive) return;
-        setTop(Array.isArray(r?.top) ? r.top : []);
-        setMe(r?.me || null);
-      })
-      .catch(() => alive && setErr(true))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [visible, game]);
+    load();
+    const t = setInterval(() => load({ silent: true }), POLL_MS);
+    return () => clearInterval(t);
+  }, [visible, load]);
 
   const meInTop = top.some((r) => r.isMe);
 

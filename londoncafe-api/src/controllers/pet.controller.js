@@ -2,6 +2,7 @@
 const User = require("../models/User");
 const { isUserVIP } = require("./me.controller");
 const { applyDailyRefillOnAppOpen } = require("../utils/buddy");
+const { sendExpoPushNotification } = require("../utils/push");
 
 // --- Decaimiento por tiempo real (mismo patrón que applyEnergyDecay de
 //     buddy.controller.js): las 4 barras bajan cada N minutos. ---
@@ -323,6 +324,45 @@ async function feedPet(req, res) {
   }
 }
 
+const GAME_LABELS = {
+  tetris: "Café Crush",
+  doodle: "Salto Café",
+  ninja: "Barista Ninja",
+  tetris_survival: "Café Crush (supervivencia)",
+  doodle_survival: "Salto Café (supervivencia)",
+  ninja_survival: "Barista Ninja (supervivencia)",
+};
+
+// Si esta jugada acaba de superar a quien iba en 1er lugar de esa tabla,
+// le avisamos por push. Dispara SOLO en el momento del cambio de trono
+// (oldBest <= runnerUp.best < newBest) -- no en cada mejora posterior de
+// quien ya iba en primero, para no mandarle push tras push a sí mismo.
+async function notifyIfDisplacedFromFirst({ uid, field, gameKey, oldBest, newBest }) {
+  if (!(newBest > oldBest)) return;
+  const petField = `pet.${field}`;
+  try {
+    const runnerUp = await User.findOne({ "pet.owned": true, _id: { $ne: uid }, [petField]: { $gt: 0 } })
+      .sort({ [petField]: -1 })
+      .select(`expoPushToken notificationPrefs pet.${field}`)
+      .lean();
+    if (!runnerUp?.expoPushToken) return;
+    if (runnerUp.notificationPrefs?.leaderboard === false) return;
+
+    const runnerBest = Number(runnerUp.pet?.[field]) || 0;
+    if (runnerBest < oldBest || newBest <= runnerBest) return; // no era el 1er lugar, o no lo alcanzó a superar
+
+    const gameLabel = GAME_LABELS[gameKey] || "un mini-juego";
+    await sendExpoPushNotification(
+      runnerUp.expoPushToken,
+      "¡Te quitaron el 1er lugar! 🏆",
+      `Alguien superó tu récord en ${gameLabel}. Entra a recuperar el top.`,
+      { type: "leaderboard-displaced", game: gameKey }
+    );
+  } catch (err) {
+    console.error("notifyIfDisplacedFromFirst ERROR:", err?.message);
+  }
+}
+
 // POST /pet/play  body: { score }  (0..1, fracción de aciertos del mini-juego)
 async function playPet(req, res) {
   try {
@@ -365,14 +405,18 @@ async function playPet(req, res) {
     if (req.body?.game === "tetris") {
       const cleared = Math.max(0, Math.floor(Number(req.body?.cleared) || 0));
       if (isSurvival) {
-        if (cleared > Number(user.pet.tetrisSurvivalBest ?? 0)) {
+        const oldBest = Number(user.pet.tetrisSurvivalBest ?? 0);
+        if (cleared > oldBest) {
           user.pet.tetrisSurvivalBest = cleared;
           tetrisRecord = true;
+          notifyIfDisplacedFromFirst({ uid: user._id, field: "tetrisSurvivalBest", gameKey: "tetris_survival", oldBest, newBest: cleared });
         }
       } else {
-        if (cleared > Number(user.pet.tetrisBest ?? 0)) {
+        const oldBest = Number(user.pet.tetrisBest ?? 0);
+        if (cleared > oldBest) {
           user.pet.tetrisBest = cleared;
           tetrisRecord = true;
+          notifyIfDisplacedFromFirst({ uid: user._id, field: "tetrisBest", gameKey: "tetris", oldBest, newBest: cleared });
         }
 
         // Progresión de niveles: SOLO avanza si ganaste justo el nivel que
@@ -397,14 +441,18 @@ async function playPet(req, res) {
     if (req.body?.game === "doodle") {
       const height = Math.max(0, Math.floor(Number(req.body?.height) || 0));
       if (isSurvival) {
-        if (height > Number(user.pet.doodleSurvivalBest ?? 0)) {
+        const oldBest = Number(user.pet.doodleSurvivalBest ?? 0);
+        if (height > oldBest) {
           user.pet.doodleSurvivalBest = height;
           doodleRecord = true;
+          notifyIfDisplacedFromFirst({ uid: user._id, field: "doodleSurvivalBest", gameKey: "doodle_survival", oldBest, newBest: height });
         }
       } else {
-        if (height > Number(user.pet.doodleBest ?? 0)) {
+        const oldBest = Number(user.pet.doodleBest ?? 0);
+        if (height > oldBest) {
           user.pet.doodleBest = height;
           doodleRecord = true;
+          notifyIfDisplacedFromFirst({ uid: user._id, field: "doodleBest", gameKey: "doodle", oldBest, newBest: height });
         }
 
         const won = req.body?.won === true;
@@ -424,14 +472,18 @@ async function playPet(req, res) {
     if (req.body?.game === "ninja") {
       const sliced = Math.max(0, Math.floor(Number(req.body?.sliced) || 0));
       if (isSurvival) {
-        if (sliced > Number(user.pet.ninjaSurvivalBest ?? 0)) {
+        const oldBest = Number(user.pet.ninjaSurvivalBest ?? 0);
+        if (sliced > oldBest) {
           user.pet.ninjaSurvivalBest = sliced;
           ninjaRecord = true;
+          notifyIfDisplacedFromFirst({ uid: user._id, field: "ninjaSurvivalBest", gameKey: "ninja_survival", oldBest, newBest: sliced });
         }
       } else {
-        if (sliced > Number(user.pet.ninjaBest ?? 0)) {
+        const oldBest = Number(user.pet.ninjaBest ?? 0);
+        if (sliced > oldBest) {
           user.pet.ninjaBest = sliced;
           ninjaRecord = true;
+          notifyIfDisplacedFromFirst({ uid: user._id, field: "ninjaBest", gameKey: "ninja", oldBest, newBest: sliced });
         }
 
         const won = req.body?.won === true;
