@@ -382,6 +382,17 @@ async function login(req, res) {
       token,
       user: {
         id: user._id,
+        // ✅ BUG encontrado: en todo el resto del cliente/backend se lee
+        // `user._id` (convención Mongoose), pero esta respuesta solo traía
+        // `id` -- user._id quedaba `undefined` en TODA sesión restaurada
+        // por login. Efecto real: App.js guardaba el "ya viste el tour de
+        // bienvenida" bajo la llave `onboarding_seen_v1_${user._id}`, que
+        // con _id undefined es SIEMPRE la misma llave rota -- y el guard
+        // `if (user?._id)` en finishOnboarding impedía que ese guardado
+        // corriera JAMÁS, así que el tour reaparecía en cada apertura de
+        // la app sin importar cuántas veces se "terminara". Se agrega
+        // _id sin quitar `id` (por si algo más ya depende de ese nombre).
+        _id: user._id,
         name: user.name,
         email: user.email,
         username: user.username,
@@ -500,6 +511,7 @@ async function me(req, res) {
     return res.json({
       user: {
         id: user._id,
+        _id: user._id, // ver comentario en login() -- mismo bug, mismo fix.
         name: user.name,
         email: user.email,
         username: user.username,
