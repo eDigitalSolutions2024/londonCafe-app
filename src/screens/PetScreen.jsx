@@ -670,8 +670,13 @@ function MiniGameCard({ emoji, title, tint, blocked, myBest, survivalBest, top, 
           </Text>
         ) : null}
         {top ? (
-          <Pressable onPress={(e) => { e.stopPropagation?.(); onPressTop?.(); }} hitSlop={6}>
-            <Text style={[styles.gameTop, { color: tint }]}>{top}</Text>
+          <Pressable
+            onPress={(e) => { e.stopPropagation?.(); onPressTop?.(); }}
+            hitSlop={6}
+            style={styles.gameTopRow}
+          >
+            <Text style={[styles.gameTop, { color: tint }]}>🏆 {top}</Text>
+            <Text style={[styles.gameTopChevron, { color: tint }]}>›</Text>
           </Pressable>
         ) : subtitle ? (
           <Text style={styles.gameMyBest}>{subtitle}</Text>
@@ -853,7 +858,9 @@ const styles = StyleSheet.create({
   gameEmoji: { fontSize: 26 },
   gameTitle: { color: "#111", fontSize: 15, fontWeight: "900" },
   gameMyBest: { marginTop: 2, color: colors.textMuted, fontSize: 11.5, fontWeight: "700" },
-  gameTop: { marginTop: 2, fontSize: 11.5, fontWeight: "900" },
+  gameTopRow: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: 2, alignSelf: "flex-start" },
+  gameTop: { fontSize: 11.5, fontWeight: "900", textDecorationLine: "underline" },
+  gameTopChevron: { fontSize: 13, fontWeight: "900" },
   gamePlayBtn: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999 },
   gamePlayText: { color: "#fff", fontWeight: "900", fontSize: 12.5 },
   gameSurvivalBtn: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1.5 },
