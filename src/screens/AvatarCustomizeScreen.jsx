@@ -6,6 +6,20 @@ import Avatar3DViewer from "../components/Avatar3DViewer";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 import { CHARACTER_OPTIONS, SKIN_TONE_OPTIONS, SKIN_TONE_SUPPORTED_CHARACTERS } from "../assets/avatar3dParts";
+import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
+
+// useBottomTabBarHeight() de @react-navigation/bottom-tabs TRUENA si no hay
+// un Bottom Tab Navigator arriba en el árbol -- y esta pantalla se monta en
+// dos contextos: normal (dentro de HomeStack, sí hay tabs) y `forced`
+// (Avatar3DGateScreen, montado ANTES del NavigationContainer/tabs en
+// App.js, sin tabs para nada). React.useContext nunca truena si no hay
+// Provider (regresa undefined), a diferencia del hook que sí valida y
+// avienta un Error -- por eso se usa el Context directo, con 0 de
+// respaldo cuando no hay barra de tabs que evitar.
+function useSafeBottomTabBarHeight() {
+  const height = useContext(BottomTabBarHeightContext);
+  return height ?? 0;
+}
 
 const PET_SPECIES = [
   { id: "cat", emoji: "🐱", label: "Gato" },
@@ -147,6 +161,7 @@ const STARTER_CHARACTER_IDS = new Set(["kenney_male_a", "kenney_female_d"]);
 export default function AvatarCustomizeScreen({ navigation, forced = false, onDone }) {
   const { token, setUser, user } = useContext(AuthContext);
   const [saving, setSaving] = useState(false);
+  const tabBarHeight = useSafeBottomTabBarHeight();
 
   const existing = user?.avatar3d;
   // accessory: forzado a null (no se lee `existing`) -- el picker de
@@ -256,7 +271,7 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
   };
 
   return (
-    <Screen safeStyle={styles.safeDark}>
+    <Screen safeStyle={styles.safeDark} edges={["top", "bottom"]}>
       {/* Fuera del ScrollView a propósito: el avatar se queda fijo
           arriba mientras el resto (partes/colores) hace scroll abajo,
           en vez de perderse de vista al bajar a elegir algo. */}
@@ -282,7 +297,11 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
         </View>
       </View>
 
-      <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.wrap}
+        contentContainerStyle={[styles.content, { paddingBottom: 28 + tabBarHeight }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.card}>
           <SkinToneRow value={parts.skinTone} onChange={(v) => setPart("skinTone", v)} character={parts.character} />
           <CharacterRow

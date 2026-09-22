@@ -376,6 +376,18 @@ function BoothStreakBar({
 export default function HomeScreen({ navigation }) {
   const { signOut, user, token } = useContext(AuthContext);
 
+  // Snapshot SIEMPRE actualizado de `user`, sin que fetchMe dependa de él
+  // como dependencia reactiva -- ver comentario junto a fetchMe: `user`
+  // ahí solo era un respaldo de emergencia (si /me falla), no algo que
+  // debiera invalidar el memo cada vez que cambia (ej. justo al activar
+  // "Amigos en el café", que llama setUser). Con `user` en las deps,
+  // cada cambio de `user` desestabilizaba fetchMe -> refreshHome -> el
+  // useFocusEffect de abajo, ejecutándolo de nuevo en cada re-render --
+  // exactamente el síntoma reportado de "reload eterno" al volver a Home
+  // justo después de activar esa opción.
+  const userRef = useRef(user);
+  userRef.current = user;
+
   const [showAvatarPeek, setShowAvatarPeek] = useState(false);
 
   // ✅ puntos reales
@@ -565,7 +577,7 @@ useEffect(() => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const u = r?.user ?? user ?? null;
+      const u = r?.user ?? userRef.current ?? null;
       setMe(u);
 
       setAvatarConfig(mergeAvatar3D(u));
@@ -583,7 +595,7 @@ useEffect(() => {
     } catch (e) {
       console.log("❌ /me:", e?.data || e?.message);
 
-      const u = user ?? null;
+      const u = userRef.current ?? null;
       setMe(u);
       setAvatarConfig(mergeAvatar3D(u));
       setBuddy(u?.buddy ?? null);
@@ -597,7 +609,7 @@ useEffect(() => {
     } finally {
       setLoadingMe(false);
     }
-  }, [token, user]);
+  }, [token]);
 
     const refreshingHomeRef = useRef(false);
 
