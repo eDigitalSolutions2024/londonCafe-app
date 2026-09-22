@@ -153,7 +153,7 @@ export default function AmigosScreen({ navigation }) {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Buscar por username..."
+          placeholder="Buscar por nombre o username..."
           placeholderTextColor="rgba(255,255,255,0.35)"
           autoCapitalize="none"
           autoCorrect={false}

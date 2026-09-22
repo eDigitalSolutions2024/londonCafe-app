@@ -57,9 +57,14 @@ function isHereNow(u) {
   return Date.now() - updatedAt < PRESENCE_STALE_MS;
 }
 
-// GET /friends/search?q=username -- busca por username exacto/parcial
-// (no por email, no por nombre completo -- evita que cualquiera encuentre
-// a alguien solo sabiendo su nombre real).
+// GET /friends/search?q=... -- busca por username O nombre (parcial,
+// anclado al inicio). Antes solo buscaba username a propósito, con la
+// idea de que el nombre real no debía ser suficiente para encontrar a
+// alguien -- pero no toda cuenta tiene username puesto (es opcional en
+// el registro), así que esas personas eran imposibles de encontrar por
+// nadie. Se agrega `name` a la búsqueda; sigue sin buscar por correo
+// (ese sí se queda fuera -- sería demasiado fácil encontrar a alguien
+// solo con su correo, que ni siquiera se le pide compartir a otros).
 async function searchUsers(req, res) {
   try {
     const uid = req.user?.uid;
@@ -68,9 +73,12 @@ async function searchUsers(req, res) {
     const q = String(req.query?.q || "").trim().toLowerCase();
     if (q.length < 2) return res.json({ ok: true, results: [] });
 
+    const safe = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const rx = { $regex: `^${safe}`, $options: "i" };
+
     const users = await User.find({
       _id: { $ne: uid },
-      username: { $regex: `^${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, $options: "i" },
+      $or: [{ username: rx }, { name: rx }],
     })
       .select("username name avatar3d.snapshotUrl")
       .limit(10)
