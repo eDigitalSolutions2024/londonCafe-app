@@ -129,12 +129,20 @@ function PartRow({ title, options, value, onChange }) {
 // `forced`: usado por Avatar3DGateScreen (migración obligatoria post-login)
 // -- oculta "Cerrar" y la sección de mascota (no aplica en ese momento) y
 // llama `onDone` en vez de navigation.goBack() al terminar de guardar.
-// En este modo el picker de personaje solo ofrece Chico A / Chica A (no
-// los 12) -- primera impresión más simple, y de paso evita el tono de
-// piel roto: solo esos dos personajes lo soportan bien (ver
-// SKIN_TONE_SUPPORTED_CHARACTERS en avatar3dParts.js). El resto de
-// personajes se desbloquea después desde "Personalizar avatar".
-const STARTER_CHARACTER_IDS = new Set(["kenney_male_a", "kenney_female_a"]);
+// En este modo el picker de personaje solo ofrece Chico A / Chica D (no
+// los 12) -- primera impresión más simple.
+//
+// v2: Chica A se reemplazó por Chica D -- Chica A resultó traer algo
+// tipo muletas/bastones en las manos, mala primera impresión para el
+// personaje de arranque de toda cuenta nueva. Costo real del cambio:
+// Chica D SÍ pierde el selector de tono de piel en este paso (solo
+// Chico A / Chica A lo soportan bien, ver SKIN_TONE_SUPPORTED_CHARACTERS
+// en avatar3dParts.js -- las demás variantes recolorean mal por una
+// paleta compartida sin arreglar todavía). Se acepta ese costo a cambio
+// de no mostrar el problema de las muletas a cada cuenta nueva -- quien
+// quiera Chica A con su tono de piel real puede elegirla después desde
+// "Personalizar avatar", donde sí aparecen las 12 variantes completas.
+const STARTER_CHARACTER_IDS = new Set(["kenney_male_a", "kenney_female_d"]);
 
 export default function AvatarCustomizeScreen({ navigation, forced = false, onDone }) {
   const { token, setUser, user } = useContext(AuthContext);
