@@ -94,9 +94,16 @@ export default function ChatScreen({ route, navigation }) {
         <Text style={styles.title} numberOfLines={1}>{name || "Chat"}</Text>
       </View>
 
+      {/* Antes en Android behavior era `undefined` -- KeyboardAvoidingView
+          no hacía NADA ahí, dejando el resize/pan enteramente al sistema
+          operativo. Con edgeToEdgeEnabled:true (app.json) esa combinación
+          es un punto débil conocido: el input de mensaje podía quedar
+          tapado por el teclado. "height" es el valor que React Native
+          recomienda para Android -- encoge la vista cuando aparece el
+          teclado en vez de confiar solo en el resize nativo. */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {loading ? (
