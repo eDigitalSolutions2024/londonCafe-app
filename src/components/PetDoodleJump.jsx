@@ -306,9 +306,21 @@ export default function PetDoodleJump({ visible, level = 1, survival = false, sp
         draggingRef.current = true;
         charRef.current.x = e.nativeEvent.locationX;
       },
+      // v2: antes esto seguía el dedo 1:1 sin límite -- un swipe rápido, o
+      // simplemente tocar lejos del personaje, lo "teletransportaba" al
+      // instante a esa X, sin importar qué tan lejos. Se siente como
+      // salir disparado a los lados con solo rozar la pantalla. Ahora se
+      // limita cuánto puede avanzar por evento de arrastre hacia el
+      // punto del dedo -- sigue sintiéndose como agarrarlo y arrastrarlo
+      // (no como inclinación/empuje), solo que ya no puede saltar de un
+      // lado al otro del tablero en un solo movimiento brusco.
       onPanResponderMove: (e) => {
         if (phaseRef.current !== "play") return;
-        charRef.current.x = e.nativeEvent.locationX;
+        const target = e.nativeEvent.locationX;
+        const maxStepPerMove = 22;
+        const cur = charRef.current.x;
+        const delta = target - cur;
+        charRef.current.x = cur + Math.max(-maxStepPerMove, Math.min(maxStepPerMove, delta));
       },
       onPanResponderRelease: () => {
         draggingRef.current = false;
