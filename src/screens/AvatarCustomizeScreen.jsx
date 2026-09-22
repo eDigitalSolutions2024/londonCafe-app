@@ -146,17 +146,15 @@ function PartRow({ title, options, value, onChange }) {
 // En este modo el picker de personaje solo ofrece Chico A / Chica D (no
 // los 12) -- primera impresión más simple.
 //
-// v2: Chica A se reemplazó por Chica D -- Chica A resultó traer algo
-// tipo muletas/bastones en las manos, mala primera impresión para el
-// personaje de arranque de toda cuenta nueva. Costo real del cambio:
-// Chica D SÍ pierde el selector de tono de piel en este paso (solo
-// Chico A / Chica A lo soportan bien, ver SKIN_TONE_SUPPORTED_CHARACTERS
-// en avatar3dParts.js -- las demás variantes recolorean mal por una
-// paleta compartida sin arreglar todavía). Se acepta ese costo a cambio
-// de no mostrar el problema de las muletas a cada cuenta nueva -- quien
-// quiera Chica A con su tono de piel real puede elegirla después desde
-// "Personalizar avatar", donde sí aparecen las 12 variantes completas.
-const STARTER_CHARACTER_IDS = new Set(["kenney_male_a", "kenney_female_d"]);
+// v3: el modelo de "Chica A" venía con algo tipo muletas/bastones en las
+// manos -- mala primera impresión para el personaje de arranque de toda
+// cuenta nueva. Se resolvió intercambiando qué .glb usa cada id (ver
+// avatar3dParts.js): "kenney_female_a" ahora apunta al modelo que antes
+// era "Chica D" (limpio), y el modelo con muletas se quitó del catálogo
+// por completo (junto con "Chico B"). Como el id sigue siendo
+// "kenney_female_a", recupera el selector de tono de piel en este paso
+// (ver SKIN_TONE_SUPPORTED_CHARACTERS en avatar3dParts.js).
+const STARTER_CHARACTER_IDS = new Set(["kenney_male_a", "kenney_female_a"]);
 
 export default function AvatarCustomizeScreen({ navigation, forced = false, onDone }) {
   const { token, setUser, user } = useContext(AuthContext);

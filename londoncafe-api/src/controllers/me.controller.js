@@ -560,8 +560,8 @@ async function updateAvatar(req, res) {
 // `accessory` (lentes/gorra) sigue siendo geometría procedural aparte.
 const AVATAR3D_PART_IDS = {
   character: new Set([
-    "kenney_male_a", "kenney_male_b", "kenney_male_c", "kenney_male_d", "kenney_male_e", "kenney_male_f",
-    "kenney_female_a", "kenney_female_b", "kenney_female_c", "kenney_female_d", "kenney_female_e", "kenney_female_f",
+    "kenney_male_a", "kenney_male_c", "kenney_male_d", "kenney_male_e", "kenney_male_f",
+    "kenney_female_a", "kenney_female_b", "kenney_female_c", "kenney_female_e", "kenney_female_f",
   ]),
   accessory: new Set([null, "acc3d_01", "acc3d_02"]),
   // Tono de piel real (recoloreo de textura, ver avatar3dParts.js del

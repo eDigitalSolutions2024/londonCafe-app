@@ -17,17 +17,22 @@ const KENNEY_BASE = `${API_STATIC_URL}/avatar3d-assets/kenney`;
 // para estampar en el pecho del avatar -- ver Avatar3DViewer.jsx applyBrand().
 export const BRAND_LOGO_URL = `${API_STATIC_URL}/avatar3d-assets/branding/logo.png`;
 
+// "Chico B" y "Chica D" (que traía el modelo con muletas) se quitaron por
+// pedido explícito -- quedan 5 variantes por género en vez de 6. Ningún
+// usuario tenía elegido ninguno de los dos ids al momento de quitarlos
+// (verificado contra Atlas), así que no se necesitó migración.
 export const CHARACTER_OPTIONS = [
   { id: "kenney_male_a", label: "Chico A", glb: `${KENNEY_BASE}/character-male-a.glb`, preview: `${KENNEY_BASE}/Previews/character-male-a.png` },
-  { id: "kenney_male_b", label: "Chico B", glb: `${KENNEY_BASE}/character-male-b.glb`, preview: `${KENNEY_BASE}/Previews/character-male-b.png` },
   { id: "kenney_male_c", label: "Chico C", glb: `${KENNEY_BASE}/character-male-c.glb`, preview: `${KENNEY_BASE}/Previews/character-male-c.png` },
   { id: "kenney_male_d", label: "Chico D", glb: `${KENNEY_BASE}/character-male-d.glb`, preview: `${KENNEY_BASE}/Previews/character-male-d.png` },
   { id: "kenney_male_e", label: "Chico E", glb: `${KENNEY_BASE}/character-male-e.glb`, preview: `${KENNEY_BASE}/Previews/character-male-e.png` },
   { id: "kenney_male_f", label: "Chico F", glb: `${KENNEY_BASE}/character-male-f.glb`, preview: `${KENNEY_BASE}/Previews/character-male-f.png` },
-  { id: "kenney_female_a", label: "Chica A", glb: `${KENNEY_BASE}/character-female-a.glb`, preview: `${KENNEY_BASE}/Previews/character-female-a.png` },
+  // "Chica A" usa el .glb que antes era el de "Chica D" (el que
+  // confirmamos limpio) -- el modelo original de female-a (con lo que
+  // parecían muletas) se descartó por completo junto con el label D.
+  { id: "kenney_female_a", label: "Chica A", glb: `${KENNEY_BASE}/character-female-d.glb`, preview: `${KENNEY_BASE}/Previews/character-female-d.png` },
   { id: "kenney_female_b", label: "Chica B", glb: `${KENNEY_BASE}/character-female-b.glb`, preview: `${KENNEY_BASE}/Previews/character-female-b.png` },
   { id: "kenney_female_c", label: "Chica C", glb: `${KENNEY_BASE}/character-female-c.glb`, preview: `${KENNEY_BASE}/Previews/character-female-c.png` },
-  { id: "kenney_female_d", label: "Chica D", glb: `${KENNEY_BASE}/character-female-d.glb`, preview: `${KENNEY_BASE}/Previews/character-female-d.png` },
   { id: "kenney_female_e", label: "Chica E", glb: `${KENNEY_BASE}/character-female-e.glb`, preview: `${KENNEY_BASE}/Previews/character-female-e.png` },
   { id: "kenney_female_f", label: "Chica F", glb: `${KENNEY_BASE}/character-female-f.glb`, preview: `${KENNEY_BASE}/Previews/character-female-f.png` },
 ];
