@@ -83,7 +83,7 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   return (
-    <Screen safeStyle={styles.safeDark} withPadding={false}>
+    <Screen safeStyle={styles.safeDark} withPadding={false} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>‹</Text>
