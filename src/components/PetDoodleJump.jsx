@@ -214,8 +214,14 @@ export default function PetDoodleJump({ visible, level = 1, survival = false, sp
     // Inclinación: solo mueve si el dedo no está tocando el tablero ahora
     // mismo (el arrastre manda). Zona muerta chica para que "derecho" no
     // resbale solo por el ruido del sensor.
+    //
+    // Signo invertido a propósito: el eje X del acelerómetro (con el
+    // teléfono en su orientación normal, vertical) da NEGATIVO al
+    // inclinar hacia la derecha -- lo opuesto a "derecha = positivo" en
+    // coordenadas de pantalla, que es lo que espera ch.x. Sin el "-",
+    // inclinar a la derecha mandaba al personaje a la izquierda.
     if (!draggingRef.current && Math.abs(tiltRef.current) > TILT_DEADZONE) {
-      ch.x += tiltRef.current * TILT_SENSITIVITY;
+      ch.x += -tiltRef.current * TILT_SENSITIVITY;
     }
 
     vyRef.current += GRAVITY;
