@@ -129,6 +129,13 @@ function PartRow({ title, options, value, onChange }) {
 // `forced`: usado por Avatar3DGateScreen (migración obligatoria post-login)
 // -- oculta "Cerrar" y la sección de mascota (no aplica en ese momento) y
 // llama `onDone` en vez de navigation.goBack() al terminar de guardar.
+// En este modo el picker de personaje solo ofrece Chico A / Chica A (no
+// los 12) -- primera impresión más simple, y de paso evita el tono de
+// piel roto: solo esos dos personajes lo soportan bien (ver
+// SKIN_TONE_SUPPORTED_CHARACTERS en avatar3dParts.js). El resto de
+// personajes se desbloquea después desde "Personalizar avatar".
+const STARTER_CHARACTER_IDS = new Set(["kenney_male_a", "kenney_female_a"]);
+
 export default function AvatarCustomizeScreen({ navigation, forced = false, onDone }) {
   const { token, setUser, user } = useContext(AuthContext);
   const [saving, setSaving] = useState(false);
@@ -270,7 +277,16 @@ export default function AvatarCustomizeScreen({ navigation, forced = false, onDo
       <ScrollView style={styles.wrap} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <SkinToneRow value={parts.skinTone} onChange={(v) => setPart("skinTone", v)} character={parts.character} />
-          <CharacterRow options={CHARACTER_OPTIONS} value={parts.character} onChange={(v) => setPart("character", v)} />
+          <CharacterRow
+            options={forced ? CHARACTER_OPTIONS.filter((o) => STARTER_CHARACTER_IDS.has(o.id)) : CHARACTER_OPTIONS}
+            value={parts.character}
+            onChange={(v) => setPart("character", v)}
+          />
+          {forced ? (
+            <Text style={styles.starterHint}>
+              Más personajes se desbloquean después desde "Personalizar avatar" 🎉
+            </Text>
+          ) : null}
 
           {/* Mascota VIP -- especie/nombre; cuidarla vive en PetScreen.
               No aplica todavía en el gate obligatorio post-login. */}
@@ -416,6 +432,7 @@ const styles = StyleSheet.create({
   skinLabel: { marginTop: 4, color: "#111", fontSize: 10.5, fontWeight: "900" },
   skinLabelActive: { color: "#fff" },
   skinUnsupportedHint: { color: colors.textMuted, fontSize: 11.5, fontWeight: "700", lineHeight: 16 },
+  starterHint: { marginTop: -6, color: colors.textMuted, fontSize: 11.5, fontWeight: "700", lineHeight: 16 },
 
   charRow: { flexDirection: "row" },
   charBtn: {
