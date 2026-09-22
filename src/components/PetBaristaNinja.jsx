@@ -292,8 +292,17 @@ export default function PetBaristaNinja({
   // PanResponder para captura táctil suave de la estela de corte
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      // v2: bug real -- devolvía true SIEMPRE, sin importar la fase. Eso
+      // capturaba el toque ANTES de que pudiera llegarle al botón
+      // "Continuar" de la pantalla de fin de nivel (mismo View, el botón
+      // vive encima de este responder de corte) -- el onPanResponderGrant/
+      // Move de abajo sí revisaban `phase === "play"`, pero para
+      // entonces el toque ya había sido interceptado, así que el botón
+      // nunca recibía el tap. Se agrega la misma condición aquí, un paso
+      // antes: si no se está jugando, este responder ni siquiera se
+      // adjudica el toque.
+      onStartShouldSetPanResponder: () => phaseRef.current === "play",
+      onMoveShouldSetPanResponder: () => phaseRef.current === "play",
       onPanResponderGrant: (evt) => {
         if (phaseRef.current !== "play") return;
         const { locationX, locationY } = evt.nativeEvent;
