@@ -22,6 +22,7 @@ import {
 
 
 import { useFocusEffect } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { colors } from "../theme/colors";
 import Screen from "../components/Screen";
@@ -538,11 +539,35 @@ useEffect(() => {
  * ✅ Sync real con backend:
  * cada 30s vuelve a traer /me para que no se desfasen.
  */
-// ✅ abre el modal cuando backend diga canRecover
+// ✅ abre el modal cuando backend diga canRecover -- SOLO una vez por día
+// por cuenta (AsyncStorage, mismo patrón que el tour de bienvenida en
+// App.js). Antes se reabría cada vez que /me volvía a traer
+// canRecover:true (cada poll de 45s, cada regreso a Home, cada apertura
+// de la app) -- si el usuario lo ignoraba la primera vez, se le seguía
+// insistiendo el resto del día sin parar. Se marca "ya visto hoy" en el
+// instante en que se abre, así que tanto cerrarlo como simplemente
+// navegar a otra pantalla cuenta como "ya lo vio" -- no vuelve a
+// aparecer solo hasta el día siguiente (o hasta que expire la oferta,
+// ver normalizeStreakAutoReset en el backend).
 useEffect(() => {
-  if (streak?.canRecover) setRecoverVisible(true);
-  else setRecoverVisible(false);
-}, [streak?.canRecover]);
+  if (!streak?.canRecover) {
+    setRecoverVisible(false);
+    return;
+  }
+  if (!user?._id) return;
+
+  let alive = true;
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const seenKey = `streak_recover_seen_${todayKey}_${user._id}`;
+  AsyncStorage.getItem(seenKey).then((seen) => {
+    if (!alive || seen) return;
+    setRecoverVisible(true);
+    AsyncStorage.setItem(seenKey, "1");
+  });
+  return () => {
+    alive = false;
+  };
+}, [streak?.canRecover, user?._id]);
 
 
   const fetchPoints = useCallback(async () => {
