@@ -194,14 +194,19 @@ const styles = StyleSheet.create({
   // respaldo por plataforma para no cortar el emoji -- ver nota de
   // petEmojiBox más abajo. Con eso, Android e iOS pueden compartir el
   // mismo alto de stage otra vez.
-  // v6: el propio `stage` tenía overflow:"hidden" ADEMÁS del `card` de
-  // afuera (que ya recorta todo a las esquinas redondeadas). En iOS,
-  // ese overflow extra + el transform 3D de `tilt` (perspective+rotateX)
-  // recortaba el avatar y la mascota a media figura -- Android es más
-  // permisivo con contenido transformado que se sale del bounding box
-  // "de antes del transform" y no lo recortaba, por eso solo se veía
-  // roto en iPhone real. `card` ya se encarga del recorte visual (bordes
-  // redondeados), así que este segundo overflow era puro riesgo.
+  // v6: quitar el overflow:"hidden" duplicado (el `card` de afuera ya
+  // recorta a bordes redondeados) NO fue suficiente -- seguía cortado en
+  // iPhone real.
+  // v7: se quita por completo el transform 3D de `tilt` (perspective +
+  // rotateX, la "mesa inclinada"). Es el único elemento que nunca se
+  // había tocado en 6 intentos previos (todos ajustaban el CONTENIDO:
+  // lineHeight, tamaño de caja, alto del stage) -- un `perspective` en
+  // RN calcula los bounds de recorte para su contenido transformado de
+  // forma distinta en iOS que en Android, y es sospechoso conocido para
+  // este tipo de corte inconsistente entre plataformas. Sin ese
+  // transform no hay nada 3D que recortar mal -- se pierde el efecto de
+  // "mesa inclinada" pero el bounce/sombra/rotateZ de cada slot se
+  // queda igual.
   stage: {
     width: 100,
     height: 84,
@@ -213,7 +218,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     justifyContent: "center",
     paddingBottom: 8,
-    transform: [{ perspective: 600 }, { rotateX: "12deg" }],
   },
   slot: { alignItems: "center", justifyContent: "flex-end", width: 44, height: 46 },
   groundShadow: { position: "absolute", bottom: 4, width: 18, height: 5, borderRadius: 999, backgroundColor: "rgba(58,20,10,0.30)" },
