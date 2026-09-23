@@ -1,8 +1,10 @@
 const cron = require("node-cron");
 const User = require("../models/User");
+const AppMeta = require("../models/AppMeta");
 const { sendExpoPushNotification } = require("../utils/push");
 const { applyEnergyDecay, dayKeyLocal } = require("../utils/buddy");
 const { applyPetDecay } = require("../controllers/pet.controller");
+const { getLiveStoreVersions, compareVersions } = require("../utils/storeVersion");
 
 // 🟡 CADA 10 MINUTOS → revisar energía
 cron.schedule("*/10 * * * *", async () => {
@@ -304,5 +306,63 @@ cron.schedule("0 11 * * *", async () => {
     }
   } catch (err) {
     console.log("⚠️ reengage cron:", err?.message);
+  }
+});
+
+// 🟣 CADA 2 HORAS → avisar de una nueva versión ya publicada en las
+// tiendas ("cuando exista", no cuando nosotros la subamos -- Apple puede
+// tardar horas/días en aprobarla, ver storeVersion.js). Compara contra
+// AppMeta.lastAnnouncedVersion para mandar el push UNA sola vez por
+// versión nueva, sin importar cuántas veces corra este cron mientras esa
+// sigue siendo la última. El banner in-app (ver /api/app/version-check +
+// HomeScreen.jsx) no depende de esto -- ese siempre refleja la versión
+// real de la tienda, este cron solo decide cuándo mandar el push.
+cron.schedule("0 */2 * * *", async () => {
+  console.log("⏰ Revisando si hay versión nueva en las tiendas...");
+  try {
+    const { ios, android } = await getLiveStoreVersions();
+    if (!ios && !android) return;
+
+    let meta = await AppMeta.findById("singleton");
+    const hasBaseline = meta && (meta.lastAnnouncedVersion?.ios || meta.lastAnnouncedVersion?.android);
+    if (!hasBaseline) {
+      // Primera vez que corre este cron (o AppMeta no existía todavía) --
+      // solo establece el punto de partida, sin mandar push. Si no,
+      // "ios/android sin versión previa registrada" se leería como
+      // "siempre hay una nueva versión" y mandaría un blast falso apenas
+      // se despliega esta feature.
+      await AppMeta.findByIdAndUpdate(
+        "singleton",
+        { lastAnnouncedVersion: { ios, android } },
+        { upsert: true, setDefaultsOnInsert: true }
+      );
+      return;
+    }
+
+    const newerIOS = ios && compareVersions(ios, meta.lastAnnouncedVersion?.ios) > 0;
+    const newerAndroid = android && compareVersions(android, meta.lastAnnouncedVersion?.android) > 0;
+    if (!newerIOS && !newerAndroid) return;
+
+    console.log(`⏰ Nueva versión detectada -- ios:${ios} android:${android}, avisando por push...`);
+
+    const users = await User.find({ expoPushToken: { $exists: true, $ne: "" } });
+    for (const user of users) {
+      if (user.notificationPrefs?.appUpdate === false) continue;
+      try {
+        await sendExpoPushNotification(
+          user.expoPushToken,
+          "¡Hay una nueva versión de London Café! ☕✨",
+          "Actualiza para disfrutar las mejoras más recientes.",
+          { type: "app-update" }
+        );
+      } catch (err) {
+        console.log(`⚠️ app-update push (${user._id}):`, err?.message);
+      }
+    }
+
+    meta.lastAnnouncedVersion = { ios: ios || meta.lastAnnouncedVersion?.ios || null, android: android || meta.lastAnnouncedVersion?.android || null };
+    await meta.save();
+  } catch (err) {
+    console.log("⚠️ app-update cron:", err?.message);
   }
 });

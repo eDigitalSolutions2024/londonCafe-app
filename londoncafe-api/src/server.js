@@ -23,6 +23,7 @@ const eventsRoutes = require("./routes/events.routes");
 const paymentsRoutes = require("./routes/payments.routes");
 const paymentsController = require("./controllers/payments.controller"); // para webhook raw
 const orderRoutes = require("./routes/order.routes");
+const appRoutes = require("./routes/app.routes");
 
 const app = express();
 
@@ -88,6 +89,7 @@ app.use("/api/buddy", buddyRoutes);
 app.use("/api/pet", require("./routes/pet.routes"));
 app.use("/api/friends", require("./routes/friends.routes"));
 app.use("/api", require("./routes/internalPush.routes"));
+app.use("/api/app", appRoutes);
 // ✅ Payments normal: /api/payments/sheet
 app.use("/api/payments", paymentsRoutes);
 app.use("/api/giftcards", giftcardsRouter);

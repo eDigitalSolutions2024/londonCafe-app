@@ -45,6 +45,7 @@ import PromosSection from "../components/PromoSection";
 import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
 import PetDioramaCard from "../components/PetDioramaCard";
 import VisitsProgressCard from "../components/VisitsProgressCard";
+import UpdateBanner from "../components/UpdateBanner";
 
 // ✅ mood por energía (front fallback)
 function moodLabelFromEnergy(energy = 0) {
@@ -1134,6 +1135,8 @@ const moodEmoji = moodEmojiFromEnergy(energy);
     </TouchableOpacity>
   </View>
 </View>
+
+          <UpdateBanner />
 
           {/* Avatar + Puntos */}
           <View style={styles.avatarSection}>
