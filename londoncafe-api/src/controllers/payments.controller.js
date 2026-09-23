@@ -105,6 +105,32 @@ async function calcOrderAmountFromDB(items = []) {
   return Math.round(total * 100);
 }
 
+// Cupón "free_beverage" (check-in de visitas, ver Coupon.ts en el repo
+// POS): regala UNA bebida (categoría "Bebidas") completa -- la leche de
+// especialidad de esa misma línea se sigue cobrando aparte. Busca la
+// PRIMERA línea del carrito cuyo item sea "Bebidas" y regresa cuánto
+// descontar (precio base en centavos, sin la leche).
+async function findFreeBeverageDiscountCents(items = []) {
+  const normalizedItems = Array.isArray(items) ? items : [];
+  const ids = [...new Set(normalizedItems.map((it) => String(it?._id || "").trim()).filter(Boolean))];
+  if (ids.length === 0) return 0;
+
+  const docs = await AppMenuItem.find({ _id: { $in: ids }, active: true }).lean();
+  const byId = new Map(docs.map((d) => [String(d._id), d]));
+
+  // Solo se descuenta `basePrice` -- milkExtra/tempExtra/flavorsExtra de
+  // esa misma línea siguen sumados en `amount` (ver calcOrderAmountFromDB)
+  // y por lo tanto se siguen cobrando, sin tocar nada aquí.
+  for (const it of normalizedItems) {
+    const doc = byId.get(String(it?._id || "").trim());
+    if (doc?.category === "Bebidas") {
+      const basePrice = Number(doc.price) || 0;
+      return Math.round(basePrice * 100);
+    }
+  }
+  return 0;
+}
+
 const POS_URL = process.env.POS_URL || "https://api.londoncafejrz.com/api";
 
 // El cupón vive en la DB del POS (no en esta), ver Coupon.ts/coupons.ts en
@@ -178,10 +204,14 @@ exports.createPaymentSheet = async (req, res) => {
       });
     }
     if (validCoupon) {
-      discountCents =
-        validCoupon.discountType === "percent"
-          ? Math.round(amount * (Number(validCoupon.discountValue) / 100))
-          : Math.round(Number(validCoupon.discountValue) * 100);
+      if (validCoupon.discountType === "free_beverage") {
+        discountCents = await findFreeBeverageDiscountCents(items);
+      } else {
+        discountCents =
+          validCoupon.discountType === "percent"
+            ? Math.round(amount * (Number(validCoupon.discountValue) / 100))
+            : Math.round(Number(validCoupon.discountValue) * 100);
+      }
       // nunca deja el cobro en $0 -- un cupón de 100% igual cobra el mínimo de un peso
       discountCents = Math.max(0, Math.min(discountCents, amount - 100));
       amount = amount - discountCents;

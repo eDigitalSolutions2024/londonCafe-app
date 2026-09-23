@@ -44,6 +44,7 @@ import PromosSection from "../components/PromoSection";
 // ✅ Modal avatar grande
 import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
 import PetDioramaCard from "../components/PetDioramaCard";
+import VisitsProgressCard from "../components/VisitsProgressCard";
 
 // ✅ mood por energía (front fallback)
 function moodLabelFromEnergy(energy = 0) {
@@ -283,7 +284,7 @@ function BoothStreakBar({
   const shown = claimedToday ? day : Math.max(0, day - 1);
   const pct = shown / totalDays; // 0..1
 
-  const BOOTH_H = 112; // debe ser igual a styles.boothBox.height
+  const BOOTH_H = 88; // debe ser igual a styles.boothBox.height
 
   // ✅ animación del llenado
  const fillAnim = useRef(new Animated.Value(pct * BOOTH_H)).current;
@@ -1207,6 +1208,16 @@ const moodEmoji = moodEmojiFromEnergy(energy);
               onPress={() => navigation.navigate("Pet")}
             />
 
+            {/* ✅ Check-in de visitas -- se suma 1 por día al pagar en el
+                Kiosk (ver orders.ts del repo POS). Al llegar a 5 se genera
+                sola una bebida gratis, que aparece como cupón en Regalos --
+                por eso manda ahí, no hace falta pantalla nueva. */}
+            <VisitsProgressCard
+              count={user?.visits?.count ?? 2}
+              rewardsEarned={user?.visits?.rewardsEarned ?? 0}
+              onPress={() => navigation.navigate("Regalos")}
+            />
+
             {/* ✅ Amigos -- gancho social: racha diaria COMPARTIDA con
                 amigos (ver AmigosScreen.jsx), no solo la solo de arriba. */}
             <Pressable style={styles.amigosCard} onPress={() => navigation.navigate("Amigos")}>
@@ -1575,9 +1586,9 @@ const styles = StyleSheet.create({
 
   /* ✅ Streak Card (cabina + botón + texto) */
   duoCard: {
-    marginTop: 12,
+    marginTop: 10,
     borderRadius: 16,
-    padding: 8,
+    padding: 7,
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: colors.primary,
@@ -1601,22 +1612,22 @@ const styles = StyleSheet.create({
   },
 
   duoTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "900",
     color: "#ffffff",
-    marginBottom: 2,
+    marginBottom: 1,
   },
 
   duoSubtitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: "800",
     color: "rgba(255,255,255,0.95)",
-    marginBottom: 6,
+    marginBottom: 5,
   },
 
   duoBtnCompact: {
-    height: 28,
-    paddingHorizontal: 10,
+    height: 24,
+    paddingHorizontal: 9,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.95)",
     alignItems: "center",
@@ -1626,7 +1637,7 @@ const styles = StyleSheet.create({
   duoBtnDisabled: { opacity: 0.6 },
 
   duoBtnTextCompact: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: "900",
     color: colors.primary,
   },
@@ -1637,18 +1648,18 @@ const styles = StyleSheet.create({
   },
 
   boothBox: {
-    width: 84,
-    height: 112,
+    width: 66,
+    height: 88,
     overflow: "hidden",
   },
   boothImg: {
-    width: 84,
-    height: 112,
+    width: 66,
+    height: 88,
   },
 
   boothHint: {
-    marginTop: 6,
-    fontSize: 9,
+    marginTop: 4,
+    fontSize: 8.5,
     fontWeight: "800",
     color: "rgba(255,255,255,0.85)",
   },

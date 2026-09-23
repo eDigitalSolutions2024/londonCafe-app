@@ -176,7 +176,7 @@ export default function PetDioramaCard({ avatarConfig, onPress, refreshSignal = 
 
 const styles = StyleSheet.create({
   card: {
-    marginTop: 12,
+    marginTop: 10,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.primarySoft,

@@ -233,7 +233,7 @@ async function getMe(req, res) {
     await user.save();
 
     const sanitizedUser = await User.findById(uid).select(
-      "name gender username email pendingEmail isEmailVerified avatarConfig avatar3d createdAt buddy points lifetimePoints phone"
+      "name gender username email pendingEmail isEmailVerified avatarConfig avatar3d createdAt buddy points lifetimePoints phone visits"
     );
 
     const canRecover = calcCanRecover(user);

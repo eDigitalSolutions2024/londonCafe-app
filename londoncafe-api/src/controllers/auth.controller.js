@@ -522,6 +522,7 @@ async function me(req, res) {
         buddy: user.buddy,
         points: user.points,
         lifetimePoints: user.lifetimePoints,
+        visits: user.visits,
       },
     });
   } catch (err) {

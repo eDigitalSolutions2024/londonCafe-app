@@ -402,8 +402,15 @@ const tabBarHeight = useBottomTabBarHeight();
     };
   }, [loyaltyUserId]);
 
+  // "free_beverage" (check-in de visitas): preview aproximado -- toma el
+  // precio de la primera línea "Bebidas" del carrito tal cual (que ya
+  // trae la leche horneada adentro, ver CartContext.js). El cobro real
+  // SIEMPRE lo recalcula el server (payments.controller.js), que sí
+  // separa la leche y la deja cobrándose aparte -- esto es solo estimado.
   const couponDiscountPreview = appliedCoupon
-    ? appliedCoupon.discountType === "percent"
+    ? appliedCoupon.discountType === "free_beverage"
+      ? Number(items.find((it) => it.category === "Bebidas")?.price || 0)
+      : appliedCoupon.discountType === "percent"
       ? (subtotal * Number(appliedCoupon.discountValue)) / 100
       : Number(appliedCoupon.discountValue)
     : 0;
@@ -890,7 +897,9 @@ showsVerticalScrollIndicator={false}
               🎟️ {c.title || c.code}
             </Text>
             <Text style={{ color: COLORS.pageMuted, fontWeight: "700", fontSize: 11, marginTop: 2 }}>
-              {c.discountType === "percent" ? `${c.discountValue}%` : money(c.discountValue)} de descuento
+              {c.discountType === "free_beverage"
+                ? "Bebida gratis"
+                : `${c.discountType === "percent" ? `${c.discountValue}%` : money(c.discountValue)} de descuento`}
             </Text>
           </View>
           <Text style={{ color: "#fff", fontWeight: "900", fontSize: 11.5, backgroundColor: COLORS.wine, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 }}>

@@ -144,10 +144,10 @@ export default function PointsStepperBar({
 const styles = StyleSheet.create({
   // ✅ un poquito más grande que la racha
   card: {
-    marginTop: 12,
+    marginTop: 10,
     ...appStyles.card,
 
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 12,
 
     // “premium” sin cambiar appStyles
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   tapHintChevron: { color: colors.textMuted, fontSize: 13, fontWeight: "900" },
 
   // ✅ barra más “pro”
-  barWrap: { position: "relative", height: 38, justifyContent: "center" },
+  barWrap: { position: "relative", height: 34, justifyContent: "center" },
 
   track: {
     position: "absolute",

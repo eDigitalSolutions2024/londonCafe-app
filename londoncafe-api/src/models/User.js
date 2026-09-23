@@ -317,6 +317,17 @@ const userSchema = new mongoose.Schema(
     lifetimePoints: { type: Number, default: 0 }, // acumulados históricos
     pointsHistory: { type: [pointsHistorySchema], default: [] },
 
+    // ✅ Check-in de visitas -- 1 por día natural, se incrementa al pagar
+    // una orden identificada en el Kiosk (ver orders.ts del repo POS,
+    // que es quien realmente escribe este campo). Tope 5 = cupón de
+    // bebida gratis (se genera automático y count vuelve a 0). Todo
+    // usuario arranca en 2 (cabeza de arranque, ver migración one-off).
+    visits: {
+      count: { type: Number, default: 2, min: 0, max: 5 },
+      lastCheckInDay: { type: String, default: "" }, // "YYYY-MM-DD"
+      rewardsEarned: { type: Number, default: 0 },
+    },
+
     // ✅ Buddy
     buddy: { type: buddySchema, default: () => ({}) },
 
