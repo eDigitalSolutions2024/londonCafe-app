@@ -33,18 +33,19 @@ const PET_SPECIES = [
 // tono de piel con "otro personaje distinto" -- ej. elegir "Moreno" te
 // mandaba a un policía con gorra en vez de solo oscurecer la piel).
 //
-// Solo se muestra con los personajes A (Chico/Chica) -- ver
-// SKIN_TONE_SUPPORTED_CHARACTERS en avatar3dParts.js: en los demás
-// personajes el color de piel comparte franja de la paleta con su pelo/
-// ropa y el recoloreo se ve mal (confirmado en pruebas). Mejor ocultar el
-// picker en esos que dejarlo prometiendo algo que no hace bien.
+// Solo se muestra con Chico A -- ver SKIN_TONE_SUPPORTED_CHARACTERS en
+// avatar3dParts.js: en los demás personajes (incluida Chica A desde el
+// swap que le quitó las muletas) el color de piel comparte franja de la
+// paleta con su pelo/ropa y el recoloreo se ve mal (confirmado en
+// pruebas). Mejor ocultar el picker en esos que dejarlo prometiendo algo
+// que no hace bien.
 function SkinToneRow({ value, onChange, character }) {
   if (!SKIN_TONE_SUPPORTED_CHARACTERS.has(character)) {
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tono de piel</Text>
         <Text style={styles.skinUnsupportedHint}>
-          Por ahora disponible solo con Chico A / Chica A -- para los demás personajes llega pronto.
+          Por ahora disponible solo con Chico A -- para los demás personajes llega pronto.
         </Text>
       </View>
     );
@@ -150,10 +151,13 @@ function PartRow({ title, options, value, onChange }) {
 // manos -- mala primera impresión para el personaje de arranque de toda
 // cuenta nueva. Se resolvió intercambiando qué .glb usa cada id (ver
 // avatar3dParts.js): "kenney_female_a" ahora apunta al modelo que antes
-// era "Chica D" (limpio), y el modelo con muletas se quitó del catálogo
-// por completo (junto con "Chico B"). Como el id sigue siendo
-// "kenney_female_a", recupera el selector de tono de piel en este paso
-// (ver SKIN_TONE_SUPPORTED_CHARACTERS en avatar3dParts.js).
+// era "Chica D" (limpio de muletas), y el modelo con muletas se quitó
+// del catálogo por completo (junto con "Chico B"). Costo real de ese
+// swap: "kenney_female_a" SÍ perdió el selector de tono de piel (el
+// modelo que ahora usa nunca se verificó limpio para eso -- teñía pelo/
+// ropa igual que B..F, ver SKIN_TONE_SUPPORTED_CHARACTERS en
+// avatar3dParts.js). Se acepta ese costo a cambio de no mostrar las
+// muletas a cada cuenta nueva.
 const STARTER_CHARACTER_IDS = new Set(["kenney_male_a", "kenney_female_a"]);
 
 export default function AvatarCustomizeScreen({ navigation, forced = false, onDone }) {

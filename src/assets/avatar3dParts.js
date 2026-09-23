@@ -60,13 +60,22 @@ export const SKIN_TONE_OPTIONS = [
 
 // El recoloreo de piel (applySkinTint en Avatar3DViewer.jsx) detecta "qué
 // es piel" por color en colormap.png, la textura COMPARTIDA por los 12
-// personajes. Se verificó (script offline + prueba en vivo) que solo en
-// los personajes A (Chico/Chica) el color de piel cae en una franja
-// limpia y aislada del resto de la paleta -- en B..F esa misma franja se
-// cruza con el color de pelo/ropa de ESE personaje en particular (cada
-// uno usa la paleta compartida de forma distinta), así que tiñe de más
-// (pelo, y en algunos hasta la ropa). Mientras no se cure esa mezcla
-// personaje por personaje, el picker de tono de piel solo aplica (y solo
-// se muestra) en los personajes A -- para los demás, cambiar de tono no
-// hace nada en vez de dejar un resultado roto.
-export const SKIN_TONE_SUPPORTED_CHARACTERS = new Set(["kenney_male_a", "kenney_female_a"]);
+// personajes -- cada modelo usa esa MISMA imagen pero con su propio mapeo
+// UV (qué franja de color cae en qué parte del cuerpo), así que si el
+// mapeo UV de un personaje en particular hace caer su pelo/ropa en una
+// franja de color parecida a la piel, el recoloreo tiñe de más ahí
+// también. Se verificó (script offline + prueba en vivo) que en el
+// modelo ORIGINAL de "Chico A" y "Chica A" el color de piel cae en una
+// franja limpia y aislada del resto de la paleta -- en B..F esa misma
+// franja se cruza con pelo/ropa, así que tiñe de más.
+//
+// "kenney_female_a" ya NO usa ese modelo original -- apunta al que antes
+// era "Chica D" (swap para quitar las muletas de Chica A, ver
+// CHARACTER_OPTIONS arriba), que nunca se verificó limpio. Prueba en
+// vivo confirmó que sí tiñe de más (pelo y playera) -- mismo problema que
+// B..F, así que se saca del set aquí también, en vez de dejar un
+// resultado visiblemente roto. Una corrección real necesitaría mapear a
+// mano qué franja de colormap.png es la piel EN ESE modelo específico
+// (herramienta de edición 3D/UV, no algo que se pueda calibrar a ciegas
+// por rango de color).
+export const SKIN_TONE_SUPPORTED_CHARACTERS = new Set(["kenney_male_a"]);
