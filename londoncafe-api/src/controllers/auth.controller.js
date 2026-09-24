@@ -7,6 +7,7 @@ const PasswordReset = require("../models/PasswordReset");
 const { generateOtp6, hashOtp } = require("../utils/otp");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("../utils/email");
 const { signAccessToken } = require("../utils/tokens");
+const { getWallet } = require("../utils/wallet");
 
 const OTP_EXPIRE_MIN = 10;
 const RESEND_COOLDOWN_SEC = 60;
@@ -555,6 +556,11 @@ async function me(req, res) {
     applyEnergyDecay(user, now);
     await user.save();
 
+    // Wallet V2 es la única fuente de saldo (points/lifetimePoints conservan su
+    // nombre para las apps ya instaladas). Si el POS no responde: null, nunca
+    // el campo legado.
+    const wallet = await getWallet(String(user._id)).catch(() => null);
+
     return res.json({
       user: {
         id: user._id,
@@ -567,8 +573,8 @@ async function me(req, res) {
         avatarConfig: user.avatarConfig,
         avatar3d: user.avatar3d,
         buddy: user.buddy,
-        points: user.points,
-        lifetimePoints: user.lifetimePoints,
+        points: wallet ? wallet.balance : null,
+        lifetimePoints: wallet ? wallet.totalEarned : null,
         visits: user.visits,
       },
     });

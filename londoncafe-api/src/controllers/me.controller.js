@@ -24,33 +24,11 @@ const {
 } = require("../utils/buddy");
 
 const { sendExpoPushNotification } = require("../utils/push");
+const { getWallet, withWalletPoints, creditBonus, spendCoins } = require("../utils/wallet");
 
 const RECOVERY_COST = 25;
 
-// Mismo POS_URL/POS_API_KEY que points.controller.js usa para hablar con
-// apps/api server-a-servidor (ARCHITECTURE.md §6). El claim de racha solo
-// abonaba al campo legado (user.points) -- la App muestra el saldo de
-// Wallet V2 desde Fase 6, así que sin este puente el cliente nunca veía
-// reflejado lo que ganaba por racha, aunque el punto sí quedara guardado.
-// Fire-and-forget: si Wallet V2 no responde, el claim real (ya guardado en
-// el campo legado arriba) no debe fallar por eso.
 const POS_URL = process.env.POS_URL || "https://api.londoncafejrz.com/api";
-
-async function creditWalletBonus(userId, coins, dayKey, reason) {
-  if (!(coins > 0)) return;
-  try {
-    const res = await fetch(`${POS_URL}/wallet/${userId}/bonus`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": process.env.POS_API_KEY || "" },
-      body: JSON.stringify({ coins, dayKey, reason }),
-    });
-    if (!res.ok) {
-      console.log("creditWalletBonus error:", res.status, await res.text().catch(() => ""));
-    }
-  } catch (err) {
-    console.log("creditWalletBonus error:", err?.message);
-  }
-}
 
 /** helper: saca uid del token */
 function getUid(req) {
@@ -77,11 +55,29 @@ async function claimReward(req, res) {
 
     const result = claimDailyReward(user, now);
 
+    // Wallet V2 es la única fuente de saldo. Se acredita ANTES de guardar la
+    // racha: si el Wallet no responde, no se marca el día como reclamado y la
+    // persona puede reintentar (la clave por día evita duplicar el bono).
+    let balanceAfter = null;
+    if (result.ok && result.reward?.coins > 0) {
+      try {
+        const credited = await creditBonus(String(user._id), {
+          coins: result.reward.coins,
+          key: result.today,
+          reason: "Recompensa diaria / racha",
+        });
+        balanceAfter = credited.balanceAfter;
+      } catch (walletErr) {
+        console.log("claimReward wallet error:", walletErr?.message);
+        return res.status(502).json({ error: "WALLET_UNAVAILABLE" });
+      }
+    }
+
     user.markModified("buddy");
     await user.save();
 
-    if (result.ok && result.reward?.coins > 0) {
-      creditWalletBonus(String(user._id), result.reward.coins, result.today, "Recompensa diaria / racha");
+    if (!Number.isFinite(balanceAfter)) {
+      balanceAfter = await getWallet(String(user._id)).then((w) => w.balance).catch(() => null);
     }
 
     const canRecover = calcCanRecover(user);
@@ -97,7 +93,7 @@ async function claimReward(req, res) {
         recoveryCost: RECOVERY_COST,
       },
       buddy: user.buddy,
-      points: user.points,
+      points: balanceAfter,
     });
   } catch (err) {
     console.log("claimReward FULL:", err); // 👈 para ver stack completo
@@ -122,29 +118,27 @@ async function recoverStreak(req, res) {
       return res.status(400).json({ ok: false, error: "NO_RECOVERY_AVAILABLE" });
     }
 
-    const current = Number(user.points || 0);
-    if (current < RECOVERY_COST) {
-      return res.status(400).json({
-        ok: false,
-        error: "INSUFFICIENT_COINS",
-        needed: RECOVERY_COST,
-        current,
+    // ✅ cobrar en Wallet V2 (única fuente de saldo). Idempotente por el día
+    // en que se rompió la racha: reintentar no cobra dos veces.
+    let balanceAfter;
+    try {
+      const spent = await spendCoins(String(user._id), {
+        coins: RECOVERY_COST,
+        idempotencyKey: `STREAK_RECOVER:${user.buddy?.streakBrokenDay || "na"}`,
+        reason: "Recuperar racha",
       });
-    }
-
-    // ✅ cobrar
-    user.points = current - RECOVERY_COST;
-
-    // ✅ historial (opcional)
-    if (Array.isArray(user.pointsHistory)) {
-      user.pointsHistory.unshift({
-        type: "REDEEM",
-        points: -RECOVERY_COST,
-        source: "STREAK_RECOVER",
-        ref: user.buddy?.streakBrokenDay || null,
-        note: "Recover streak",
-        createdAt: new Date(),
-      });
+      if (!spent.ok) {
+        return res.status(400).json({
+          ok: false,
+          error: "INSUFFICIENT_COINS",
+          needed: RECOVERY_COST,
+          current: spent.balance,
+        });
+      }
+      balanceAfter = spent.balanceAfter;
+    } catch (walletErr) {
+      console.log("recoverStreak wallet error:", walletErr?.message);
+      return res.status(502).json({ ok: false, error: "WALLET_UNAVAILABLE" });
     }
 
     // ✅ restaurar
@@ -169,7 +163,7 @@ user.buddy.lastClaimDay = "";
 
     return res.json({
       ok: true,
-      points: user.points,
+      points: balanceAfter,
       buddy: user.buddy,
       streak: {
         count: user.buddy?.streakCount || 0,
@@ -233,7 +227,7 @@ async function getMe(req, res) {
     await user.save();
 
     const sanitizedUser = await User.findById(uid).select(
-      "name gender username email pendingEmail isEmailVerified avatarConfig avatar3d createdAt buddy points lifetimePoints phone visits"
+      "name gender username email pendingEmail isEmailVerified avatarConfig avatar3d createdAt buddy phone visits"
     );
 
     const canRecover = calcCanRecover(user);
@@ -241,7 +235,8 @@ async function getMe(req, res) {
     // ✅ manda el timer junto al user
     return res.json({
       ok: true,
-      user: sanitizedUser,
+      // points/lifetimePoints salen de Wallet V2 (mismos nombres que siempre).
+      user: await withWalletPoints(sanitizedUser),
       refillTimer,
       streak: {
         count: user.buddy?.streakCount || 0,

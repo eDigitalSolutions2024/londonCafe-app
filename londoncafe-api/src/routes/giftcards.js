@@ -8,6 +8,7 @@ const GiftCard = require("../models/GiftCard");
 const User = require("../models/User");
 const { generateGiftCardCode } = require("../utils/giftCardCode");
 const { requireAuth } = require("../middleware/auth.middleware");
+const { creditBonus } = require("../utils/wallet");
 
 // Helpers
 function normalizeEmail(email) {
@@ -213,32 +214,26 @@ router.post("/redeem", requireAuth, async (req, res) => {
       return res.status(403).json({ ok: false, msg: "Esta tarjeta no está asignada a tu cuenta." });
     }
 
+    // Acredita el valor como Buddy Coins (1 peso de gift card = 1 Buddy Coin)
+    // en Wallet V2, la ÚNICA fuente de saldo, y se usan en Ordena/Kiosk/POS igual
+    // que cualquier otro saldo. Va ANTES de marcar la tarjeta como canjeada: si
+    // el Wallet no responde, la tarjeta sigue vigente y se puede reintentar (la
+    // clave GIFTCARD-<id> evita acreditar dos veces).
+    try {
+      await creditBonus(String(userId), {
+        coins: Math.floor(Number(gift.amount) || 0),
+        key: `GIFTCARD-${String(gift._id)}`,
+        reason: `Tarjeta de regalo canjeada (${gift.code})`,
+      });
+    } catch (walletErr) {
+      console.error("giftcards /redeem wallet:", walletErr?.message);
+      return res.status(502).json({ ok: false, msg: "No se pudo acreditar tu saldo en este momento. Intenta de nuevo." });
+    }
+
     gift.status = "REDEEMED";
     gift.redeemedAt = new Date();
     gift.redeemedBy = userId;
     await gift.save();
-
-    // Acredita el valor como Buddy Coins (1 peso de gift card = 1 Buddy
-    // Coin) -- ANTES esto no pasaba: la respuesta ya decía
-    // `credited: gift.amount` pero nunca se sumaba a ningún lado (bug
-    // real: "no le llega al usuario"). Ya siendo Buddy Coins, se pueden
-    // usar en Ordena igual que cualquier otro saldo (useBuddyCoins en
-    // CartScreen.jsx) -- no hace falta un flujo de canje aparte ahí.
-    const user = await User.findById(userId);
-    if (user) {
-      user.points = (Number(user.points) || 0) + gift.amount;
-      user.lifetimePoints = (Number(user.lifetimePoints) || 0) + gift.amount;
-      if (!Array.isArray(user.pointsHistory)) user.pointsHistory = [];
-      user.pointsHistory.unshift({
-        type: "EARN",
-        points: gift.amount,
-        source: "GIFTCARD",
-        ref: String(gift._id),
-        note: `Tarjeta de regalo canjeada (${gift.code})`,
-        createdAt: new Date(),
-      });
-      await user.save();
-    }
 
     return res.json({ ok: true, gift, credited: gift.amount });
   } catch (err) {

@@ -6,6 +6,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 const AppMenuItem = require("../models/AppMenuItem");
 const User = require("../models/User");
+const { getRedeemLimit } = require("../utils/wallet");
 
 /**
  * ✅ Recibe [{ _id, qty }]
@@ -236,17 +237,27 @@ exports.createPaymentSheet = async (req, res) => {
     let buddyCoinsApplied = 0;
     let buddyDiscountCents = 0;
     const requestedCoins = Math.max(0, Math.floor(Number(buddyCoinsRedeemed) || 0));
+    // Base sobre la que Wallet V2 calculó el tope (monto después del cupón,
+    // antes de los coins): se guarda en el metadata para que createOrderFromApp
+    // pida el canje con exactamente el mismo subtotal.
+    const buddyBaseCents = amount;
     if (requestedCoins > 0) {
-      const me = await User.findById(uid).select("points").lean();
-      const availableCoins = Math.max(0, Number(me?.points) || 0);
-      const maxByAmount = Math.floor((amount / 100) * 2); // no más de lo que cubre el total restante
-      buddyCoinsApplied = Math.min(requestedCoins, availableCoins, maxByAmount);
-      buddyDiscountCents = Math.round((buddyCoinsApplied / 2) * 100);
+      // Wallet V2 es la única fuente: el POS decide el tope (mínimo entre el
+      // saldo real y el % máximo de la RewardRule) y la tasa de conversión.
+      let limit;
+      try {
+        limit = await getRedeemLimit(String(uid), amount / 100);
+      } catch (walletErr) {
+        console.log("❌ createPaymentSheet wallet:", walletErr?.message);
+        return res.status(502).json({ ok: false, error: "WALLET_UNAVAILABLE" });
+      }
+      buddyCoinsApplied = Math.min(requestedCoins, limit.maxCoins);
+      buddyDiscountCents = Math.round(buddyCoinsApplied * limit.centavosPerCoin);
       // nunca deja el cobro en $0 -- mismo mínimo de un peso que el cupón
       const maxDiscount = Math.max(0, amount - 100);
       if (buddyDiscountCents > maxDiscount) {
-        buddyDiscountCents = maxDiscount;
-        buddyCoinsApplied = Math.floor((buddyDiscountCents / 100) * 2);
+        buddyCoinsApplied = Math.floor(maxDiscount / limit.centavosPerCoin);
+        buddyDiscountCents = buddyCoinsApplied * limit.centavosPerCoin;
       }
       amount = amount - buddyDiscountCents;
     }
@@ -263,6 +274,8 @@ exports.createPaymentSheet = async (req, res) => {
         userId: String(uid),
         couponCode: validCoupon ? validCoupon.code : "",
         buddyCoinsApplied: String(buddyCoinsApplied),
+        buddyDiscountCents: String(buddyDiscountCents),
+        buddyBaseCents: String(buddyBaseCents),
       },
     });
 

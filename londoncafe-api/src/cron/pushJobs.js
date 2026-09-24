@@ -5,6 +5,7 @@ const { sendExpoPushNotification } = require("../utils/push");
 const { applyEnergyDecay, dayKeyLocal } = require("../utils/buddy");
 const { applyPetDecay } = require("../controllers/pet.controller");
 const { getLiveStoreVersions, compareVersions } = require("../utils/storeVersion");
+const { getWallet } = require("../utils/wallet");
 
 // 🟡 CADA 10 MINUTOS → revisar energía
 cron.schedule("*/10 * * * *", async () => {
@@ -242,7 +243,8 @@ cron.schedule("0 11 * * *", async () => {
     for (const user of inactive1d) {
       if (user.notificationPrefs?.reengage === false) continue;
       try {
-        const coins = Math.max(0, Math.floor(Number(user.points) || 0));
+        // Saldo real de Wallet V2 (si el POS no responde, el mensaje sale sin monto).
+        const coins = await getWallet(String(user._id)).then((w) => Math.max(0, Math.floor(w.balance))).catch(() => 0);
         await sendExpoPushNotification(
           user.expoPushToken,
           "Te extrañamos en London Café ☕",

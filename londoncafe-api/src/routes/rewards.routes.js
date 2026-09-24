@@ -9,6 +9,7 @@ const User = require("../models/User");
 // 2) module.exports = requireAuth
 const authMod = require("../middleware/auth.middleware");
 const apiKeyMod = require("../middleware/apiKey.middleware");
+const { getWallet, spendCoins } = require("../utils/wallet");
 
 const requireAuth = authMod.requireAuth || authMod;
 const requireApiKey = apiKeyMod.requireApiKey || apiKeyMod;
@@ -48,7 +49,15 @@ router.post("/redeem", requireAuth, async (req, res) => {
     const u = await User.findById(userId);
     if (!u) return res.status(404).json({ ok: false, message: "Usuario no existe" });
 
-    if ((u.points || 0) < costPoints) {
+    // Wallet V2 es la única fuente de saldo.
+    let balance;
+    try {
+      balance = (await getWallet(String(userId))).balance;
+    } catch (walletErr) {
+      console.log("rewards /redeem wallet:", walletErr?.message);
+      return res.status(502).json({ ok: false, message: "No se pudo consultar tu saldo. Intenta de nuevo." });
+    }
+    if (balance < costPoints) {
       return res.status(400).json({ ok: false, message: "Puntos insuficientes" });
     }
 
@@ -123,13 +132,25 @@ router.post("/consume", requireApiKey, async (req, res) => {
     const u = await User.findById(userId);
     if (!u) return res.status(404).json({ ok: false, message: "Usuario no existe" });
 
-    if ((u.points || 0) < costPoints) {
-      return res.status(400).json({ ok: false, message: "Puntos insuficientes" });
+    // Descuenta en Wallet V2 (única fuente de saldo), idempotente por canje:
+    // si el POS reintenta, no cobra dos veces.
+    let remainingPoints;
+    try {
+      const spent = await spendCoins(String(userId), {
+        coins: costPoints,
+        idempotencyKey: `REWARD:${String(redemption._id)}`,
+        reason: `Canje de recompensa (${rewardType})`,
+      });
+      if (!spent.ok) {
+        return res.status(400).json({ ok: false, message: "Puntos insuficientes" });
+      }
+      remainingPoints = spent.balanceAfter;
+    } catch (walletErr) {
+      console.log("rewards /consume wallet:", walletErr?.message);
+      return res.status(502).json({ ok: false, message: "No se pudo descontar el saldo. Intenta de nuevo." });
     }
 
-    // descuenta puntos + marca consumido
-    u.points = (u.points || 0) - costPoints;
-    await u.save();
+    // marca consumido
 
     redemption.status = "consumed";
     redemption.consumedAt = new Date();
@@ -141,7 +162,7 @@ router.post("/consume", requireApiKey, async (req, res) => {
       message: "Canje aplicado",
       rewardType,
       costPoints,
-      remainingPoints: u.points,
+      remainingPoints,
     });
   } catch (e) {
     console.log("❌ /rewards/consume", e);

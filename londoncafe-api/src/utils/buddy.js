@@ -203,12 +203,9 @@ function calcDailyRewardByWeekDay(weekDay) {
 function grantReward(user, reward, now = new Date()) {
   if (!user.buddy) user.buddy = {};
 
-  // ✅ BuddyCoins reales = user.points (lo que usa tu UI)
-  if (reward.coins) {
-    const add = Number(reward.coins) || 0;
-    user.points = (Number(user.points) || 0) + add;
-    user.lifetimePoints = (Number(user.lifetimePoints) || 0) + add; // opcional pero recomendado
-  }
+  // Los BuddyCoins (reward.coins) YA NO se suman aquí: Wallet V2 es la única
+  // fuente de saldo y quien llama (me.controller.claimReward) los acredita
+  // ahí, de forma idempotente, ANTES de guardar la racha.
 
   // ✅ extras para alimentar
   if (reward.coffee) user.buddy.coffee = (Number(user.buddy.coffee) || 0) + Number(reward.coffee);
@@ -322,8 +319,6 @@ grantReward(user, reward, now);
   weekDay,
   reward,
   buddy: user.buddy,
-  points: user.points,
-  lifetimePoints: user.lifetimePoints,
 };
 }
 

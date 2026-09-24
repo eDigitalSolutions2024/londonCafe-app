@@ -4,7 +4,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const POS_URL = process.env.POS_URL || "https://api.londoncafejrz.com/api";
 
 // ajusta la ruta si está en otra carpeta
-const User = require("../models/User");
+const { redeemOrder, earnOrder } = require("../utils/wallet");
 
 async function createOrderFromApp(req, res) {
   try {
@@ -132,68 +132,47 @@ async function createOrderFromApp(req, res) {
     }
 
     // =========================
-    // BUDDYCOINS AL PAGAR (gana EARN sobre lo realmente cobrado, y
-    // descuenta el REDEEM si se usaron Buddy Coins al pagar -- ver
-    // buddyCoinsApplied en el metadata, reservado en createPaymentSheet
-    // pero nunca descontado hasta que el pago se confirma aquí).
+    // BUDDYCOINS AL PAGAR -- SOLO Wallet V2 (abono sobre lo realmente cobrado y
+    // canje si se usaron Buddy Coins -- ver buddyCoinsApplied en el metadata,
+    // reservado en createPaymentSheet pero nunca descontado hasta que el pago
+    // se confirma aquí).
     // =========================
     let buddyCoinsAwarded = 0;
     let buddyCoinsRedeemed = 0;
 
-try {
-  const user = await User.findById(uid);
+    // Wallet V2 es la ÚNICA fuente de BuddyCoins. Canje y abono se asientan con
+    // el id de la orden del POS (posData.order._id): es la misma clave que usa
+    // el POS al entregar (EARN:ORDER:<id>), así que si después se marca
+    // entregada, no se abona dos veces; y un reintento de esta llamada tampoco
+    // duplica nada (ambos endpoints son idempotentes por orden).
+    try {
+      const posOrderId = String(posData?.order?._id || "");
+      if (!posOrderId) {
+        console.error("[FROM-APP] el POS no devolvió el id de la orden; no se pudo asentar BuddyCoins", posData);
+      } else {
+        const requestedCoins = Math.max(0, Math.floor(Number(paymentIntent.metadata?.buddyCoinsApplied) || 0));
+        if (requestedCoins > 0) {
+          // Subtotal sobre el que se calculó el tope al crear el PaymentIntent
+          // (monto después del cupón, antes de los coins).
+          const baseCents =
+            Number(paymentIntent.metadata?.buddyBaseCents) ||
+            paymentIntent.amount + Math.round(Number(paymentIntent.metadata?.buddyDiscountCents) || 0);
+          const redeemed = await redeemOrder(String(uid), {
+            orderId: posOrderId,
+            requestedCoins,
+            subtotalInPesos: +(baseCents / 100).toFixed(2),
+          });
+          buddyCoinsRedeemed = redeemed.appliedCoins;
+        }
 
-  if (user) {
-    if (!Array.isArray(user.pointsHistory)) user.pointsHistory = [];
-
-    const alreadyAwarded = user.pointsHistory.some(
-      (entry) => entry?.type === "EARN" && String(entry?.ref || "") === String(paymentIntentId)
-    );
-    const alreadyRedeemed = user.pointsHistory.some(
-      (entry) => entry?.type === "REDEEM" && String(entry?.ref || "") === String(paymentIntentId)
-    );
-
-    const requestedCoins = Math.max(0, Math.floor(Number(paymentIntent.metadata?.buddyCoinsApplied) || 0));
-    if (!alreadyRedeemed && requestedCoins > 0) {
-      // Tope de seguridad: nunca descuenta más de lo que la cuenta
-      // realmente tiene, aunque el metadata dijera otra cosa.
-      const toRedeem = Math.min(requestedCoins, Math.max(0, Number(user.points) || 0));
-      if (toRedeem > 0) {
-        user.points = Math.max(0, Number(user.points || 0) - toRedeem);
-        user.pointsHistory.push({
-          type: "REDEEM",
-          points: -toRedeem,
-          source: "APP_ORDER",
-          ref: paymentIntentId,
-          note: `Canje en Ordena por $${(toRedeem / 2).toFixed(2)}`,
-          createdAt: new Date(),
-        });
-        buddyCoinsRedeemed = toRedeem;
+        // Abono sobre lo realmente cobrado por Stripe (ya sin coins ni cupón).
+        const earned = await earnOrder(String(uid), { orderId: posOrderId, paidInPesos: verifiedTotal });
+        buddyCoinsAwarded = earned.earnedCoins;
       }
+    } catch (loyaltyError) {
+      console.error("[FROM-APP] buddycoins error:", loyaltyError);
     }
 
-    const pointsToAward = Math.floor(verifiedTotal / 10);
-    if (!alreadyAwarded && pointsToAward > 0) {
-      user.points = Number(user.points || 0) + pointsToAward;
-      user.lifetimePoints = Number(user.lifetimePoints || 0) + pointsToAward;
-
-      user.pointsHistory.push({
-        type: "EARN",
-        points: pointsToAward,
-        source: "APP_ORDER",
-        ref: paymentIntentId,
-        note: `Compra pagada en app por ${verifiedTotal} MXN`,
-        createdAt: new Date(),
-      });
-
-      buddyCoinsAwarded = pointsToAward;
-    }
-
-    if (buddyCoinsRedeemed > 0 || buddyCoinsAwarded > 0) await user.save();
-  }
-} catch (loyaltyError) {
-  console.error("[FROM-APP] buddycoins error:", loyaltyError);
-}
 
     return res.status(201).json({
       ok: true,

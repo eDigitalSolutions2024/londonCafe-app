@@ -1,6 +1,7 @@
 // controllers/points.controller.js
 const User = require("../models/User");
 const Receipt = require("../models/Receipt"); // anti-duplicados (receiptId UNIQUE)
+const { getWallet, withWalletPoints, creditBonus } = require("../utils/wallet");
 
 /** helper: saca uid del token (tu auth normal) */
 function getUid(req) {
@@ -33,13 +34,15 @@ async function getMyPoints(req, res) {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
 
-    const user = await User.findById(uid).select("points lifetimePoints");
+    // Wallet V2 es la única fuente de saldo (ya no se lee user.points).
+    const user = await User.findById(uid).select("_id");
     if (!user) return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
 
+    const w = await getWallet(uid);
     return res.json({
       ok: true,
-      points: Number(user.points) || 0,
-      lifetimePoints: Number(user.lifetimePoints) || 0,
+      points: w.balance,
+      lifetimePoints: w.totalEarned,
     });
   } catch (err) {
     console.log("getMyPoints error:", err?.message);
@@ -83,14 +86,14 @@ async function posScanQr(req, res) {
       return res.status(400).json({ ok: false, error: "QR_INVALID" });
     }
 
-    const user = await User.findById(uid).select("_id name username email points lifetimePoints");
+    const user = await User.findById(uid).select("_id name username email");
     if (!user) {
       return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
     }
 
     return res.json({
       ok: true,
-      user,
+      user: await withWalletPoints(user),
     });
   } catch (err) {
     console.log("posScanQr error:", err?.message);
@@ -135,35 +138,36 @@ async function posCheckout(req, res) {
       return res.status(500).json({ ok: false, error: "RECEIPT_SAVE_FAILED" });
     }
 
-    // sumar puntos al usuario + historial
-    const updatedUser = await User.findByIdAndUpdate(
-      uid,
-      {
-        $inc: { points: add, lifetimePoints: add },
-        $push: {
-          pointsHistory: {
-            type: "EARN",
-            points: add,
-            source: "POS",
-            ref: cleanReceipt,
-            note: "Compra en caja",
-            createdAt: new Date(),
-          },
-        },
-      },
-      { new: true }
-    ).select("points lifetimePoints");
-
-    if (!updatedUser) {
+    // Abono en Wallet V2 (única fuente de saldo). Idempotente por recibo: si
+    // el POS reintenta, el POS de Wallet no duplica el movimiento.
+    const user = await User.findById(uid).select("_id");
+    if (!user) {
       return res.status(404).json({ ok: false, error: "USER_NOT_FOUND" });
     }
 
+    let credited;
+    try {
+      credited = await creditBonus(uid, {
+        coins: add,
+        key: `RECEIPT-${cleanReceipt}`,
+        reason: "Compra en caja",
+      });
+    } catch (walletErr) {
+      // Sin abono no debe quedar el recibo marcado como procesado: el POS
+      // podrá reintentar (la clave RECEIPT-<id> evita duplicar el abono).
+      await Receipt.deleteOne({ receiptId: cleanReceipt }).catch(() => {});
+      console.log("posCheckout wallet error:", walletErr?.message);
+      return res.status(502).json({ ok: false, error: "WALLET_UNAVAILABLE" });
+    }
+
+    const w = await getWallet(uid);
     return res.json({
       ok: true,
       added: add,
-      points: Number(updatedUser?.points) || 0,
-      lifetimePoints: Number(updatedUser?.lifetimePoints) || 0,
+      points: w.balance,
+      lifetimePoints: w.totalEarned,
       receiptId: cleanReceipt,
+      balanceAfter: credited.balanceAfter,
     });
   } catch (err) {
     console.log("posCheckout error:", err?.message);

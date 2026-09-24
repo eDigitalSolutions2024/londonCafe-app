@@ -396,6 +396,25 @@ const tabBarHeight = useBottomTabBarHeight();
 
   const loyaltyUserId = user?._id || user?.id || "";
 
+  // RewardRule activa de Wallet V2: única fuente de la tasa de canje y del %
+  // máximo del total que se puede pagar con BuddyCoins. Mientras carga se usa
+  // el valor actual (50 centavos por coin, 30%); el server siempre decide.
+  const [redeemRate, setRedeemRate] = useState({ centavosPerCoin: 50, maxRedeemPercent: 0.3 });
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    apiFetch("/points/reward-rule", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => {
+        const rr = r?.rewardRule?.redeemRate;
+        if (alive && rr?.centavosPerCoin > 0) setRedeemRate({ centavosPerCoin: rr.centavosPerCoin, maxRedeemPercent: rr.maxRedeemPercent ?? 0.3 });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+  const pesosPerCoin = redeemRate.centavosPerCoin / 100;
+
   useEffect(() => {
     if (!loyaltyUserId) {
       setMyCoupons([]);
@@ -425,7 +444,7 @@ const tabBarHeight = useBottomTabBarHeight();
   const estimatedTotalAfterCoupon = Math.max(0, subtotal - couponDiscountPreview);
 
   const availableBuddyCoins = Number(user?.points || 0);
-  const maxBuddyCoinsByTotal = Math.floor(estimatedTotalAfterCoupon * 2);
+  const maxBuddyCoinsByTotal = Math.floor((estimatedTotalAfterCoupon * redeemRate.maxRedeemPercent) / pesosPerCoin);
   const maxBuddyCoinsUsable = Math.max(0, Math.min(availableBuddyCoins, maxBuddyCoinsByTotal));
   const safeBuddyCoinsToRedeem = useMemo(() => {
     if (!useBuddyCoins) return 0;
@@ -433,7 +452,7 @@ const tabBarHeight = useBottomTabBarHeight();
     if (!Number.isFinite(raw) || raw <= 0) return 0;
     return Math.min(Math.floor(raw), maxBuddyCoinsUsable);
   }, [buddyCoinsToRedeem, useBuddyCoins, maxBuddyCoinsUsable]);
-  const buddyDiscountPreview = safeBuddyCoinsToRedeem / 2;
+  const buddyDiscountPreview = safeBuddyCoinsToRedeem * pesosPerCoin;
 
   const estimatedTotal = Math.max(0, estimatedTotalAfterCoupon - buddyDiscountPreview);
 
