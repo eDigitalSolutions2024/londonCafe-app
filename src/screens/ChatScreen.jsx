@@ -8,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -30,6 +31,26 @@ export default function ChatScreen({ route, navigation }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
+
+  // "height" de KeyboardAvoidingView en Android seguía sin subir el input
+  // -- con edgeToEdgeEnabled:true (app.json) esa combinación con
+  // adjustResize es un punto débil conocido (el resize del sistema y el
+  // cálculo de KeyboardAvoidingView no cuadran). En vez de seguir
+  // peleando con el comportamiento automático, en Android se mide el alto
+  // real del teclado con los eventos nativos y se aplica como padding
+  // directo -- no depende de que el "resize" de la ventana se calcule bien.
+  const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const onShow = Keyboard.addListener("keyboardDidShow", (e) => {
+      setAndroidKeyboardHeight(e.endCoordinates?.height || 0);
+    });
+    const onHide = Keyboard.addListener("keyboardDidHide", () => setAndroidKeyboardHeight(0));
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, []);
 
   // El tab bar de abajo es `position: absolute` (App.js) -- flota SOBRE
   // el contenido en vez de empujarlo, así que tapaba el input del chat.
@@ -94,16 +115,14 @@ export default function ChatScreen({ route, navigation }) {
         <Text style={styles.title} numberOfLines={1}>{name || "Chat"}</Text>
       </View>
 
-      {/* Antes en Android behavior era `undefined` -- KeyboardAvoidingView
-          no hacía NADA ahí, dejando el resize/pan enteramente al sistema
-          operativo. Con edgeToEdgeEnabled:true (app.json) esa combinación
-          es un punto débil conocido: el input de mensaje podía quedar
-          tapado por el teclado. "height" es el valor que React Native
-          recomienda para Android -- encoge la vista cuando aparece el
-          teclado en vez de confiar solo en el resize nativo. */}
+      {/* iOS sigue con KeyboardAvoidingView normal (funciona bien ahí).
+          Android usa androidKeyboardHeight (ver arriba) en vez de
+          behavior="height" -- ver esa nota para el porqué. behavior=null
+          en Android para que KeyboardAvoidingView no intente compensar
+          por su cuenta y se pisen los dos ajustes. */}
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={[{ flex: 1 }, Platform.OS === "android" && { paddingBottom: androidKeyboardHeight }]}
+        behavior={Platform.OS === "ios" ? "padding" : null}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {loading ? (

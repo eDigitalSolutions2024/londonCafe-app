@@ -72,7 +72,7 @@ const ITEM_SPAWN_CHANCE = 0.22; // fracción de plataformas nuevas que traen un 
 // lados) -- se suaviza con un filtro simple para que no tiemble, y se
 // ignora un rango chico cerca de 0 para que sostenerlo "derecho" no haga
 // que la mascota se resbale sola.
-const TILT_SENSITIVITY = 16; // px/frame por cada 1.0 de inclinación
+const TILT_SENSITIVITY = 8; // px/frame por cada 1.0 de inclinación (bajado de 16 -- se iba muy fácil a los lados)
 const TILT_DEADZONE = 0.06;
 const TILT_SMOOTHING = 0.25; // 0..1, más alto = responde más rápido/tiembla más
 
