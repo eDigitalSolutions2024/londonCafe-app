@@ -32,6 +32,16 @@ async function getMyEmail(req) {
 // lo cobra con presentPaymentSheet, y SOLO si el pago se confirma (ver
 // /purchase/confirm abajo, o el webhook de Stripe como red de respaldo)
 // se crea la tarjeta de verdad.
+// Ruta ANTERIOR (creaba la tarjeta sin cobrar nada). Las versiones de la app
+// instaladas antes del cobro real con Stripe todavía la llaman: en vez de un
+// 404 mudo, se les dice que actualicen. Ya no crea nada.
+router.post("/purchase", requireAuth, (_req, res) => {
+  return res.status(426).json({
+    ok: false,
+    error: "Para comprar tarjetas de regalo actualiza la app a la última versión.",
+  });
+});
+
 router.post("/purchase/sheet", requireAuth, async (req, res) => {
   try {
     const fromUserId = req.user?.uid;
