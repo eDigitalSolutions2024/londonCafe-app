@@ -28,6 +28,13 @@ const GiftCardSchema = new mongoose.Schema(
     redeemedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 
     expiresAt: { type: Date, default: null },
+
+    // Id del PaymentIntent de Stripe que pagó esta tarjeta -- clave para
+    // que la creación sea idempotente (ver createGiftCardForPaymentIntent
+    // en routes/giftcards.js): tanto /purchase/confirm como el webhook de
+    // Stripe pueden intentar crear la misma tarjeta, y con esto el
+    // segundo intento encuentra la ya creada en vez de duplicarla.
+    paymentIntentId: { type: String, default: null, index: true },
   },
   { timestamps: true }
 );

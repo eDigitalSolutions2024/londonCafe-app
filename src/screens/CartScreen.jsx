@@ -386,6 +386,14 @@ const tabBarHeight = useBottomTabBarHeight();
   const [couponError, setCouponError] = useState("");
   const [myCoupons, setMyCoupons] = useState([]); // cupones PERSONALES (ver GET /coupons/mine) -- se muestran solos, sin escribir código
 
+  // ✅ Buddy Coins -- ANTES Ordena no tenía esto (solo Kiosk/Cobro sí).
+  // Misma tasa (2 coins = $1 MXN) y mismo tope (nunca más de lo que
+  // cubre el total ni más de lo que la cuenta tiene) que esos dos
+  // canales -- el cálculo real/autoritativo lo hace el server en
+  // /payments/sheet (payments.controller.js), esto es solo preview.
+  const [useBuddyCoins, setUseBuddyCoins] = useState(false);
+  const [buddyCoinsToRedeem, setBuddyCoinsToRedeem] = useState("");
+
   const loyaltyUserId = user?._id || user?.id || "";
 
   useEffect(() => {
@@ -414,7 +422,20 @@ const tabBarHeight = useBottomTabBarHeight();
       ? (subtotal * Number(appliedCoupon.discountValue)) / 100
       : Number(appliedCoupon.discountValue)
     : 0;
-  const estimatedTotal = Math.max(0, subtotal - couponDiscountPreview);
+  const estimatedTotalAfterCoupon = Math.max(0, subtotal - couponDiscountPreview);
+
+  const availableBuddyCoins = Number(user?.points || 0);
+  const maxBuddyCoinsByTotal = Math.floor(estimatedTotalAfterCoupon * 2);
+  const maxBuddyCoinsUsable = Math.max(0, Math.min(availableBuddyCoins, maxBuddyCoinsByTotal));
+  const safeBuddyCoinsToRedeem = useMemo(() => {
+    if (!useBuddyCoins) return 0;
+    const raw = Number(buddyCoinsToRedeem || 0);
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    return Math.min(Math.floor(raw), maxBuddyCoinsUsable);
+  }, [buddyCoinsToRedeem, useBuddyCoins, maxBuddyCoinsUsable]);
+  const buddyDiscountPreview = safeBuddyCoinsToRedeem / 2;
+
+  const estimatedTotal = Math.max(0, estimatedTotalAfterCoupon - buddyDiscountPreview);
 
   const onApplyCoupon = async (codeOverride) => {
     const code = (codeOverride || couponInput).trim().toUpperCase();
@@ -582,6 +603,7 @@ async function getLoggedUserData() {
         items: payloadItems,
         couponCode: appliedCoupon?.code || undefined,
         loyaltyUserId: loyaltyUserId || undefined,
+        buddyCoinsRedeemed: safeBuddyCoinsToRedeem || undefined,
       }),
     });
 
@@ -695,6 +717,8 @@ console.log("[APP] orderPayload:", JSON.stringify(orderPayload, null, 2));
 
     clear();
     removeCoupon();
+    setUseBuddyCoins(false);
+    setBuddyCoinsToRedeem("");
 
 navigation.navigate("Order", {
   playOrderBubble: true,
@@ -974,6 +998,72 @@ showsVerticalScrollIndicator={false}
     </Text>
   ) : null}
 
+  {/* ✅ Buddy Coins -- mismo patrón visual que Kiosk/Cobro */}
+  {availableBuddyCoins > 0 ? (
+    <View style={{ marginBottom: 10 }}>
+      <Pressable
+        onPress={() => setUseBuddyCoins((v) => !v)}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          backgroundColor: useBuddyCoins ? "rgba(122,30,58,0.35)" : "transparent",
+          borderWidth: 1,
+          borderColor: COLORS.border,
+          borderRadius: 12,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+        }}
+      >
+        <Text style={{ color: COLORS.pageText, fontWeight: "800", fontSize: 12.5 }}>
+          🪙 Usar mis Buddy Coins ({availableBuddyCoins} disponibles)
+        </Text>
+        <View
+          style={{
+            width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: COLORS.wine,
+            alignItems: "center", justifyContent: "center",
+            backgroundColor: useBuddyCoins ? COLORS.wine : "transparent",
+          }}
+        >
+          {useBuddyCoins ? <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>✓</Text> : null}
+        </View>
+      </Pressable>
+
+      {useBuddyCoins ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <TextInput
+            value={buddyCoinsToRedeem}
+            onChangeText={(v) => setBuddyCoinsToRedeem(v.replace(/[^0-9]/g, ""))}
+            placeholder={`Hasta ${maxBuddyCoinsUsable}`}
+            placeholderTextColor={COLORS.pageMuted}
+            keyboardType="number-pad"
+            style={{
+              flex: 1,
+              borderWidth: 1,
+              borderColor: COLORS.border,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              color: COLORS.pageText,
+              fontWeight: "700",
+            }}
+          />
+          <Pressable
+            onPress={() => setBuddyCoinsToRedeem(String(maxBuddyCoinsUsable))}
+            style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: "rgba(122,30,58,0.35)" }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 12 }}>Máximo</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {safeBuddyCoinsToRedeem > 0 ? (
+        <Text style={{ color: COLORS.pageMuted, fontWeight: "700", fontSize: 11.5, marginTop: 6 }}>
+          {safeBuddyCoinsToRedeem} coins = {money(buddyDiscountPreview)} de descuento
+        </Text>
+      ) : null}
+    </View>
+  ) : null}
+
   <View
     style={{
       flexDirection: "row",
@@ -983,7 +1073,7 @@ showsVerticalScrollIndicator={false}
     }}
   >
     <View>
-      {appliedCoupon ? (
+      {appliedCoupon || safeBuddyCoinsToRedeem > 0 ? (
         <>
           <Text style={{ color: COLORS.pageMuted, fontWeight: "700", fontSize: 12, textDecorationLine: "line-through" }}>
             {money(subtotal)}

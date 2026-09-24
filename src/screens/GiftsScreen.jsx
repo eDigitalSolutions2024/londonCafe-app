@@ -18,9 +18,10 @@ import {
   RefreshControl,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
+import { useStripe } from "@stripe/stripe-react-native";
 
 import { AuthContext } from "../context/AuthContext";
-import { fetchMyGiftCards, purchaseGiftCard, redeemGiftCard } from "../api/giftcards";
+import { fetchMyGiftCards, createGiftCardSheet, confirmGiftCard, redeemGiftCard } from "../api/giftcards";
 import { posFetch } from "../api/client";
 import { colors } from "../theme/colors";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -512,6 +513,8 @@ function CouponQrModal({ coupon, onClose }) {
 export default function GiftsScreen() {
   const { token, user } = useContext(AuthContext);
 const tabBarHeight = useBottomTabBarHeight();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const [buying, setBuying] = useState(false);
 
   const scrollRef = useRef(null);
   const redeemYRef = useRef(0);
@@ -600,23 +603,47 @@ const tabBarHeight = useBottomTabBarHeight();
     }, 60);
   }, []);
 
+  // 2 pasos con Stripe (mismo patrón que el Pase VIP en StoreScreen.jsx):
+  // /purchase/sheet arma el PaymentIntent, el PaymentSheet cobra de
+  // verdad, y /purchase/confirm crea la tarjeta ya con el pago
+  // confirmado -- antes esto creaba la tarjeta directo, sin cobrar nada.
   const onPurchase = useCallback(async () => {
     try {
       const email = toEmail.trim();
       if (!email.includes("@")) return Alert.alert("Falta info", "Escribe un email válido.");
       if (!amount || amount <= 0) return Alert.alert("Falta info", "Selecciona un monto.");
 
-      const res = await purchaseGiftCard(token, { toEmail: email, amount, message });
-      if (!res?.ok) return Alert.alert("Error", res?.msg || "No se pudo enviar.");
+      setBuying(true);
 
-      Alert.alert("Listo", `Tarjeta enviada ✅\nCódigo: ${res.gift.code}`);
+      const sheet = await createGiftCardSheet(token, { toEmail: email, amount, message });
+      if (!sheet?.ok) throw new Error(sheet?.msg || "No se pudo iniciar el cobro.");
+
+      const { error: initError } = await initPaymentSheet({
+        merchantDisplayName: "London Café",
+        paymentIntentClientSecret: sheet.paymentIntentClientSecret,
+        allowsDelayedPaymentMethods: true,
+      });
+      if (initError) throw new Error(initError.message);
+
+      const { error: payError } = await presentPaymentSheet();
+      if (payError) {
+        if (payError.code === "Canceled") return; // el usuario canceló, no es un error real
+        throw new Error(payError.message);
+      }
+
+      const confirm = await confirmGiftCard(token, sheet.paymentIntentId);
+      if (!confirm?.ok) throw new Error(confirm?.msg || "No se pudo confirmar la tarjeta.");
+
+      Alert.alert("Listo", `Tarjeta enviada ✅\nCódigo: ${confirm.gift.code}`);
       setToEmail("");
       setMessage("");
       await load();
     } catch (e) {
-      Alert.alert("Error", e?.message || "Error");
+      Alert.alert("Error", e?.data?.msg || e?.message || "Error");
+    } finally {
+      setBuying(false);
     }
-  }, [token, toEmail, amount, message, load]);
+  }, [token, toEmail, amount, message, load, initPaymentSheet, presentPaymentSheet]);
 
   const onRedeem = useCallback(async () => {
     try {
@@ -808,7 +835,7 @@ const tabBarHeight = useBottomTabBarHeight();
 
         <View style={{ height: 12 }} />
 
-        <PrimaryButton label="Enviar regalo" onPress={onPurchase} disabled={!token} />
+        <PrimaryButton label={buying ? "Cobrando..." : "Enviar regalo"} onPress={onPurchase} disabled={!token || buying} />
       </Card>
 
       {/* Canjear */}

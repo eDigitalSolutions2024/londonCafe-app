@@ -8,6 +8,9 @@ const User = require("../models/User");
 
 async function createOrderFromApp(req, res) {
   try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
     const {
       source,
       paymentIntentId,
@@ -20,7 +23,6 @@ async function createOrderFromApp(req, res) {
       customer,
       generalNotes,
       customerPhone,
-      userId, // 👈 nuevo
     } = req.body || {};
 
     const finalCustomerName = String(
@@ -54,16 +56,34 @@ async function createOrderFromApp(req, res) {
       });
     }
 
+    // ⚠️ Antes no se revisaba NADA de esto -- cualquier paymentIntentId
+    // "succeeded" (de cualquier persona, o incluso de otro flujo como el
+    // Pase VIP o una gift card) servía para crear una orden y cobrar
+    // Buddy Coins a la cuenta que el body dijera. Ahora se exige que el
+    // PaymentIntent haya sido creado por ESTE flujo (source:
+    // "londoncafe-app", ver createPaymentSheet en payments.controller.js)
+    // Y para ESTE usuario autenticado.
+    if (paymentIntent.metadata?.source !== "londoncafe-app" || paymentIntent.metadata?.userId !== String(uid)) {
+      return res.status(403).json({ ok: false, error: "PAYMENT_MISMATCH" });
+    }
+
+    // Total REAL cobrado (Stripe, en centavos) -- ya no el que mandara el
+    // cliente. El `total` del body se ignora para todo lo que importa
+    // (registro de la orden y cálculo de Buddy Coins); antes ambos venían
+    // de ahí sin verificar nada, así que cualquiera podía inflar el total
+    // reportado para farmear puntos sin pagar más.
+    const verifiedTotal = +(paymentIntent.amount / 100).toFixed(2);
+
     const orderPayload = {
   source: source || "app",
   paymentIntentId,
   paymentStatus: paymentIntent.status === "succeeded" ? "paid" : "pending",
-  total: Number(total || 0),
+  total: verifiedTotal,
   currency: currency || "mxn",
   customerName: finalCustomerName,
   customerPhone: customerPhone || "",
   generalNotes: generalNotes || "",
-  userId: userId || null, // 👈 nuevo
+  userId: uid,
   status: "pending",
   createdAt: new Date().toISOString(),
   items: items.map((it) => ({
@@ -112,48 +132,64 @@ async function createOrderFromApp(req, res) {
     }
 
     // =========================
-    // BUDDYCOINS AL PAGAR
+    // BUDDYCOINS AL PAGAR (gana EARN sobre lo realmente cobrado, y
+    // descuenta el REDEEM si se usaron Buddy Coins al pagar -- ver
+    // buddyCoinsApplied en el metadata, reservado en createPaymentSheet
+    // pero nunca descontado hasta que el pago se confirma aquí).
     // =========================
     let buddyCoinsAwarded = 0;
+    let buddyCoinsRedeemed = 0;
 
 try {
-  const userId = req.user?._id || req.user?.id || req.body.userId || null;
+  const user = await User.findById(uid);
 
-  console.log("============== DEBUG BUDDY ==============");
-  console.log("req.user:", req.user);
-  console.log("userId:", userId);
-  console.log("=========================================");
+  if (user) {
+    if (!Array.isArray(user.pointsHistory)) user.pointsHistory = [];
 
-  if (userId) {
-    const user = await User.findById(userId);
+    const alreadyAwarded = user.pointsHistory.some(
+      (entry) => entry?.type === "EARN" && String(entry?.ref || "") === String(paymentIntentId)
+    );
+    const alreadyRedeemed = user.pointsHistory.some(
+      (entry) => entry?.type === "REDEEM" && String(entry?.ref || "") === String(paymentIntentId)
+    );
 
-    if (user) {
-      const orderTotal = Number(total || 0);
-      const pointsToAward = Math.floor(orderTotal / 10);
-
-      const alreadyAwarded = (user.pointsHistory || []).some(
-        (entry) =>
-          entry?.type === "EARN" &&
-          String(entry?.ref || "") === String(paymentIntentId)
-      );
-
-      if (!alreadyAwarded && pointsToAward > 0) {
-        user.points = Number(user.points || 0) + pointsToAward;
-        user.lifetimePoints = Number(user.lifetimePoints || 0) + pointsToAward;
-
+    const requestedCoins = Math.max(0, Math.floor(Number(paymentIntent.metadata?.buddyCoinsApplied) || 0));
+    if (!alreadyRedeemed && requestedCoins > 0) {
+      // Tope de seguridad: nunca descuenta más de lo que la cuenta
+      // realmente tiene, aunque el metadata dijera otra cosa.
+      const toRedeem = Math.min(requestedCoins, Math.max(0, Number(user.points) || 0));
+      if (toRedeem > 0) {
+        user.points = Math.max(0, Number(user.points || 0) - toRedeem);
         user.pointsHistory.push({
-          type: "EARN",
-          points: pointsToAward,
+          type: "REDEEM",
+          points: -toRedeem,
           source: "APP_ORDER",
           ref: paymentIntentId,
-          note: `Compra pagada en app por ${orderTotal} MXN`,
+          note: `Canje en Ordena por $${(toRedeem / 2).toFixed(2)}`,
           createdAt: new Date(),
         });
-
-        await user.save();
-        buddyCoinsAwarded = pointsToAward;
+        buddyCoinsRedeemed = toRedeem;
       }
     }
+
+    const pointsToAward = Math.floor(verifiedTotal / 10);
+    if (!alreadyAwarded && pointsToAward > 0) {
+      user.points = Number(user.points || 0) + pointsToAward;
+      user.lifetimePoints = Number(user.lifetimePoints || 0) + pointsToAward;
+
+      user.pointsHistory.push({
+        type: "EARN",
+        points: pointsToAward,
+        source: "APP_ORDER",
+        ref: paymentIntentId,
+        note: `Compra pagada en app por ${verifiedTotal} MXN`,
+        createdAt: new Date(),
+      });
+
+      buddyCoinsAwarded = pointsToAward;
+    }
+
+    if (buddyCoinsRedeemed > 0 || buddyCoinsAwarded > 0) await user.save();
   }
 } catch (loyaltyError) {
   console.error("[FROM-APP] buddycoins error:", loyaltyError);
@@ -164,6 +200,7 @@ try {
       message: "ORDER_CREATED",
       order: posData,
       buddyCoinsAwarded,
+      buddyCoinsRedeemed,
     });
   } catch (error) {
     console.error("createOrderFromApp error:", error);
@@ -176,12 +213,17 @@ try {
 
 async function getMyOrders(req, res) {
   try {
-    const { userId } = req.params;
+    // Antes confiaba en :userId de la URL -- cualquiera podía leer el
+    // historial de pedidos de cualquier otra cuenta con solo cambiar el
+    // id. Ahora siempre es la cuenta autenticada, el param de la URL ya
+    // no se usa (se deja en la ruta por compatibilidad con el cliente,
+    // que igual sigue mandándolo).
+    const userId = req.user?.uid;
 
     if (!userId) {
-      return res.status(400).json({
+      return res.status(401).json({
         ok: false,
-        error: "USER_ID_REQUIRED",
+        error: "BAD_TOKEN",
       });
     }
 

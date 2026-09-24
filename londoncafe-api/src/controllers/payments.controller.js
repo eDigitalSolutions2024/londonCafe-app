@@ -169,7 +169,14 @@ function cartMeetsProductRequirement(items, coupon) {
 
 exports.createPaymentSheet = async (req, res) => {
   try {
-    const { items, customerEmail, couponCode, loyaltyUserId } = req.body;
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
+
+    const { items, customerEmail, couponCode, buddyCoinsRedeemed } = req.body;
+    // loyaltyUserId SIEMPRE es el de la sesión autenticada -- ya no se
+    // confía en un valor del body (permitía validar/usar el cupón
+    // personal de OTRA cuenta con solo mandar su id).
+    const loyaltyUserId = uid;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ ok: false, error: "CART_EMPTY" });
@@ -217,6 +224,33 @@ exports.createPaymentSheet = async (req, res) => {
       amount = amount - discountCents;
     }
 
+    // Buddy Coins -- ANTES Ordena no tenía esto para nada (solo cupón),
+    // a diferencia de Kiosk/Cobro donde ya existe. Misma tasa que esos
+    // dos canales: 2 coins = $1 MXN (ver buddyDiscountAmount en
+    // KioskOrderPage.tsx). Se aplica DESPUÉS del cupón, mismo orden que
+    // ya usan Kiosk/Cobro. No se descuenta el saldo del usuario aquí --
+    // solo se reserva la intención en el metadata del PaymentIntent; el
+    // descuento real de puntos pasa en createOrderFromApp (order.controller.js)
+    // SOLO si el pago se confirma, mismo principio que el resto de este
+    // archivo (nunca tocar saldo antes de que el cobro sea un hecho).
+    let buddyCoinsApplied = 0;
+    let buddyDiscountCents = 0;
+    const requestedCoins = Math.max(0, Math.floor(Number(buddyCoinsRedeemed) || 0));
+    if (requestedCoins > 0) {
+      const me = await User.findById(uid).select("points").lean();
+      const availableCoins = Math.max(0, Number(me?.points) || 0);
+      const maxByAmount = Math.floor((amount / 100) * 2); // no más de lo que cubre el total restante
+      buddyCoinsApplied = Math.min(requestedCoins, availableCoins, maxByAmount);
+      buddyDiscountCents = Math.round((buddyCoinsApplied / 2) * 100);
+      // nunca deja el cobro en $0 -- mismo mínimo de un peso que el cupón
+      const maxDiscount = Math.max(0, amount - 100);
+      if (buddyDiscountCents > maxDiscount) {
+        buddyDiscountCents = maxDiscount;
+        buddyCoinsApplied = Math.floor((buddyDiscountCents / 100) * 2);
+      }
+      amount = amount - buddyDiscountCents;
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: "mxn",
@@ -224,8 +258,11 @@ exports.createPaymentSheet = async (req, res) => {
       receipt_email: customerEmail || undefined,
       metadata: {
         source: "londoncafe-app",
-        userId: req.user?.id ? String(req.user.id) : "",
+        // Antes: req.user?.id -- ese campo no existe (requireAuth pone
+        // req.user.uid), así que esto SIEMPRE quedaba vacío.
+        userId: String(uid),
         couponCode: validCoupon ? validCoupon.code : "",
+        buddyCoinsApplied: String(buddyCoinsApplied),
       },
     });
 
@@ -233,6 +270,8 @@ exports.createPaymentSheet = async (req, res) => {
       ok: true,
       paymentIntentClientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
+      buddyCoinsApplied,
+      buddyDiscountCents,
       amount,
       discountCents,
       coupon: validCoupon,
@@ -412,6 +451,14 @@ exports.handleStripeWebhook = async (req, res) => {
       // cliente -- activa el pase de todos modos.
       if (pi.metadata?.source === "vip-pass") {
         await activateVipPassForPaymentIntent(pi);
+      }
+
+      // Misma red de respaldo para gift cards -- si /purchase/confirm
+      // nunca se llama, este webhook crea la tarjeta de todos modos
+      // (createGiftCardForPaymentIntent es idempotente por paymentIntentId).
+      if (pi.metadata?.source === "giftcard") {
+        const { createGiftCardForPaymentIntent } = require("../routes/giftcards");
+        await createGiftCardForPaymentIntent(pi);
       }
     }
 
