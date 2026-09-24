@@ -116,12 +116,15 @@ export default function PetScreen({ navigation }) {
 
   const load = useCallback(async () => {
     try {
+      // El ranking ahora es SOLO Survival (pedido explícito) -- en modo
+      // normal cada quien va en un nivel distinto, así que "mejor puntaje"
+      // no era una competencia justa entre personas.
       const [petRes, walletRes, tetrisTop, doodleTop, ninjaTop] = await Promise.all([
         apiFetch("/pet"),
         apiFetch("/points/wallet").catch(() => null),
-        apiFetch("/pet/leaderboard?game=tetris").catch(() => null),
-        apiFetch("/pet/leaderboard?game=doodle").catch(() => null),
-        apiFetch("/pet/leaderboard?game=ninja").catch(() => null),
+        apiFetch("/pet/leaderboard?game=tetris_survival").catch(() => null),
+        apiFetch("/pet/leaderboard?game=doodle_survival").catch(() => null),
+        apiFetch("/pet/leaderboard?game=ninja_survival").catch(() => null),
       ]);
       setState(petRes || null);
       setSleepLeft(Math.max(0, Number(petRes?.sleepSecondsLeft) || 0));
@@ -427,7 +430,7 @@ export default function PetScreen({ navigation }) {
         top={top1.tetris ? `${top1.tetris.isMe ? "Tú vas 1° 👑" : `${top1.tetris.petName}: ${top1.tetris.best} 🍰`}` : null}
         onPress={() => setMatch3Open(true)}
         onPressSurvival={() => setMatch3SurvivalOpen(true)}
-        onPressTop={() => setLeaderboardGame("tetris")}
+        onPressTop={() => setLeaderboardGame("tetris_survival")}
       />
       <MiniGameCard
         emoji="🦘"
@@ -439,7 +442,7 @@ export default function PetScreen({ navigation }) {
         top={top1.doodle ? `${top1.doodle.isMe ? "Tú vas 1° 👑" : `${top1.doodle.petName}: altura ${top1.doodle.best} 🦘`}` : null}
         onPress={() => setDoodleOpen(true)}
         onPressSurvival={() => setDoodleSurvivalOpen(true)}
-        onPressTop={() => setLeaderboardGame("doodle")}
+        onPressTop={() => setLeaderboardGame("doodle_survival")}
       />
       <MiniGameCard
         emoji="🥷"
@@ -451,7 +454,7 @@ export default function PetScreen({ navigation }) {
         top={top1.ninja ? `${top1.ninja.isMe ? "Tú vas 1° 👑" : `${top1.ninja.petName}: ${top1.ninja.best} 🥷`}` : null}
         onPress={() => setNinjaOpen(true)}
         onPressSurvival={() => setNinjaSurvivalOpen(true)}
-        onPressTop={() => setLeaderboardGame("ninja")}
+        onPressTop={() => setLeaderboardGame("ninja_survival")}
       />
       <MiniGameCard
         emoji="🎮"
@@ -613,7 +616,7 @@ export default function PetScreen({ navigation }) {
       />
       <PetLeaderboard
         visible={!!leaderboardGame}
-        game={leaderboardGame || "tetris"}
+        game={leaderboardGame || "tetris_survival"}
         onClose={() => setLeaderboardGame(null)}
       />
 

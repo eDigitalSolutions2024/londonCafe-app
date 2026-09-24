@@ -9,10 +9,15 @@ const MEDAL = { 1: "🥇", 2: "🥈", 3: "🥉" };
 // v2: antes esto era SOLO Café Crush -- ahora `game` elige cuál tabla
 // pedir al backend (ver GET /pet/leaderboard?game=... en pet.controller.js),
 // mismo componente para las dos.
+// v3: el ranking ahora es SOLO de Survival (pedido explícito) -- en el
+// modo normal cada quien avanza por sus propios niveles fijos, así que
+// comparar el "mejor puntaje" ahí no era una competencia real entre
+// personas (unos llevan más niveles jugados que otros). Survival sí es
+// la misma prueba para todos: sin niveles, hasta dónde aguantas.
 const GAME_META = {
-  tetris: { title: "🏆 Top Café Crush", sub: "Las mascotas que más fichas juntaron en una sola partida", unit: "🍰", noun: "fichas" },
-  doodle: { title: "🏆 Top Salto Café", sub: "Las mascotas que llegaron más alto en Salto Café", unit: "🦘", noun: "de altura" },
-  ninja: { title: "🏆 Top Barista Ninja", sub: "Las mascotas que más productos rebanaron en Barista Ninja", unit: "🥷", noun: "cortes" },
+  tetris_survival: { title: "🏆 Top Café Crush Survival", sub: "Las mascotas que más fichas juntaron en supervivencia", unit: "🍰", noun: "fichas" },
+  doodle_survival: { title: "🏆 Top Salto Café Survival", sub: "Las mascotas que llegaron más alto en supervivencia", unit: "🦘", noun: "de altura" },
+  ninja_survival: { title: "🏆 Top Barista Ninja Survival", sub: "Las mascotas que más productos rebanaron en supervivencia", unit: "🥷", noun: "cortes" },
 };
 
 /**
@@ -25,12 +30,12 @@ const GAME_META = {
 // vivo" mientras el modal está abierto.
 const POLL_MS = 4000;
 
-export default function PetLeaderboard({ visible, game = "tetris", onClose }) {
+export default function PetLeaderboard({ visible, game = "tetris_survival", onClose }) {
   const [loading, setLoading] = useState(true);
   const [top, setTop] = useState([]);
   const [me, setMe] = useState(null);
   const [err, setErr] = useState(false);
-  const meta = GAME_META[game] || GAME_META.tetris;
+  const meta = GAME_META[game] || GAME_META.tetris_survival;
 
   const load = useCallback(
     (opts = {}) => {

@@ -590,6 +590,13 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
   function endGame(didWin, reason) {
     if (overRef.current) return;
     overRef.current = true;
+    // Por si endGame dispara (ej. se acabó el tiempo) mientras una
+    // animación de combo todavía no alcanzó a reflejar el último clear en
+    // el estado -- sincroniza clearedRef -> cleared aquí, en el momento
+    // que se congela el resultado, así la pantalla de fin de nivel (y
+    // finish(), que igual ya usa clearedRef.current) nunca muestran menos
+    // de lo que realmente se juntó.
+    setCleared(clearedRef.current);
     setWon(!!didWin);
     if (!didWin) setLoseReason(reason || "moves");
     setPhase("over");
@@ -648,10 +655,19 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
   // Survival no tiene target (Infinity) -- el puntaje que se manda al
   // backend (alimenta happiness/xp ganados, ver pet.controller.js) escala
   // con las fichas juntadas en vez de con "% del nivel completado".
+  //
+  // OJO: siempre clearedRef.current, nunca el estado `cleared` -- mismo
+  // motivo que ya explica el comentario junto a clearedRef arriba
+  // (setCleared es async/batched). endGame() puede disparar por timeout
+  // justo mientras una animación de combo todavía no termina de reflejar
+  // el último clear en el estado -- si `finish` lee `cleared` (el
+  // closure del render en que se dibujó este botón), podía reportar 0 o
+  // un número viejo a pesar de que sí se juntaron fichas. Bug real: "sale
+  // 0 de un tirón" en Café Crush.
   const score = survival
     ? Math.min(1, 0.4 + clearedRef.current / 150)
-    : Math.max(0, Math.min(1, cleared / levelDef.target));
-  const finish = () => onFinish?.(score, cleared, level, won);
+    : Math.max(0, Math.min(1, clearedRef.current / levelDef.target));
+  const finish = () => onFinish?.(score, clearedRef.current, level, won);
 
   const avatarScale = avatarBounce.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
   const comboScale = comboAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1.22] });
