@@ -139,8 +139,21 @@ async function register(req, res) {
     if (!/^\+?[0-9]{10,16}$/.test(phoneStr)) {
       return res.status(400).json({ error: "INVALID_PHONE" });
     }
-    const phoneExists = await User.findOne({ phone: phoneStr });
-    if (phoneExists) return res.status(409).json({ error: "PHONE_ALREADY_EXISTS" });
+    // Cuenta de invitado (creada en POS/Kiosk o por el QR del ticket con solo
+    // el teléfono): si la persona se registra con ese MISMO teléfono, la
+    // cuenta se COMPLETA (correo, contraseña...) en vez de rechazarla --
+    // conserva puntos e historial desde el día 1. El teléfono puede estar
+    // guardado con o sin "+", por eso se busca en ambas formas.
+    const phoneAlt = phoneStr.startsWith("+") ? phoneStr.slice(1) : `+${phoneStr}`;
+    let phoneOwner = await User.findOne({ phone: phoneStr });
+    if (!phoneOwner) {
+      const guestAlt = await User.findOne({ phone: phoneAlt, isGuest: true });
+      if (guestAlt) phoneOwner = guestAlt;
+    }
+    // Solo una cuenta que sigue siendo de invitado se puede completar; una
+    // cuenta ya verificada con ese teléfono sí es un duplicado real.
+    const guestToComplete = phoneOwner && phoneOwner.isGuest === true ? phoneOwner : null;
+    if (phoneOwner && !guestToComplete) return res.status(409).json({ error: "PHONE_ALREADY_EXISTS" });
     const validPhone = phoneStr;
 
     // ✅ birthDate — optional
@@ -161,7 +174,9 @@ async function register(req, res) {
     // ✅ Duplicados: email
     const emailLower = String(email).toLowerCase();
     const exists = await User.findOne({ email: emailLower });
-    if (exists) return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
+    if (exists && !(guestToComplete && String(exists._id) === String(guestToComplete._id))) {
+      return res.status(409).json({ error: "EMAIL_ALREADY_EXISTS" });
+    }
 
     const allowed = ["male", "female", "other"];
     const safeGender = allowed.includes(String(gender)) ? String(gender) : "other";
@@ -206,17 +221,37 @@ async function register(req, res) {
         }
       : null;
 
-    const user = await User.create({
-      name,
-      email: emailLower,
-      passwordHash,
-      isEmailVerified: false,
-      gender: safeGender,
-      avatarConfig,
-      ...(validPhone ? { phone: validPhone } : {}),
-      ...(bd ? { birthDate: bd } : {}),
-      ...(petChoice ? { pet: petChoice } : {}),
-    });
+    let user;
+    if (guestToComplete) {
+      // Se completa la cuenta existente: puntos, historial y demás se quedan.
+      // isGuest sigue en true hasta que verifique el correo (verifyEmail).
+      guestToComplete.name = name;
+      guestToComplete.email = emailLower;
+      guestToComplete.passwordHash = passwordHash;
+      guestToComplete.isEmailVerified = false;
+      guestToComplete.gender = safeGender;
+      guestToComplete.avatarConfig = avatarConfig;
+      guestToComplete.phone = validPhone;
+      if (bd) guestToComplete.birthDate = bd;
+      if (petChoice) guestToComplete.pet = petChoice;
+      await guestToComplete.save();
+      user = guestToComplete;
+    } else {
+      user = await User.create({
+        name,
+        email: emailLower,
+        passwordHash,
+        isEmailVerified: false,
+        gender: safeGender,
+        avatarConfig,
+        ...(validPhone ? { phone: validPhone } : {}),
+        ...(bd ? { birthDate: bd } : {}),
+        ...(petChoice ? { pet: petChoice } : {}),
+      });
+    }
+
+    // Reintento de registro sobre la misma cuenta: se limpian códigos viejos.
+    if (guestToComplete) await EmailVerification.deleteMany({ userId: user._id });
 
     // OTP
     const code = generateOtp6();
@@ -249,7 +284,16 @@ async function register(req, res) {
       } catch (mailErr) {
         console.error("REGISTER EMAIL SEND ERROR:", mailErr);
         await EmailVerification.deleteMany({ userId: user._id });
-        await User.deleteOne({ _id: user._id });
+        if (guestToComplete) {
+          // NO se borra la cuenta de invitado (tiene puntos): solo se le
+          // quita lo que se acaba de agregar para poder reintentar.
+          await User.updateOne(
+            { _id: user._id },
+            { $unset: { email: 1, passwordHash: 1 }, $set: { isEmailVerified: false } }
+          );
+        } else {
+          await User.deleteOne({ _id: user._id });
+        }
         return res.status(502).json({ error: "EMAIL_SEND_FAILED" });
       }
     }
@@ -298,6 +342,9 @@ async function verifyEmail(req, res) {
     }
 
     user.isEmailVerified = true;
+    // Una cuenta de invitado que completó su registro deja de serlo al
+    // confirmar su correo.
+    if (user.isGuest) user.isGuest = false;
     await user.save();
     await EmailVerification.deleteMany({ userId: user._id });
 
