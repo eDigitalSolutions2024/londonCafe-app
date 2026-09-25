@@ -616,7 +616,12 @@ async function getLeaderboard(req, res) {
     if (!uid) return res.status(401).json({ ok: false, error: "BAD_TOKEN" });
 
     const game = LEADERBOARD_FIELDS[req.query?.game] ? req.query.game : "tetris";
-    const field = LEADERBOARD_FIELDS[game];
+    // El top es SOLO de Survival: las apps instaladas antes de ese cambio
+    // todavía piden game=tetris|doodle|ninja (modo normal) -- se les responde
+    // con los números de Survival de ese mismo juego. Las nuevas ya piden
+    // *_survival directo. `game` en la respuesta conserva lo que se pidió.
+    const rankedGame = game.endsWith("_survival") ? game : `${game}_survival`;
+    const field = LEADERBOARD_FIELDS[rankedGame];
     const petField = `pet.${field}`;
 
     const top = await User.find({ "pet.owned": true, [petField]: { $gt: 0 } })
