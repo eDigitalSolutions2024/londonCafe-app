@@ -17,6 +17,8 @@ import {
 } from "react-native";
 import { colors } from "../theme/colors";
 import { getNinjaLevel, MAX_NINJA_LEVEL } from "../assets/ninjaLevels";
+import MusicToggle from "./MusicToggle";
+import { useGameMusic } from "../audio/useGameMusic";
 
 const SPECIES_EMOJI = { cat: "🐱", dog: "🐶", hamster: "🐹" };
 
@@ -73,6 +75,8 @@ export default function PetBaristaNinja({
   onClose,
   onFinish,
 }) {
+  // Música de fondo mientras el juego está abierto (ver src/audio/gameMusic.js).
+  useGameMusic(visible);
   const levelDef = survival ? SURVIVAL_NINJA_DEF : getNinjaLevel(level);
   const petEmoji = SPECIES_EMOJI[species] || "🐾";
 
@@ -426,9 +430,12 @@ export default function PetBaristaNinja({
                 {survival ? "Survival 🔥 · ¡corta sin parar!" : `Nivel ${level} · Corta ${levelDef.targetSlices} productos`}
               </Text>
             </View>
-            <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
-              <Text style={styles.closeText}>✕</Text>
-            </Pressable>
+            <View style={styles.headerRight}>
+              <MusicToggle style={styles.musicBtn} />
+              <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
+                <Text style={styles.closeText}>✕</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* Marcador Superior */}
@@ -605,6 +612,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  musicBtn: { width: 28, height: 28, borderRadius: 14 },
   title: {
     color: "#111",
     fontSize: 18,

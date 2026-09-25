@@ -4,6 +4,8 @@ import { colors } from "../theme/colors";
 import AvatarPreview from "./AvatarPreview";
 import PetActor from "./PetActor";
 import { getMatch3Level, MAX_MATCH3_LEVEL } from "../assets/matchLevels";
+import MusicToggle from "./MusicToggle";
+import { useGameMusic } from "../audio/useGameMusic";
 
 // --- Tablero estilo Pokémon Puzzle / Tetris Attack -------------------------
 const COLS = 6;
@@ -183,6 +185,8 @@ function reshuffleBoard(g) {
 }
 
 export default function PetMatch3({ visible, level = 1, survival = false, species = "cat", petName = "tu mascota", avatarConfig, onClose, onFinish }) {
+  // Música de fondo mientras el juego está abierto (ver src/audio/gameMusic.js).
+  useGameMusic(visible);
   const levelDef = survival ? SURVIVAL_LEVEL_DEF : getMatch3Level(level);
 
   // Dificultad dinámica de Survival: cuántos sabores (de KINDS) están en
@@ -688,13 +692,16 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
                 <Text style={styles.hdrTitle}>
                   Café Crush 🍰 · {survival ? "Survival 🔥" : `Nivel ${level}`}
                 </Text>
-                <Pressable
-                  onPress={() => setCompact((v) => !v)}
-                  style={styles.zoomBtn}
-                  hitSlop={8}
-                >
-                  <Text style={styles.zoomBtnText}>{compact ? "🔍" : "🔎"}</Text>
-                </Pressable>
+                <View style={styles.hdrRight}>
+                  <MusicToggle style={styles.musicBtn} />
+                  <Pressable
+                    onPress={() => setCompact((v) => !v)}
+                    style={styles.zoomBtn}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.zoomBtnText}>{compact ? "🔍" : "🔎"}</Text>
+                  </Pressable>
+                </View>
               </View>
               <View style={styles.goalRow}>
                 {survival ? (
@@ -866,6 +873,8 @@ const styles = StyleSheet.create({
 
   hdr: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   hdrTitle: { color: "#111", fontSize: 16, fontWeight: "900" },
+  hdrRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  musicBtn: { width: 28, height: 28, borderRadius: 14 },
   zoomBtn: {
     width: 26,
     height: 26,

@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing } from "react-native";
 import { colors } from "../theme/colors";
+import MusicToggle from "./MusicToggle";
+import { useGameMusic } from "../audio/useGameMusic";
 
 const TOY = { cat: "🧶", dog: "🦴", hamster: "🌰" };
 const PET = { cat: "🐱", dog: "🐶", hamster: "🐹" };
@@ -17,6 +19,8 @@ const PET_SIZE = 56;
  * cuando lo atrapas. Al terminar devuelve score 0..1 (aciertos/objetivo).
  */
 export default function PetMiniGame({ visible, species = "cat", petName = "tu mascota", onClose, onFinish }) {
+  // Música de fondo mientras el juego está abierto (ver src/audio/gameMusic.js).
+  useGameMusic(visible);
   const toy = TOY[species] || "🎾";
   const petEmoji = PET[species] || "🐾";
 
@@ -125,7 +129,10 @@ export default function PetMiniGame({ visible, species = "cat", petName = "tu ma
             <>
               <View style={styles.hdr}>
                 <Text style={styles.hdrTitle}>¡Atrapa el juguete!</Text>
-                <Text style={styles.hdrTimer}>{left}s</Text>
+                <View style={styles.hdrRight}>
+                  <MusicToggle style={styles.musicBtn} />
+                  <Text style={styles.hdrTimer}>{left}s</Text>
+                </View>
               </View>
               <Text style={styles.hdrSub}>Atrapadas: {hits}</Text>
 
@@ -180,6 +187,8 @@ const styles = StyleSheet.create({
 
   hdr: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   hdrTitle: { color: "#111", fontSize: 16, fontWeight: "900" },
+  hdrRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  musicBtn: { width: 28, height: 28, borderRadius: 14 },
   hdrTimer: { color: colors.primary, fontSize: 16, fontWeight: "900" },
   hdrSub: { color: colors.textMuted, fontSize: 12, fontWeight: "800", marginTop: 2, marginBottom: 10 },
 

@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, Modal, Animated, PanResponder } from "react-native";
 import { colors } from "../theme/colors";
 import { getDoodleLevel, MAX_DOODLE_LEVEL } from "../assets/doodleLevels";
+import MusicToggle from "./MusicToggle";
+import { useGameMusic } from "../audio/useGameMusic";
 
 // expo-sensors es un módulo NATIVO -- si el binario instalado todavía no
 // lo trae compilado (dev-client viejo, o cualquier build hecho antes de
@@ -93,6 +95,8 @@ function survivalDifficultyAt(height) {
 const SURVIVAL_DOODLE_DEF = { targetHeight: Infinity };
 
 export default function PetDoodleJump({ visible, level = 1, survival = false, species = "cat", petName = "tu mascota", onClose, onFinish }) {
+  // Música de fondo mientras el juego está abierto (ver src/audio/gameMusic.js).
+  useGameMusic(visible);
   const levelDef = survival ? SURVIVAL_DOODLE_DEF : getDoodleLevel(level);
   const emoji = SPECIES_EMOJI[species] || "🐾";
 
@@ -385,6 +389,7 @@ export default function PetDoodleJump({ visible, level = 1, survival = false, sp
                 <Text style={styles.hdrTitle}>
                   Salto Café 🦘 · {survival ? "Survival 🔥" : `Nivel ${level}`}
                 </Text>
+                <MusicToggle style={styles.musicBtn} />
               </View>
               <View style={styles.goalRow}>
                 <Text style={styles.goalText}>
@@ -501,6 +506,7 @@ const styles = StyleSheet.create({
 
   hdr: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   hdrTitle: { color: "#111", fontSize: 16, fontWeight: "900" },
+  musicBtn: { width: 28, height: 28, borderRadius: 14 },
   goalRow: { flexDirection: "row", justifyContent: "center", gap: 14, marginTop: 6 },
   goalText: { color: colors.primary, fontSize: 13, fontWeight: "900" },
   hdrSub: { color: colors.textMuted, fontSize: 11.5, fontWeight: "800", marginTop: 4, marginBottom: 8, textAlign: "center" },
