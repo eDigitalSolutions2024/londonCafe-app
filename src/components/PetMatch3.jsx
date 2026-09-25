@@ -142,6 +142,20 @@ function hasAnyMove(g) {
   return false;
 }
 
+// Igual que hasAnyMove, pero devuelve el PRIMER par que sí arma una
+// combinación -- es lo que se resalta como pista en los últimos 15s.
+function findHintMove(g) {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const v = g[r][c];
+      if (v == null || v === CLEARING) continue;
+      if (c + 1 < COLS && tryTestSwap(g, r, c, r, c + 1)) return { r1: r, c1: c, r2: r, c2: c + 1 };
+      if (r + 1 < ROWS && tryTestSwap(g, r, c, r + 1, c)) return { r1: r, c1: c, r2: r + 1, c2: c };
+    }
+  }
+  return null;
+}
+
 function tryTestSwap(g, r1, c1, r2, c2) {
   const a = g[r1][c1];
   const b = g[r2][c2];
@@ -235,6 +249,12 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
   const [comboBurst, setComboBurst] = useState([]); // chispas que salen disparadas del "¡Combo!"
   const comboPid = useRef(0);
   const avatarBounce = useRef(new Animated.Value(0)).current;
+  // Últimos 15s: en vez de estresar (vibración/temblor), AYUDA -- se resalta
+  // un movimiento válido directo sobre las fichas para que la persona pueda
+  // seguir jugando sin quedarse buscando. `hint` = {r1,c1,r2,c2} o null;
+  // `hintPulse` hace que el resplandor respire en vez de quedar fijo.
+  const [hint, setHint] = useState(null);
+  const hintPulse = useRef(new Animated.Value(0)).current;
   const [petReaction, setPetReaction] = useState({ type: null, id: 0 });
 
   // Arrastre: SOLO visual mientras se mueve; el swap se aplica al soltar.
@@ -275,6 +295,7 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
     timeLeftRef.current = levelDef.timeLimit;
     setCombo(0);
     setComboSize(0);
+    setHint(null);
     setWon(false);
     setLoseReason("moves");
     setPhase("play");
@@ -298,6 +319,21 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, level]);
 
+  // Respiración del resplandor de la pista (corre siempre que el modal esté
+  // abierto; sin efecto visible mientras `hint` es null, ver estilo cellHint).
+  useEffect(() => {
+    if (!visible) return;
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hintPulse, { toValue: 1, duration: 550, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(hintPulse, { toValue: 0, duration: 550, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
   // Cronómetro del nivel -- corre en paralelo al límite de movimientos
   // (lo que se acabe primero corta el nivel). Se salta mientras no esté
   // en juego (resuelto/ganado/perdido) o el modal esté cerrado.
@@ -307,11 +343,28 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
       if (phaseRef.current !== "play" || overRef.current) return;
       timeLeftRef.current = Math.max(0, timeLeftRef.current - 1);
       setTimeLeft(timeLeftRef.current);
-      if (timeLeftRef.current <= 0) endGame(false, "time");
+      if (timeLeftRef.current <= 0) {
+        endGame(false, "time");
+        return;
+      }
+      updateHint(timeLeftRef.current);
     }, 1000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, level]);
+
+  // Últimos 15s: en vez de meter presión, AYUDA -- se busca un movimiento
+  // válido de verdad sobre el tablero actual y se resalta en las fichas
+  // (ver findHintMove), refrescándolo cada segundo. Se salta mientras una
+  // cadena sigue resolviéndose (grid con CLEARING a medias) para no ofrecer
+  // una pista sobre un tablero que todavía se está acomodando.
+  function updateHint(t) {
+    if (t > 15 || resolving.current) {
+      if (hint) setHint(null);
+      return;
+    }
+    setHint(findHintMove(gridRef.current));
+  }
 
   // Si ya no hay NINGÚN movimiento posible (ver hasAnyMove arriba), el
   // tablero quedó trabado. Se rebaraja en el lugar (mismas posiciones,
@@ -342,6 +395,7 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
       return;
     }
     resolving.current = true;
+    setHint(null); // la jugada que acaba de confirmarse pudo ser justo la de la pista
     let chain = baseCombo || 0;
     let total = 0;
 
@@ -594,6 +648,7 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
   function endGame(didWin, reason) {
     if (overRef.current) return;
     overRef.current = true;
+    setHint(null);
     // Por si endGame dispara (ej. se acabó el tiempo) mientras una
     // animación de combo todavía no alcanzó a reflejar el último clear en
     // el estado -- sincroniza clearedRef -> cleared aquí, en el momento
@@ -749,6 +804,8 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
                           const isNbR = dragCell && dragCell.r === r && c === dragCell.c + 1;
                           const isNbUp = dragCell && dragCell.c === c && r === dragCell.r - 1;
                           const isNbDown = dragCell && dragCell.c === c && r === dragCell.r + 1;
+                          const isHint =
+                            hint && ((r === hint.r1 && c === hint.c1) || (r === hint.r2 && c === hint.c2));
                           let extra = null;
                           if (isDrag) {
                             extra = {
@@ -771,6 +828,15 @@ export default function PetMatch3({ visible, level = 1, survival = false, specie
                                 extra,
                               ]}
                             >
+                              {isHint && (
+                                <Animated.View
+                                  pointerEvents="none"
+                                  style={[
+                                    styles.hintGlow,
+                                    { opacity: hintPulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.95] }) },
+                                  ]}
+                                />
+                              )}
                               <Text style={[styles.tile, { fontSize: tileSize * 0.63 }]}>
                                 {empty ? "" : clearing ? "✨" : KINDS[k]}
                               </Text>
@@ -908,6 +974,25 @@ const styles = StyleSheet.create({
   },
   cellEmpty: { backgroundColor: "transparent", borderColor: "transparent" },
   cellClearing: { backgroundColor: "#fff6df" },
+  // Resplandor de la pista (últimos 15s) -- un halo dorado que respira sobre
+  // la ficha, sin tapar el emoji (pointerEvents="none", detrás del texto no
+  // hace falta: el texto ya se dibuja encima en el orden del JSX).
+  hintGlow: {
+    position: "absolute",
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: 10,
+    borderWidth: 3,
+    borderColor: "#ffca28",
+    backgroundColor: "rgba(255,202,40,0.22)",
+    shadowColor: "#ffca28",
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
+  },
   cellDrag: {
     borderColor: colors.primary,
     borderWidth: 2,
