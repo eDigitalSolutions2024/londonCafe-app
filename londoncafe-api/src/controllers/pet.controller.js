@@ -15,10 +15,13 @@ const MESS_HYGIENE_THRESHOLD = 12;
 
 // --- Alimentar: consume del MISMO inventario que el avatar. Café = antojito
 //     con cafeína -> mucho ánimo y ENERGÍA; pan = comida -> llena el hambre.
-//     Comer ensucia un poco. ---
+//     Comer ensucia un poco. energy de café+pan suma 100 a propósito: un
+//     café y un pan (lo mínimo que cualquiera tiene a mano) deja la energía
+//     llena -- gancho de enganche para que se sienta satisfactorio desde
+//     la primera alimentada. ---
 const FOOD = {
-  coffee: { hunger: 15, happiness: 30, energy: 22, inv: "coffee", noneError: "NO_COFFEE" },
-  bread: { hunger: 45, happiness: 10, energy: 8, inv: "bread", noneError: "NO_BREAD" },
+  coffee: { hunger: 15, happiness: 30, energy: 70, inv: "coffee", noneError: "NO_COFFEE" },
+  bread: { hunger: 45, happiness: 10, energy: 30, inv: "bread", noneError: "NO_BREAD" },
 };
 const FEED_HYGIENE_COST = 8;
 const FEED_MESS_HYGIENE = 30; // si tras comer la higiene queda por debajo -> desastre

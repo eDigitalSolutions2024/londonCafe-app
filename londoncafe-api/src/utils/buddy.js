@@ -11,6 +11,8 @@ function daysPassed(from, to) {
 }
 
 /** ========= Refill Café/Pan (cada 24h desde lastRefillAt) ========= */
+const DAILY_FOOD_AMOUNT = 3; // cafés y panes que se regalan por cada día que se abre la app
+
 function applyDailyRefillOnAppOpen(user, now = new Date()) {
   if (!user.buddy) user.buddy = {};
 
@@ -24,8 +26,8 @@ function applyDailyRefillOnAppOpen(user, now = new Date()) {
 
   const d = daysPassed(new Date(last), now);
   if (d > 0) {
-    user.buddy.coffee = (Number(user.buddy.coffee) || 0) + d;
-    user.buddy.bread = (Number(user.buddy.bread) || 0) + d;
+    user.buddy.coffee = (Number(user.buddy.coffee) || 0) + d * DAILY_FOOD_AMOUNT;
+    user.buddy.bread = (Number(user.buddy.bread) || 0) + d * DAILY_FOOD_AMOUNT;
     user.buddy.lastRefillAt = now;
   }
 

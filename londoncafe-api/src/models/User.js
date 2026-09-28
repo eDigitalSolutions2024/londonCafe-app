@@ -67,8 +67,8 @@ const buddySchema = new mongoose.Schema(
   {
     energy: { type: Number, default: 100, min: 0, max: 100 },
 
-    coffee: { type: Number, default: 1, min: 0 },
-    bread: { type: Number, default: 1, min: 0 },
+    coffee: { type: Number, default: 3, min: 0 },
+    bread: { type: Number, default: 3, min: 0 },
 
       energyAlerts: {
       fifty: {
