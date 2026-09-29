@@ -12,6 +12,20 @@ function daysPassed(from, to) {
 
 /** ========= Refill Café/Pan (cada 24h desde lastRefillAt) ========= */
 const DAILY_FOOD_AMOUNT = 3; // cafés y panes que se regalan por cada día que se abre la app
+// Si además está físicamente en el café (presence, ver CafePresenceTracker.jsx),
+// se regala esto en vez de DAILY_FOOD_AMOUNT -- gancho extra para visitar la
+// sucursal. Requiere que la persona ya haya activado "Amigos en el café"
+// (presence.shareEnabled); no se activa el GPS solo para esto.
+const CAFE_LOGIN_FOOD_AMOUNT = 10;
+// Mismo umbral que PRESENCE_STALE_MS en friends.controller.js -- pasado ese
+// tiempo sin ping, el "está en el café" ya no cuenta como vigente.
+const PRESENCE_STALE_MS = 20 * 60 * 1000;
+
+function isAtCafeNow(user) {
+  if (!user.presence?.shareEnabled || !user.presence?.atCafe) return false;
+  const updatedAt = user.presence.atCafeUpdatedAt ? new Date(user.presence.atCafeUpdatedAt).getTime() : 0;
+  return Date.now() - updatedAt < PRESENCE_STALE_MS;
+}
 
 function applyDailyRefillOnAppOpen(user, now = new Date()) {
   if (!user.buddy) user.buddy = {};
@@ -26,8 +40,9 @@ function applyDailyRefillOnAppOpen(user, now = new Date()) {
 
   const d = daysPassed(new Date(last), now);
   if (d > 0) {
-    user.buddy.coffee = (Number(user.buddy.coffee) || 0) + d * DAILY_FOOD_AMOUNT;
-    user.buddy.bread = (Number(user.buddy.bread) || 0) + d * DAILY_FOOD_AMOUNT;
+    const perDay = isAtCafeNow(user) ? CAFE_LOGIN_FOOD_AMOUNT : DAILY_FOOD_AMOUNT;
+    user.buddy.coffee = (Number(user.buddy.coffee) || 0) + d * perDay;
+    user.buddy.bread = (Number(user.buddy.bread) || 0) + d * perDay;
     user.buddy.lastRefillAt = now;
   }
 
