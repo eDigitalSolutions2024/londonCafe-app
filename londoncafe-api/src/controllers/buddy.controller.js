@@ -3,6 +3,12 @@ const User = require("../models/User");
 // Ajustes
 const ENERGY_DECAY_EVERY_MIN = 30;
 const ENERGY_DECAY_AMOUNT = 1;
+// Mismo reparto que FOOD en pet.controller.js (coffee=70, bread=30): un café
+// + un pan deja la energía llena (100) desde cero -- antes acá estaba parejo
+// en +40/+40 (80 total), así que el avatar (esta pantalla) nunca llegaba a
+// tope aunque el de la mascota sí. Mantener los dos sincronizados.
+const ENERGY_FROM_COFFEE = 70;
+const ENERGY_FROM_BREAD = 30;
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -56,13 +62,13 @@ async function feedBuddy(req, res) {
         return res.status(400).json({ ok: false, error: "NO_COFFEE" });
       }
       user.buddy.coffee -= 1;
-      user.buddy.energy = clamp(user.buddy.energy + 40, 0, 100);
+      user.buddy.energy = clamp(user.buddy.energy + ENERGY_FROM_COFFEE, 0, 100);
     } else {
       if ((user.buddy.bread ?? 0) <= 0) {
         return res.status(400).json({ ok: false, error: "NO_BREAD" });
       }
       user.buddy.bread -= 1;
-      user.buddy.energy = clamp(user.buddy.energy + 40, 0, 100);
+      user.buddy.energy = clamp(user.buddy.energy + ENERGY_FROM_BREAD, 0, 100);
     }
 
     await user.save();
