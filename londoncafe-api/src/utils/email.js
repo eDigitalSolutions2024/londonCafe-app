@@ -1,8 +1,15 @@
 const nodemailer = require("nodemailer");
 
-function createTransporter() {
+// Un solo transporter reusado para todo el proceso (pool:true), en vez de
+// abrir una conexión SMTP nueva por cada correo -- antes cada registro/
+// reenvío/reset pagaba una conexión+TLS+AUTH completa desde cero, lo que
+// explicaba buena parte del "se tarda mucho" al crear una cuenta. El pool
+// mantiene conexiones calientes y las reusa entre envíos.
+let _transporter = null;
+function getTransporter() {
+  if (_transporter) return _transporter;
   const port = Number(process.env.EMAIL_PORT || 587);
-  return nodemailer.createTransport({
+  _transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
     port,
     // 465 es TLS implícito (secure:true) -- 587/25 usan STARTTLS sobre una
@@ -14,7 +21,11 @@ function createTransporter() {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
   });
+  return _transporter;
 }
 
 // Antes esto era texto plano puro, sin HTML, mandado desde una cuenta de
@@ -90,11 +101,7 @@ function buildVerificationEmail({ code, name, appName }) {
 }
 
 async function sendVerificationEmail({ to, code, name }) {
-  const transporter = createTransporter();
-
-  // ✅ DEBUG: verificar conexión SMTP
-  await transporter.verify();
-  console.log("✅ SMTP OK (verify) - sending to:", to);
+  const transporter = getTransporter();
 
   const appName = process.env.APP_NAME || "App";
   const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
@@ -178,10 +185,7 @@ function buildPasswordResetEmail({ code, name, appName }) {
 }
 
 async function sendPasswordResetEmail({ to, code, name }) {
-  const transporter = createTransporter();
-
-  await transporter.verify();
-  console.log("✅ SMTP OK (verify) - sending password reset to:", to);
+  const transporter = getTransporter();
 
   const appName = process.env.APP_NAME || "App";
   const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;

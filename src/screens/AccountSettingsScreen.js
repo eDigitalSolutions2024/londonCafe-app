@@ -79,19 +79,23 @@ export default function AccountSettingsScreen({ navigation }) {
     try {
       setSaving(true);
 
-      // 1) Perfil
-      const r = await apiFetch("/me", {
-        method: "PUT",
-        headers: authHeaders,
-        body: JSON.stringify({ name: fullName, username, email, phone }),
-      });
-
-      // 2) Avatar
-      await apiFetch("/me/avatar", {
-        method: "PUT",
-        headers: authHeaders,
-        body: JSON.stringify({ avatarConfig }),
-      });
+      // Perfil y avatar no dependen uno del otro (campos distintos del
+      // mismo usuario) -- antes iban uno tras otro y cada guardado pagaba
+      // 3 viajes de red seguidos (perfil + avatar + un refetch final de
+      // /me), lo que se sentía como "se tarda mucho" al elegir el avatar.
+      // Mandar los dos PUT en paralelo corta esa espera a la mitad.
+      const [r] = await Promise.all([
+        apiFetch("/me", {
+          method: "PUT",
+          headers: authHeaders,
+          body: JSON.stringify({ name: fullName, username, email, phone }),
+        }),
+        apiFetch("/me/avatar", {
+          method: "PUT",
+          headers: authHeaders,
+          body: JSON.stringify({ avatarConfig }),
+        }),
+      ]);
 
       if (r?.emailChangePending) {
         setPendingEmail(r?.user?.pendingEmail || email);
@@ -102,7 +106,10 @@ export default function AccountSettingsScreen({ navigation }) {
       } else {
         Alert.alert("Listo", "Cambios guardados ✅");
       }
-      await loadMe();
+      // Sin await: ya se guardó y ya se le avisó a la persona -- esto solo
+      // resincroniza el formulario (ej. username normalizado en el
+      // servidor) por si acaso, no hace falta que bloquee el botón.
+      loadMe();
     } catch (e) {
       console.log("❌ save:", e?.data || e?.message);
 
