@@ -1138,6 +1138,16 @@ const moodEmoji = moodEmojiFromEnergy(energy);
 
           <UpdateBanner />
 
+          {/* Promociones -- antes vivía hasta el fondo de la pantalla,
+              después de racha/puntos/mascota/visitas/amigos: casi nadie
+              la veía sin hacer scroll completo. Es lo primero que se
+              anuncia después de "bienvenido", antes que la gamificación. */}
+          <View style={styles.homePromosHeaderRow}>
+            <Text style={styles.homePromosIcon}>🔥</Text>
+            <Text style={styles.homePromosTitle}>Promociones</Text>
+          </View>
+          <PromosSection limit={5} />
+
           {/* Avatar + Puntos */}
           <View style={styles.avatarSection}>
             {avatarConfig ? (
@@ -1233,13 +1243,6 @@ const moodEmoji = moodEmojiFromEnergy(energy);
             </Pressable>
           </View>
         </View>
-
-        {/* Promociones */}
-        <View style={styles.homePromosHeaderRow}>
-          <Text style={styles.homePromosIcon}>🔥</Text>
-          <Text style={styles.homePromosTitle}>Promociones</Text>
-        </View>
-        <PromosSection limit={5}  />
       </ScrollView>
 
       {/* ✅ MODAL PEEK */}
