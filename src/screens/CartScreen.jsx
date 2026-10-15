@@ -640,6 +640,11 @@ async function getLoggedUserData() {
       merchantDisplayName: "London Café",
       paymentIntentClientSecret: clientSecret,
       allowsDelayedPaymentMethods: true,
+      // El merchantIdentifier (App.js, StripeProvider) y el plugin de Google
+      // Pay (app.json) ya estaban puestos, pero sin esto PaymentSheet nunca
+      // mostraba los botones de Apple Pay / Google Pay -- solo tarjeta.
+      applePay: { merchantCountryCode: "MX" },
+      googlePay: { merchantCountryCode: "MX", currencyCode: "MXN", testEnv: false },
     });
 
     if (initError) throw new Error(initError.message);

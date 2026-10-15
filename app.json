@@ -55,7 +55,8 @@
       [
         "@stripe/stripe-react-native",
         {
-          "enableGooglePay": true
+          "enableGooglePay": true,
+          "merchantIdentifier": "merchant.com.londoncafejrz"
         }
       ],
       [

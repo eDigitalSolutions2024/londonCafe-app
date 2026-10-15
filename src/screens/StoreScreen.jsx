@@ -92,6 +92,8 @@ export default function StoreScreen() {
         merchantDisplayName: "London Café",
         paymentIntentClientSecret: sheet.paymentIntentClientSecret,
         allowsDelayedPaymentMethods: true,
+        applePay: { merchantCountryCode: "MX" },
+        googlePay: { merchantCountryCode: "MX", currencyCode: "MXN", testEnv: false },
       });
       if (initError) throw new Error(initError.message);
 
