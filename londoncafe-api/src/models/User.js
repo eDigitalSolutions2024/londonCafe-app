@@ -291,6 +291,18 @@ const userSchema = new mongoose.Schema(
     },
     isEmailVerified: { type: Boolean, default: false },
 
+    // ✅ Referidos -- "invita a un amigo", ambos ganan BuddyCoins cuando el
+    // invitado termina de verificar su cuenta (ver REFERRAL_COINS en
+    // auth.controller.js). referralCode es el código propio que cada quien
+    // comparte; referredBy es quién lo invitó a ÉL (null si nadie, o si
+    // llegó sin código). referralRewardedAt evita pagar dos veces si algo
+    // reintenta la verificación (aparte, creditBonus ya es idempotente por
+    // su propia clave -- esto es nada más para no tener que consultar el
+    // Wallet V2 solo para saber si ya se pagó).
+    referralCode: { type: String, default: null, unique: true, sparse: true },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    referralRewardedAt: { type: Date, default: null },
+
     // ✅ Avatar (plano, legado -- se mantiene solo como fallback transitorio
     // mientras las cuentas migran al avatar 3D)
     avatarConfig: { type: avatarSchema, default: () => ({}) },

@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Alert } from "react-native";
+import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Alert, Share } from "react-native";
 import { colors } from "../theme/colors";
 import { AuthContext } from "../context/AuthContext";
 import AvatarPreview, { mergeAvatar3D } from "../components/AvatarPreview";
@@ -39,7 +39,27 @@ export default function AccountSettingsScreen({ navigation }) {
     accessory: null,
   });
 
+  // ✅ Referidos -- código propio + cuántos amigos ya se unieron.
+  const [referral, setReferral] = useState(null);
+
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch("/me/referral", { headers: authHeaders })
+      .then((r) => r?.ok && setReferral(r))
+      .catch((e) => console.log("❌ referral:", e?.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  async function shareReferral() {
+    if (!referral?.shareMessage) return;
+    try {
+      await Share.share({ message: referral.shareMessage });
+    } catch (e) {
+      console.log("❌ share referral:", e?.message);
+    }
+  }
 
   const loadMe = useCallback(async () => {
     if (!token) { setLoading(false); return; }
@@ -248,6 +268,30 @@ export default function AccountSettingsScreen({ navigation }) {
           </Pressable>
         </View>
 
+        {/* Card: Invita a un amigo -- ambos ganan BuddyCoins cuando el
+            invitado verifica su cuenta (ver /me/referral, auth.controller.js
+            rewardReferral). Arriba del Perfil a propósito: es la tarjeta que
+            queremos que más se use. */}
+        {referral && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Invita a un amigo ☕</Text>
+            <Text style={[styles.label, { marginBottom: 10 }]}>
+              Comparte tu código -- cuando tu amigo se registre y verifique su cuenta, los dos ganan BuddyCoins.
+            </Text>
+            <View style={styles.referralCodeBox}>
+              <Text style={styles.referralCodeText}>{referral.code}</Text>
+            </View>
+            {referral.referredCount > 0 && (
+              <Text style={[styles.label, { marginTop: 10 }]}>
+                Ya invitaste a {referral.referredCount} {referral.referredCount === 1 ? "persona" : "personas"} 🎉
+              </Text>
+            )}
+            <Pressable onPress={shareReferral} style={[styles.primaryBtn, { marginTop: 10 }]}>
+              <Text style={styles.primaryBtnText}>Compartir código</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Card: Perfil */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Perfil</Text>
@@ -417,6 +461,17 @@ const styles = StyleSheet.create({
   cardTitle: { color: colors.text, fontWeight: "900", fontSize: 14, marginBottom: 10 },
 
   label: { color: colors.textMuted, fontSize: 12, marginBottom: 6, marginTop: 8 },
+
+  referralCodeBox: {
+    alignSelf: "flex-start",
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: "rgba(232,207,174,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(232,207,174,0.5)",
+  },
+  referralCodeText: { color: colors.text, fontWeight: "900", fontSize: 20, letterSpacing: 4 },
 
   // ✅ Vive dentro de la tarjeta blanca "Perfil" (igual que el input de
   // correo arriba), no sobre el fondo oscuro de la pantalla.

@@ -120,6 +120,9 @@ export default function RegisterScreen({ navigation }) {
   // es VIP automática su primer mes (ver isUserVIP en me.controller.js).
   const [petSpecies, setPetSpecies] = useState(null);
   const [petName, setPetName] = useState("");
+  // ✅ Referidos -- opcional, se ignora en el backend si no existe o no es
+  // válido (nunca bloquea el registro).
+  const [referralCode, setReferralCode] = useState("");
 
   const { token } = useContext(AuthContext) || {};
 
@@ -199,6 +202,7 @@ export default function RegisterScreen({ navigation }) {
       const payload = { name: name.trim(), email: email.trim(), password, phone: phoneNorm };
 
       if (gender) payload.gender = gender;
+      if (referralCode.trim()) payload.referralCode = referralCode.trim().toUpperCase();
 
       if (birthDate.trim() && isValidBirthDate(birthDate)) {
         payload.birthDate = birthDateToISO(birthDate);
@@ -397,6 +401,19 @@ export default function RegisterScreen({ navigation }) {
               returnKeyType="next"
               focused={focusedField === "birthDate"}
               onFocus={() => setFocusedField("birthDate")}
+              onBlur={() => setFocusedField(null)}
+            />
+
+            <GlassInput
+              label="Código de invitación (opcional)"
+              value={referralCode}
+              onChangeText={(v) => setReferralCode(v.toUpperCase())}
+              placeholder="Ej. 7K2MQX"
+              autoCapitalize="characters"
+              maxLength={6}
+              returnKeyType="next"
+              focused={focusedField === "referralCode"}
+              onFocus={() => setFocusedField("referralCode")}
               onBlur={() => setFocusedField(null)}
             />
 

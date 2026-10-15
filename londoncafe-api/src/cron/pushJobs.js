@@ -5,7 +5,7 @@ const { sendExpoPushNotification } = require("../utils/push");
 const { applyEnergyDecay, dayKeyLocal } = require("../utils/buddy");
 const { applyPetDecay } = require("../controllers/pet.controller");
 const { getLiveStoreVersions, compareVersions } = require("../utils/storeVersion");
-const { getWallet } = require("../utils/wallet");
+const { getWallet, creditBonus } = require("../utils/wallet");
 
 // 🟡 CADA 10 MINUTOS → revisar energía
 cron.schedule("*/10 * * * *", async () => {
@@ -366,5 +366,49 @@ cron.schedule("0 */2 * * *", async () => {
     await meta.save();
   } catch (err) {
     console.log("⚠️ app-update cron:", err?.message);
+  }
+});
+
+// 🎂 TODOS LOS DÍAS 9AM (hora Mexico, UTC-6 fijo -- 15:00 UTC) → regalo de
+// cumpleaños. birthDate ya se pedía al registrarse pero nunca se usaba para
+// nada -- 40 de 59 cuentas ya lo tienen. creditBonus es idempotente por
+// `key` (BIRTHDAY-<uid>-<año>), así que si el cron corre dos veces el mismo
+// día (o el proceso se reinicia a medio cron, cosa que sí pasa -- ver notas
+// de otros crons) nunca duplica el regalo.
+const BIRTHDAY_COINS = 50;
+cron.schedule("0 15 * * *", async () => {
+  console.log("⏰ Revisando cumpleaños...");
+  try {
+    const MX_OFFSET_MS = 6 * 60 * 60 * 1000;
+    const nowMx = new Date(Date.now() - MX_OFFSET_MS);
+    const todayMonth = nowMx.getUTCMonth();
+    const todayDate = nowMx.getUTCDate();
+    const todayYear = nowMx.getUTCFullYear();
+
+    const users = await User.find({ birthDate: { $ne: null } }).select("_id name expoPushToken birthDate");
+
+    for (const user of users) {
+      const b = new Date(user.birthDate);
+      if (b.getUTCMonth() !== todayMonth || b.getUTCDate() !== todayDate) continue;
+
+      try {
+        const key = `BIRTHDAY-${user._id}-${todayYear}`;
+        await creditBonus(user._id, { coins: BIRTHDAY_COINS, key, reason: "Regalo de cumpleaños" });
+
+        if (user.expoPushToken) {
+          await sendExpoPushNotification(
+            user.expoPushToken,
+            "🎂 ¡Feliz cumpleaños!",
+            `De parte de London Café, te regalamos ${BIRTHDAY_COINS} BuddyCoins hoy. ¡Que lo disfrutes! 🎉`,
+            { type: "birthday", coins: BIRTHDAY_COINS }
+          );
+        }
+        console.log(`🎂 Cumpleaños abonado: ${user.name || user._id}`);
+      } catch (err) {
+        console.log(`⚠️ birthday bonus (${user._id}):`, err?.message);
+      }
+    }
+  } catch (err) {
+    console.log("⚠️ birthday cron:", err?.message);
   }
 });

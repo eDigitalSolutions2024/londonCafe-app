@@ -11,6 +11,7 @@ const Sale = require("../models/Sale");
 const GiftCard = require("../models/GiftCard");
 const { generateOtp6, hashOtp } = require("../utils/otp");
 const { sendVerificationEmail } = require("../utils/email");
+const { ensureReferralCode } = require("./auth.controller");
 
 // 👇 agrega esto (ajusta la ruta según dónde lo pusiste)
 const {
@@ -903,8 +904,33 @@ async function updatePresence(req, res) {
   }
 }
 
+/** GET /me/referral -- código propio para compartir + cuántos amigos ya se unieron de verdad. */
+async function getMyReferral(req, res) {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "BAD_TOKEN" });
+
+    const user = await User.findById(uid).select("_id name referralCode");
+    if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+    const code = await ensureReferralCode(user);
+    const referredCount = await User.countDocuments({ referredBy: uid, referralRewardedAt: { $ne: null } });
+
+    return res.json({
+      ok: true,
+      code,
+      referredCount,
+      shareMessage: `¡Descarga la app de London Café y usa mi código ${code} al registrarte -- los dos ganamos BuddyCoins! ☕`,
+    });
+  } catch (err) {
+    console.error("getMyReferral error:", err);
+    return res.status(500).json({ error: "SERVER_ERROR" });
+  }
+}
+
 module.exports = {
   updatePresence,
+  getMyReferral,
   getMe,
   updateMe,
   confirmEmailChange,

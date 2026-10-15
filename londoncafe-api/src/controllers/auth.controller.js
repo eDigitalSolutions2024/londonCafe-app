@@ -7,11 +7,69 @@ const PasswordReset = require("../models/PasswordReset");
 const { generateOtp6, hashOtp } = require("../utils/otp");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("../utils/email");
 const { signAccessToken } = require("../utils/tokens");
-const { getWallet } = require("../utils/wallet");
+const { getWallet, creditBonus } = require("../utils/wallet");
+const { sendExpoPushNotification } = require("../utils/push");
 
 const OTP_EXPIRE_MIN = 10;
 const RESEND_COOLDOWN_SEC = 60;
 const MAX_ATTEMPTS = 5;
+
+// ✅ Referidos -- "invita a un amigo". Mismo monto para ambos (quien invita
+// y quien se une) -- más que el refill diario (3), menos que el regalo de
+// cumpleaños (50, pero eso es una vez al año): es la recompensa por traer
+// gente nueva de verdad, no solo por abrir la app.
+const REFERRAL_COINS = 30;
+const REFERRAL_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sin 0/O/1/I, se confunden al escribirlos a mano
+
+function randomReferralCode(len = 6) {
+  let s = "";
+  for (let i = 0; i < len; i++) s += REFERRAL_CODE_CHARS[Math.floor(Math.random() * REFERRAL_CODE_CHARS.length)];
+  return s;
+}
+
+/** Genera y guarda un código único para quien todavía no tiene uno (cuentas de antes de esta feature, o recién creadas). */
+async function ensureReferralCode(user) {
+  if (user.referralCode) return user.referralCode;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = randomReferralCode();
+    const taken = await User.exists({ referralCode: code });
+    if (!taken) {
+      user.referralCode = code;
+      await user.save();
+      return code;
+    }
+  }
+  throw new Error("No se pudo generar un código de referido único");
+}
+
+/** Paga la recompensa a ambos lados de un referido -- se llama sin await desde verifyEmail, nunca debe tronar esa respuesta. */
+async function rewardReferral(user) {
+  const inviter = await User.findById(user.referredBy).select("_id name expoPushToken");
+  if (!inviter) return;
+
+  await creditBonus(user._id, { coins: REFERRAL_COINS, key: `REFERRAL-NEW-${user._id}`, reason: "Te invitaron a London Café" });
+  await creditBonus(inviter._id, { coins: REFERRAL_COINS, key: `REFERRAL-INVITER-${inviter._id}-${user._id}`, reason: `Invitaste a ${user.name || "un amigo"}` });
+
+  user.referralRewardedAt = new Date();
+  await user.save();
+
+  if (user.expoPushToken) {
+    await sendExpoPushNotification(
+      user.expoPushToken,
+      "🎁 ¡Bono de bienvenida!",
+      `Por llegar invitado, ganaste ${REFERRAL_COINS} BuddyCoins.`,
+      { type: "referral-reward", coins: REFERRAL_COINS }
+    ).catch(() => {});
+  }
+  if (inviter.expoPushToken) {
+    await sendExpoPushNotification(
+      inviter.expoPushToken,
+      "🎁 ¡Tu amigo ya se unió!",
+      `${user.name || "Tu invitado"} verificó su cuenta -- ganaste ${REFERRAL_COINS} BuddyCoins.`,
+      { type: "referral-reward", coins: REFERRAL_COINS }
+    ).catch(() => {});
+  }
+}
 
 // =========================
 // ✅ BUDDY / ENERGÍA LOGIC
@@ -117,7 +175,7 @@ const PET_SPECIES = new Set(["cat", "dog", "hamster"]);
 
 async function register(req, res) {
   try {
-    const { name, email, password, gender, phone, birthDate, avatarHair, petSpecies, petName } = req.body;
+    const { name, email, password, gender, phone, birthDate, avatarHair, petSpecies, petName, referralCode } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: "MISSING_FIELDS" });
@@ -222,6 +280,15 @@ async function register(req, res) {
         }
       : null;
 
+    // ✅ Código de invitación opcional -- si no existe o es el propio (nadie
+    // se refiere a sí mismo), simplemente se ignora en vez de tronar el
+    // registro por un código mal escrito.
+    let inviter = null;
+    const cleanReferralCode = String(referralCode || "").trim().toUpperCase();
+    if (cleanReferralCode) {
+      inviter = await User.findOne({ referralCode: cleanReferralCode });
+    }
+
     let user;
     if (guestToComplete) {
       // Se completa la cuenta existente: puntos, historial y demás se quedan.
@@ -235,6 +302,9 @@ async function register(req, res) {
       guestToComplete.phone = validPhone;
       if (bd) guestToComplete.birthDate = bd;
       if (petChoice) guestToComplete.pet = petChoice;
+      if (inviter && !guestToComplete.referredBy && String(inviter._id) !== String(guestToComplete._id)) {
+        guestToComplete.referredBy = inviter._id;
+      }
       await guestToComplete.save();
       user = guestToComplete;
     } else {
@@ -248,7 +318,15 @@ async function register(req, res) {
         ...(validPhone ? { phone: validPhone } : {}),
         ...(bd ? { birthDate: bd } : {}),
         ...(petChoice ? { pet: petChoice } : {}),
+        ...(inviter ? { referredBy: inviter._id } : {}),
       });
+    }
+
+    // Su propio código para invitar a otros, de una vez (no hasta que lo pida).
+    try {
+      await ensureReferralCode(user);
+    } catch (e) {
+      console.error("No se pudo generar referralCode:", e?.message);
     }
 
     // Reintento de registro sobre la misma cuenta: se limpian códigos viejos.
@@ -348,6 +426,17 @@ async function verifyEmail(req, res) {
     if (user.isGuest) user.isGuest = false;
     await user.save();
     await EmailVerification.deleteMany({ userId: user._id });
+
+    // Recompensa de referido -- se paga hasta que el invitado verifica de
+    // verdad (no al registrarse), para no regalar BuddyCoins por cuentas
+    // fantasma. Sin await: nunca debe retrasar la respuesta de "ya quedó
+    // verificado" por un hipo del Wallet V2. NOTA para cuando se arme la
+    // verificación por SMS (mañana): este mismo bloque de recompensa
+    // necesita moverse/copiarse al handler que confirme el código por SMS,
+    // o el referido dejaría de pagarse en cuanto ese sea el flujo real.
+    if (user.referredBy && !user.referralRewardedAt) {
+      rewardReferral(user).catch((e) => console.error("rewardReferral error:", e?.message));
+    }
 
     return res.json({ ok: true });
   } catch (err) {
@@ -584,4 +673,4 @@ async function me(req, res) {
   }
 }
 
-module.exports = { register, verifyEmail, resendVerification, login, me, forgotPassword, resetPassword };
+module.exports = { register, verifyEmail, resendVerification, login, me, forgotPassword, resetPassword, ensureReferralCode };
