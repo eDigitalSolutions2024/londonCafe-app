@@ -271,7 +271,7 @@ export default function App() {
   return (
     <StripeProvider
       publishableKey={STRIPE_PK}
-      merchantIdentifier="merchant.com.londoncafejrz"
+      merchantIdentifier="merchant.com.londoncafe.app"
     >
       <AuthProvider>
         <CartProvider>

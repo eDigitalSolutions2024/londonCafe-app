@@ -56,7 +56,7 @@
         "@stripe/stripe-react-native",
         {
           "enableGooglePay": true,
-          "merchantIdentifier": "merchant.com.londoncafejrz"
+          "merchantIdentifier": "merchant.com.londoncafe.app"
         }
       ],
       [
