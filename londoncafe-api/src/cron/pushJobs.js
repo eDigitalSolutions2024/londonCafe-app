@@ -11,72 +11,71 @@ const { getWallet, creditBonus } = require("../utils/wallet");
 cron.schedule("*/10 * * * *", async () => {
   console.log("⏰ Revisando energía de usuarios...");
 
-  const users = await User.find({ expoPushToken: { $exists: true, $ne: "" } });
+  // ✅ Proyección mínima + guardar solo si algo cambió de verdad -- este cron
+  // corre 144 veces/día y antes traía el documento completo (wallet, pet,
+  // avatar3d, friends...) y hacía save() SIEMPRE aunque la energía solo
+  // decae una vez por hora real (5 de cada 6 corridas no cambiaban nada).
+  // Eso era la mayor parte del tráfico de red del servidor hacia Atlas (la
+  // conexión es mongodb+srv, pública, así que cuenta como ancho de banda
+  // del EC2). Mismo comportamiento para el usuario, mucho menos I/O.
+  const users = await User.find({ expoPushToken: { $exists: true, $ne: "" } }).select(
+    "expoPushToken buddy"
+  );
 
   for (const user of users) {
     applyEnergyDecay(user, new Date());
+    let changed = user.isModified("buddy.energy") || user.isModified("buddy.lastEnergyAt");
 
     const energy = Number(user?.buddy?.energy || 0);
 
-  if (!user.buddy.energyAlerts) {
-  user.buddy.energyAlerts = {
-    fifty: false,
-    twentyFive: false,
-    ten: false,
-  };
-}
+    if (!user.buddy.energyAlerts) {
+      user.buddy.energyAlerts = { fifty: false, twentyFive: false, ten: false };
+      changed = true;
+    }
 
-const alerts = user.buddy.energyAlerts;
+    const alerts = user.buddy.energyAlerts;
 
+    // 🔔 SOLO UNA notificación por rango
+    if (energy <= 10 && !alerts.ten) {
+      alerts.ten = true;
+      changed = true;
+      await sendExpoPushNotification(
+        user.expoPushToken,
+        "¡Tu buddy está agotado! 💀",
+        `La energía está críticamente baja (${Math.round(energy)}%).`,
+        { type: "low-energy-10" }
+      );
+    } else if (energy <= 25 && !alerts.twentyFive) {
+      alerts.twentyFive = true;
+      changed = true;
+      await sendExpoPushNotification(
+        user.expoPushToken,
+        "Tu buddy está cansado 😢",
+        `La energía bajó a ${Math.round(energy)}%.`,
+        { type: "low-energy-25" }
+      );
+    } else if (energy <= 50 && !alerts.fifty) {
+      alerts.fifty = true;
+      changed = true;
+      await sendExpoPushNotification(
+        user.expoPushToken,
+        "Tu buddy necesita energía ☕",
+        `Tu energía está en ${Math.round(energy)}%. Entra a darle café o pan.`,
+        { type: "low-energy-50" }
+      );
+    }
 
-// 🔔 SOLO UNA notificación por rango
+    // ✅ reset automático -- solo cuenta como cambio si de verdad bajaba de true a false
+    if (energy > 55 && alerts.fifty) { alerts.fifty = false; changed = true; }
+    if (energy > 30 && alerts.twentyFive) { alerts.twentyFive = false; changed = true; }
+    if (energy > 15 && alerts.ten) { alerts.ten = false; changed = true; }
 
-if (energy <= 10 && !alerts.ten) {
+    if (!changed) continue;
 
-  alerts.ten = true;
+    user.buddy.energyAlerts = alerts;
+    user.markModified("buddy.energyAlerts");
 
-  await sendExpoPushNotification(
-    user.expoPushToken,
-    "¡Tu buddy está agotado! 💀",
-    `La energía está críticamente baja (${Math.round(energy)}%).`,
-    { type: "low-energy-10" }
-  );
-
-} else if (energy <= 25 && !alerts.twentyFive) {
-
-  alerts.twentyFive = true;
-
-  await sendExpoPushNotification(
-    user.expoPushToken,
-    "Tu buddy está cansado 😢",
-    `La energía bajó a ${Math.round(energy)}%.`,
-    { type: "low-energy-25" }
-  );
-
-} else if (energy <= 50 && !alerts.fifty) {
-
-  alerts.fifty = true;
-
-  await sendExpoPushNotification(
-    user.expoPushToken,
-    "Tu buddy necesita energía ☕",
-    `Tu energía está en ${Math.round(energy)}%. Entra a darle café o pan.`,
-    { type: "low-energy-50" }
-  );
-}
-
-
-// ✅ reset automático
-if (energy > 55) alerts.fifty = false;
-if (energy > 30) alerts.twentyFive = false;
-if (energy > 15) alerts.ten = false;
-
-user.buddy.energyAlerts = alerts;
-user.markModified("buddy.energyAlerts");
-
-await user.save();
-
-    
+    await user.save();
   }
 });
 
@@ -87,7 +86,7 @@ cron.schedule("*/30 * * * *", async () => {
   const users = await User.find({
     expoPushToken: { $exists: true, $ne: "" },
     "pet.owned": true,
-  });
+  }).select("expoPushToken notificationPrefs pet");
 
   const now = new Date();
 
@@ -96,10 +95,12 @@ cron.schedule("*/30 * * * *", async () => {
 
     try {
       applyPetDecay(user, now);
+      let changed = user.isModified("pet");
 
       const p = user.pet;
       if (!p.notifyFlags) {
         p.notifyFlags = { mess: false, hunger: false, energy: false, happiness: false };
+        changed = true;
       }
       const f = p.notifyFlags;
       const name = p.name || "Tu mascota";
@@ -113,6 +114,7 @@ cron.schedule("*/30 * * * *", async () => {
           { type: "pet-mess" }
         );
         f.mess = true;
+        changed = true;
       } else if (Number(p.hunger) <= 20 && !f.hunger) {
         await sendExpoPushNotification(
           user.expoPushToken,
@@ -121,6 +123,7 @@ cron.schedule("*/30 * * * *", async () => {
           { type: "pet-hunger" }
         );
         f.hunger = true;
+        changed = true;
       } else if (Number(p.energy) <= 20 && !f.energy) {
         await sendExpoPushNotification(
           user.expoPushToken,
@@ -129,6 +132,7 @@ cron.schedule("*/30 * * * *", async () => {
           { type: "pet-energy" }
         );
         f.energy = true;
+        changed = true;
       } else if (Number(p.happiness) <= 25 && !f.happiness) {
         await sendExpoPushNotification(
           user.expoPushToken,
@@ -137,13 +141,17 @@ cron.schedule("*/30 * * * *", async () => {
           { type: "pet-happiness" }
         );
         f.happiness = true;
+        changed = true;
       }
 
-      // ✅ reset automático con margen (para volver a poder avisar)
-      if (!p.mess) f.mess = false;
-      if (Number(p.hunger) > 35) f.hunger = false;
-      if (Number(p.energy) > 35) f.energy = false;
-      if (Number(p.happiness) > 40) f.happiness = false;
+      // ✅ reset automático con margen (para volver a poder avisar) -- solo
+      // cuenta como cambio real si la bandera de verdad estaba en true.
+      if (!p.mess && f.mess) { f.mess = false; changed = true; }
+      if (Number(p.hunger) > 35 && f.hunger) { f.hunger = false; changed = true; }
+      if (Number(p.energy) > 35 && f.energy) { f.energy = false; changed = true; }
+      if (Number(p.happiness) > 40 && f.happiness) { f.happiness = false; changed = true; }
+
+      if (!changed) continue;
 
       user.markModified("pet");
       await user.save();
@@ -164,7 +172,7 @@ cron.schedule("* * * * *", async () => {
     "pet.owned": true,
     "pet.sleepUntil": { $ne: null, $lte: now },
     "pet.sleepNotified": false,
-  });
+  }).select("expoPushToken notificationPrefs pet");
 
   for (const user of users) {
     const p = user.pet;
