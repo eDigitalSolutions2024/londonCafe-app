@@ -76,8 +76,15 @@ export default function PromosSection({
   // ✅ Carrusel -- antes se apilaban todas en vertical (hasta 5 tarjetas de
   // 240px = mucho scroll solo para llegar al resto del Home). Ahora se ve
   // una a la vez y van rotando solas cada 3s, como un carrusel normal.
+  //
+  // El ancho de cada tarjeta se MIDE del contenedor real (onLayout), no se
+  // calcula desde useWindowDimensions() -- el ancho de pantalla completo no
+  // es lo mismo que el ancho disponible aquí adentro (el padding del propio
+  // Home, el de esta sección, etc. se van sumando), así que calcularlo "a
+  // mano" dejaba la tarjeta más ancha de lo real y se veía descuadrada/
+  // cortada hacia la derecha.
   const { width: windowWidth } = useWindowDimensions();
-  const cardWidth = windowWidth - 40; // mismo padding horizontal (20) que ya tenía la sección
+  const [cardWidth, setCardWidth] = useState(windowWidth - 40); // valor de arranque, se corrige en el primer onLayout
   const listRef = useRef(null);
   const indexRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -126,7 +133,7 @@ export default function PromosSection({
       )}
 
       {!loading && !error && preview.length > 0 && (
-        <>
+        <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
           <FlatList
             ref={listRef}
             data={preview}
@@ -193,7 +200,7 @@ export default function PromosSection({
               ))}
             </View>
           )}
-        </>
+        </View>
       )}
     </View>
   );
@@ -242,7 +249,7 @@ const styles = StyleSheet.create({
 
   // ===== Promo Card =====
   promoCardV: {
-    height: 240,
+    height: 190,
     borderRadius: 20,
     overflow: "hidden",
     borderWidth: 1,

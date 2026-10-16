@@ -5,8 +5,7 @@ const User = require("../models/User");
 const EmailVerification = require("../models/EmailVerification");
 const PasswordReset = require("../models/PasswordReset");
 const { generateOtp6, hashOtp } = require("../utils/otp");
-const { sendPasswordResetEmail } = require("../utils/email");
-const { sendVerificationSms } = require("../utils/sms");
+const { sendVerificationEmail, sendPasswordResetEmail } = require("../utils/email");
 const { signAccessToken } = require("../utils/tokens");
 const { getWallet, creditBonus } = require("../utils/wallet");
 const { sendExpoPushNotification } = require("../utils/push");
@@ -352,19 +351,15 @@ async function register(req, res) {
     if (process.env.NODE_ENV === "development" && showOtp) {
       console.log(`🟣 [DEV OTP] Tel: ${user.phone} | Code: ${code}`);
     } else {
-      // ✅ Verificación por SMS (Twilio) en vez de correo -- la fricción de
-      // salir de la app a revisar el inbox era justo lo que frenaba el
-      // registro (ver sesión). Si el SMS no se puede entregar (número
-      // inválido, cuenta Twilio en modo trial y el número no está
-      // verificado ahí, etc.), NO dejar la cuenta a medias: se borra el
-      // usuario y su registro de verificación recién creados para que el
-      // registro se pueda reintentar limpio (si no, EMAIL_ALREADY_EXISTS
-      // bloquea cualquier reintento con ese correo, aunque nunca haya
-      // llegado el código).
+      // ✅ Verificación por correo -- la SMS vía Twilio queda en pausa hasta
+      // tener un número realmente aprovisionado (la cuenta sigue en Trial y
+      // no posee ningún número propio, ver sesión). Mismo saneamiento que
+      // tenía la rama de SMS: si el correo no se puede entregar, no dejar
+      // la cuenta a medias.
       try {
-        await sendVerificationSms({ to: user.phone, code });
-      } catch (smsErr) {
-        console.error("REGISTER SMS SEND ERROR:", smsErr);
+        await sendVerificationEmail({ to: user.email, code });
+      } catch (emailErr) {
+        console.error("REGISTER EMAIL SEND ERROR:", emailErr);
         await EmailVerification.deleteMany({ userId: user._id });
         if (guestToComplete) {
           // NO se borra la cuenta de invitado (tiene puntos): solo se le
@@ -376,7 +371,7 @@ async function register(req, res) {
         } else {
           await User.deleteOne({ _id: user._id });
         }
-        return res.status(502).json({ error: "SMS_SEND_FAILED" });
+        return res.status(502).json({ error: "EMAIL_SEND_FAILED" });
       }
     }
 
@@ -484,10 +479,10 @@ async function resendVerification(req, res) {
       console.log(`🟣 [DEV OTP - RESEND] Tel: ${user.phone} | Code: ${code}`);
     } else {
       try {
-        await sendVerificationSms({ to: user.phone, code });
-      } catch (smsErr) {
-        console.error("RESEND SMS SEND ERROR:", smsErr);
-        return res.status(502).json({ error: "SMS_SEND_FAILED" });
+        await sendVerificationEmail({ to: user.email, code });
+      } catch (emailErr) {
+        console.error("RESEND EMAIL SEND ERROR:", emailErr);
+        return res.status(502).json({ error: "EMAIL_SEND_FAILED" });
       }
     }
 

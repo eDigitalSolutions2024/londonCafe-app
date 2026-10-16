@@ -221,7 +221,7 @@ export default function LoginScreen({ route, navigation }) {
     } catch (e) {
       const errCode = e?.data?.error;
       if (errCode === "EMAIL_NOT_VERIFIED") {
-        Alert.alert("Falta verificar", "Primero verifica tu cuenta con el código que te enviamos por SMS.");
+        Alert.alert("Falta verificar", "Primero verifica tu cuenta con el código que te enviamos por correo.");
         navigation.navigate("VerifyEmail", { email });
       } else {
         Alert.alert("Error", errCode || e.message);

@@ -223,7 +223,7 @@ export default function RegisterScreen({ navigation }) {
 
       Alert.alert(
         "Cuenta creada ✅",
-        "Te enviamos un código de verificación por SMS a tu teléfono."
+        "Te enviamos un código de verificación por correo."
       );
 
       navigation.navigate("VerifyEmail", { email: res?.email || email, phone: res?.phone || phoneNorm });

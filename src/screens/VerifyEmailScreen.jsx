@@ -8,7 +8,6 @@ export default function VerifyEmailScreen({ route, navigation }) {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const email = route?.params?.email || "";
-  const phone = route?.params?.phone || "";
 
   async function onVerify() {
     try {
@@ -26,7 +25,7 @@ export default function VerifyEmailScreen({ route, navigation }) {
   async function onResend() {
     try {
       await resendVerification({ email });
-      Alert.alert("Enviado", "Te mandamos un nuevo código por SMS.");
+      Alert.alert("Enviado", "Te mandamos un nuevo código por correo.");
     } catch (e) {
       Alert.alert("Error", e?.data?.error || e.message);
     }
@@ -35,10 +34,10 @@ export default function VerifyEmailScreen({ route, navigation }) {
   return (
     <Screen safeStyle={styles.safeDark}>
       <View style={styles.wrap}>
-        <Text style={styles.title}>Verifica tu cuenta</Text>
-        <Text style={styles.subtitle}>Te mandamos un código por SMS a {phone || "tu teléfono"}</Text>
+        <Text style={styles.title}>Verifica tu correo</Text>
+        <Text style={styles.subtitle}>Te mandamos un código a {email || "tu correo"}</Text>
         <Text style={styles.hint}>
-          ¿No te llega? Revisa que el número sea correcto y espera un minuto antes de pedir otro.
+          ¿No te llega? Revisa spam/promociones y espera un minuto antes de pedir otro.
         </Text>
 
         <TextInput
