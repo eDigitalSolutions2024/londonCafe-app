@@ -223,10 +223,10 @@ export default function RegisterScreen({ navigation }) {
 
       Alert.alert(
         "Cuenta creada ✅",
-        "Te enviamos un código de verificación a tu correo. Si no lo ves en unos minutos, revisa tu carpeta de spam o correo no deseado -- ahí es donde suele llegar."
+        "Te enviamos un código de verificación por SMS a tu teléfono."
       );
 
-      navigation.navigate("VerifyEmail", { email: res?.email || email });
+      navigation.navigate("VerifyEmail", { email: res?.email || email, phone: res?.phone || phoneNorm });
     } catch (e) {
       Alert.alert("Error", e?.data?.error || e?.message || "No se pudo registrar");
     } finally {
