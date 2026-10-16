@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, FlatList, useWindowDimensions } from "react-native";
 import { colors } from "../theme/colors";
 import { posFetch } from "../api/client";
 import PromoPlaceholder from "../assets/promo_placeholder.png";
@@ -73,6 +73,34 @@ export default function PromosSection({
 
   const preview = useMemo(() => promos.slice(0, limit), [promos, limit]);
 
+  // ✅ Carrusel -- antes se apilaban todas en vertical (hasta 5 tarjetas de
+  // 240px = mucho scroll solo para llegar al resto del Home). Ahora se ve
+  // una a la vez y van rotando solas cada 3s, como un carrusel normal.
+  const { width: windowWidth } = useWindowDimensions();
+  const cardWidth = windowWidth - 40; // mismo padding horizontal (20) que ya tenía la sección
+  const listRef = useRef(null);
+  const indexRef = useRef(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    indexRef.current = 0;
+    setActiveIndex(0);
+    if (preview.length < 2) return; // nada que rotar con 0 o 1 promo
+    const id = setInterval(() => {
+      const next = (indexRef.current + 1) % preview.length;
+      indexRef.current = next;
+      listRef.current?.scrollToIndex({ index: next, animated: true });
+      setActiveIndex(next);
+    }, 3000);
+    return () => clearInterval(id);
+  }, [preview.length]);
+
+  function onManualScroll(e) {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / cardWidth);
+    indexRef.current = idx;
+    setActiveIndex(idx);
+  }
+
   return (
     <View style={styles.promosSection}>
       {loading && (
@@ -97,51 +125,76 @@ export default function PromosSection({
         </View>
       )}
 
-      {!loading && !error && preview.map((p) => {
-        const badge = computeBadge(p);
-        const tag = (p?.tag || "").trim();
-        const img = p?.imageUrl || "";
+      {!loading && !error && preview.length > 0 && (
+        <>
+          <FlatList
+            ref={listRef}
+            data={preview}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(p) => String(p._id || p.id)}
+            onScrollToIndexFailed={() => {}}
+            onMomentumScrollEnd={onManualScroll}
+            getItemLayout={(_, index) => ({ length: cardWidth, offset: cardWidth * index, index })}
+            renderItem={({ item: p }) => {
+              const badge = computeBadge(p);
+              const tag = (p?.tag || "").trim();
+              const img = p?.imageUrl || "";
 
-        return (
-          <TouchableOpacity
-            key={String(p._id || p.id)}
-            style={styles.promoCardV}
-            onPress={() => (onPressPromo ? onPressPromo(p) : onViewAll?.())}
-            activeOpacity={0.9}
-          >
-            <Image
-              source={img ? { uri: img } : PromoPlaceholder}
-              style={styles.promoImageV}
-            />
-
-            <View style={styles.promoOverlayV}>
-              <View style={styles.promoMetaRow}>
-                <Text
-                  style={[
-                    styles.promoBadge,
-                    {
-                      backgroundColor: (BADGE_STYLES[badge] || BADGE_STYLES.PROMO).backgroundColor,
-                      color: (BADGE_STYLES[badge] || BADGE_STYLES.PROMO).color,
-                    },
-                  ]}
+              return (
+                <TouchableOpacity
+                  style={[styles.promoCardV, { width: cardWidth }]}
+                  onPress={() => (onPressPromo ? onPressPromo(p) : onViewAll?.())}
+                  activeOpacity={0.9}
                 >
-                  {badge}
-                </Text>
-                <Text style={styles.promoTag}>
-                  {tag ? tag : (p?.createdAt ? formatWhen(p.createdAt) : "")}
-                </Text>
-              </View>
+                  <Image
+                    source={img ? { uri: img } : PromoPlaceholder}
+                    style={styles.promoImageV}
+                  />
 
-              <Text style={styles.promoTitle} numberOfLines={1}>
-                {p?.title || "Promoción"}
-              </Text>
-              <Text style={styles.promoSubtitle} numberOfLines={3}>
-                {p?.description || ""}
-              </Text>
+                  <View style={styles.promoOverlayV}>
+                    <View style={styles.promoMetaRow}>
+                      <Text
+                        style={[
+                          styles.promoBadge,
+                          {
+                            backgroundColor: (BADGE_STYLES[badge] || BADGE_STYLES.PROMO).backgroundColor,
+                            color: (BADGE_STYLES[badge] || BADGE_STYLES.PROMO).color,
+                          },
+                        ]}
+                      >
+                        {badge}
+                      </Text>
+                      <Text style={styles.promoTag}>
+                        {tag ? tag : (p?.createdAt ? formatWhen(p.createdAt) : "")}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.promoTitle} numberOfLines={1}>
+                      {p?.title || "Promoción"}
+                    </Text>
+                    <Text style={styles.promoSubtitle} numberOfLines={3}>
+                      {p?.description || ""}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+
+          {preview.length > 1 && (
+            <View style={styles.dotsRow}>
+              {preview.map((p, i) => (
+                <View
+                  key={String(p._id || p.id)}
+                  style={[styles.dot, i === activeIndex && styles.dotActive]}
+                />
+              ))}
             </View>
-          </TouchableOpacity>
-        );
-      })}
+          )}
+        </>
+      )}
     </View>
   );
 }
@@ -192,7 +245,6 @@ const styles = StyleSheet.create({
     height: 240,
     borderRadius: 20,
     overflow: "hidden",
-    marginBottom: 14,
     borderWidth: 1,
     borderColor: colors.primarySoft,
     backgroundColor: colors.card,
@@ -201,6 +253,24 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 10 },
     elevation: 5,
+  },
+
+  // ===== Carrusel (puntos de posición) =====
+  dotsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 10,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primarySoft,
+  },
+  dotActive: {
+    width: 18,
+    backgroundColor: colors.primary,
   },
 
   promoImageV: { width: "100%", height: "100%" },
