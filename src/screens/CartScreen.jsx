@@ -644,7 +644,7 @@ async function getLoggedUserData() {
       // Pay (app.json) ya estaban puestos, pero sin esto PaymentSheet nunca
       // mostraba los botones de Apple Pay / Google Pay -- solo tarjeta.
       applePay: { merchantCountryCode: "MX" },
-      googlePay: { merchantCountryCode: "MX", currencyCode: "MXN", testEnv: false },
+      googlePay: { merchantCountryCode: "MX", currencyCode: "MXN", testEnv: process.env.EXPO_PUBLIC_GOOGLE_PAY_TEST === "1" },
     });
 
     if (initError) throw new Error(initError.message);

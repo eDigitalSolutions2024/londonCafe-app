@@ -623,7 +623,7 @@ const tabBarHeight = useBottomTabBarHeight();
         paymentIntentClientSecret: sheet.paymentIntentClientSecret,
         allowsDelayedPaymentMethods: true,
         applePay: { merchantCountryCode: "MX" },
-        googlePay: { merchantCountryCode: "MX", currencyCode: "MXN", testEnv: false },
+        googlePay: { merchantCountryCode: "MX", currencyCode: "MXN", testEnv: process.env.EXPO_PUBLIC_GOOGLE_PAY_TEST === "1" },
       });
       if (initError) throw new Error(initError.message);
 
