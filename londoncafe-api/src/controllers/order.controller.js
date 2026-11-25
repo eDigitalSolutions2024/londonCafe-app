@@ -79,6 +79,14 @@ async function createOrderFromApp(req, res) {
   paymentIntentId,
   paymentStatus: paymentIntent.status === "succeeded" ? "paid" : "pending",
   total: verifiedTotal,
+  // Desglose de descuentos tomado del PaymentIntent (lo que el server ya
+  // aplicó al cobro), no del body. Antes el POS solo recibía `total`: la
+  // orden quedaba con subtotal y total distintos sin explicación, y el
+  // corte nunca veía los Buddy Coins ni el cupón usados en la App.
+  couponCode: paymentIntent.metadata?.couponCode || undefined,
+  couponDiscountAmount: +((Number(paymentIntent.metadata?.couponDiscountCents) || 0) / 100).toFixed(2),
+  buddyCoinsRedeemed: Math.max(0, Math.floor(Number(paymentIntent.metadata?.buddyCoinsApplied) || 0)),
+  buddyDiscountAmount: +((Number(paymentIntent.metadata?.buddyDiscountCents) || 0) / 100).toFixed(2),
   currency: currency || "mxn",
   customerName: finalCustomerName,
   customerPhone: customerPhone || "",

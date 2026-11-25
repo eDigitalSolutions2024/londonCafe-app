@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, FlatList, Image, Pressable, ActivityIndicator, Alert, TextInput } from "react-native";
+import { View, Text, FlatList, Image, Pressable, ActivityIndicator, Alert, TextInput, KeyboardAvoidingView, Platform } from "react-native";
 import Screen from "../components/Screen";
 import { useCart } from "../context/CartContext";
 import { AuthContext } from "../context/AuthContext";
@@ -778,6 +778,7 @@ navigation.navigate("Order", {
 
   return (
     <Screen safeStyle={{ backgroundColor: COLORS.bg }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View
   style={{
     flex: 1,
@@ -852,7 +853,7 @@ navigation.navigate("Order", {
               onRemove={() => remove(item.id)}
             />
           )}
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={{ paddingBottom: 16 }}
 showsVerticalScrollIndicator={false}
           ListEmptyComponent={
   <View
@@ -901,19 +902,16 @@ showsVerticalScrollIndicator={false}
     </Text>
   </View>
 }
-        />
-
-        <SuggestionsRow items={suggestions.items} onAdd={onAddSuggestion} />
-
-        <View
-  style={{
-    borderTopWidth: 1,
-    borderColor: COLORS.border,
-    paddingTop: 14,
-    marginTop: 8,
-    backgroundColor: COLORS.bg,
-  }}
->
+          // Sugerencias + cupón + Buddy Coins ahora van DENTRO de la lista
+          // (scrollean con los productos). Antes estaban en un bloque fijo
+          // abajo que crecía al abrir el cupón/los coins y empujaba el botón
+          // "Continuar al pago" debajo de la barra de pestañas (o del teclado
+          // numérico, que en iPhone no tiene tecla para cerrarse), y ya no se
+          // podía presionar. Abajo fijo solo queda el total + el botón.
+          ListFooterComponent={
+            <View>
+              <SuggestionsRow items={suggestions.items} onAdd={onAddSuggestion} />
+              <View style={{ marginTop: 8 }}>
   {/* ✅ Cupones personales -- ver GET /coupons/mine, mismo patrón que el
       Kiosk (KioskOrderPage.tsx): si tienes alguno asignado, aparece solo
       aquí para tocar y aplicar, sin tener que copiar/escribir el código. */}
@@ -1026,7 +1024,17 @@ showsVerticalScrollIndicator={false}
   {availableBuddyCoins > 0 ? (
     <View style={{ marginBottom: 10 }}>
       <Pressable
-        onPress={() => setUseBuddyCoins((v) => !v)}
+        onPress={() => {
+          // Antes solo prendía la casilla y dejaba el campo vacío: si el
+          // cliente no escribía un número (o no tocaba "Máximo"), se mandaban
+          // 0 coins y Stripe cobraba el total completo aunque la casilla
+          // apareciera marcada. Ahora al activarla se precarga el máximo.
+          setUseBuddyCoins((v) => {
+            const next = !v;
+            setBuddyCoinsToRedeem(next ? String(maxBuddyCoinsUsable) : "");
+            return next;
+          });
+        }}
         style={{
           flexDirection: "row",
           alignItems: "center",
@@ -1087,7 +1095,23 @@ showsVerticalScrollIndicator={false}
       ) : null}
     </View>
   ) : null}
+              </View>
+            </View>
+          }
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          style={{ flex: 1 }}
+        />
 
+        <View
+  style={{
+    borderTopWidth: 1,
+    borderColor: COLORS.border,
+    paddingTop: 14,
+    marginTop: 8,
+    backgroundColor: COLORS.bg,
+  }}
+>
   <View
     style={{
       flexDirection: "row",
@@ -1157,6 +1181,7 @@ showsVerticalScrollIndicator={false}
   </Pressable>
 </View>
       </View>
+      </KeyboardAvoidingView>
     </Screen>
   );
 }

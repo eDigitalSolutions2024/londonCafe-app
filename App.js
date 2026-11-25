@@ -99,6 +99,10 @@ function MainTabs() {
       sceneContainerStyle={{ backgroundColor: "#0b0709" }}
       screenOptions={({ route }) => ({
         headerShown: false,
+        // En Android la barra (position absolute) subía junto con el teclado
+        // y tapaba el botón "Continuar al pago" del carrito al escribir un
+        // cupón o los Buddy Coins.
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
           position: "absolute",
           backgroundColor: "#111118",

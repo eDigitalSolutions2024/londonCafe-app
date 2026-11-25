@@ -276,6 +276,9 @@ exports.createPaymentSheet = async (req, res) => {
         buddyCoinsApplied: String(buddyCoinsApplied),
         buddyDiscountCents: String(buddyDiscountCents),
         buddyBaseCents: String(buddyBaseCents),
+        // Para que la orden del POS registre cuánto cubrió el cupón (el corte
+        // lo reporta aparte, ver totals.couponDiscountAmount).
+        couponDiscountCents: String(discountCents),
       },
     });
 
