@@ -98,7 +98,7 @@ export default function PromosSection({
       indexRef.current = next;
       listRef.current?.scrollToIndex({ index: next, animated: true });
       setActiveIndex(next);
-    }, 3000);
+    }, 5000); // 5 s por promo (antes 3 s: el usuario pidió que no se pase tan rápido)
     return () => clearInterval(id);
   }, [preview.length]);
 

@@ -26,6 +26,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { colors } from "../theme/colors";
 import Screen from "../components/Screen";
+import ScrollHint, { useScrollHint } from "../components/ScrollHint";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
@@ -378,6 +379,8 @@ function BoothStreakBar({
 
 export default function HomeScreen({ navigation }) {
   const { signOut, user, token } = useContext(AuthContext);
+  // "Desliza para ver más" -- ver components/ScrollHint.jsx
+  const scrollHint = useScrollHint();
 
   // Snapshot SIEMPRE actualizado de `user`, sin que fetchMe dependa de él
   // como dependencia reactiva -- ver comentario junto a fetchMe: `user`
@@ -676,6 +679,52 @@ const lowEnergyNotifiedRef = useRef(false);
     }
   })();
 }, [token]);
+
+
+// 🔔 Segundo intento de permiso de notificaciones -- ADICIONAL al de arriba,
+// no lo reemplaza. Arriba se pide al abrir Home por primera vez (recién
+// creada la cuenta, antes de que la persona vea ningún beneficio real), que
+// es justo cuando más gente lo rechaza. Aquí se vuelve a intentar justo
+// cuando gana su primera recompensa real (lifetimePoints pasa de 0 a >0 --
+// primera compra o primer check-in), que es cuando sí le importa no
+// perderse el aviso. Si el permiso ya quedó resuelto (granted o denied),
+// este intento no muestra ningún diálogo nuevo -- el SO solo pregunta una
+// vez -- así que no hay riesgo de "spamear" el permiso, solo de reintentar
+// guardar el token si antes quedó pendiente. Se marca con AsyncStorage para
+// no repetir este intento puntual en cada apertura futura de la app.
+const firstRewardPushPromptedRef = useRef(false);
+useEffect(() => {
+  if (!token || !user?._id || lifetimePoints <= 0) return;
+  if (firstRewardPushPromptedRef.current) return;
+
+  const flagKey = `push_prompt_first_reward_${user._id}`;
+
+  (async () => {
+    try {
+      const already = await AsyncStorage.getItem(flagKey);
+      if (already) {
+        firstRewardPushPromptedRef.current = true;
+        return;
+      }
+      firstRewardPushPromptedRef.current = true;
+      await AsyncStorage.setItem(flagKey, "1");
+
+      const expoPushToken = await registerForPushNotificationsAsync();
+      if (!expoPushToken) return;
+
+      await apiFetch("/me/push-token", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ expoPushToken }),
+      });
+    } catch {
+      // silent — push registration is best-effort
+    }
+  })();
+}, [token, user?._id, lifetimePoints]);
 
 
 /*useEffect(() => {
@@ -981,6 +1030,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 80 }}
+          {...scrollHint.scrollProps}
         >
           {/* Welcome section -- oscuro/glass a propósito, mismo lenguaje que
               BootScreen (App.js), para que la primera impresión de la app se
@@ -1072,6 +1122,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
             </View>
           </View>
         </ScrollView>
+        <ScrollHint visible={scrollHint.visible} />
       </Screen>
     );
   }
@@ -1081,6 +1132,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
             <ScrollView
   style={styles.container}
   showsVerticalScrollIndicator={false}
+  {...scrollHint.scrollProps}
   contentInsetAdjustmentBehavior="never"
   automaticallyAdjustContentInsets={false}
   automaticallyAdjustKeyboardInsets={false}
@@ -1244,6 +1296,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
           </View>
         </View>
       </ScrollView>
+      <ScrollHint visible={scrollHint.visible} />
 
       {/* ✅ MODAL PEEK */}
       <Modal visible={showAvatarPeek} transparent animationType="fade">
