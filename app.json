@@ -2,7 +2,7 @@
   "expo": {
     "name": "London Cafe",
     "slug": "london-cafe",
-    "version": "1.2.1",
+    "version": "1.3.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
