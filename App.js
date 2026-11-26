@@ -47,6 +47,7 @@ import PedidosScreen from "./src/screens/PedidosScreen";
 
 import { colors } from "./src/theme/colors";
 import { AuthProvider, AuthContext } from "./src/context/AuthContext";
+import { holidayMusic } from "./src/audio/holidayMusic";
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -185,6 +186,9 @@ const ONBOARDING_VERSION = "v1"; // subir esto si se rediseña el tour a fondo, 
 // Handles loading splash before mounting NavigationContainer
 function AppContent() {
   const { loading, user, token } = useContext(AuthContext);
+
+  // Música navideña de fondo (solo en temporada; ver src/audio/holidayMusic.js)
+  useEffect(() => { holidayMusic.start(); }, []);
 
   // Tutorial de bienvenida: una vez por CUENTA (no por dispositivo, por si
   // varias personas comparten el mismo celular) -- se checa en

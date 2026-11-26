@@ -4,7 +4,7 @@
     "slug": "london-cafe",
     "version": "1.3.2",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon-navidad.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "splash": {
@@ -24,8 +24,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/adaptive-icon-navidad.png",
+        "backgroundImage": "./assets/adaptive-icon-bg-navidad.png",
+        "backgroundColor": "#0e3a29"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.londoncafe.app",
@@ -69,7 +70,13 @@
           }
         }
       ],
-      ["expo-audio", { "microphonePermission": false, "recordAudioAndroid": false }],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
       "./plugins/withoutAudioRecording.js"
     ]
   }

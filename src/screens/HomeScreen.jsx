@@ -27,6 +27,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colors } from "../theme/colors";
 import Screen from "../components/Screen";
 import ScrollHint, { useScrollHint } from "../components/ScrollHint";
+import HolidayMusicToggle from "../components/HolidayMusicToggle";
 import { apiFetch } from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 import LondonBuddyLogo from "../assets/icons/LondonBuddy.png";
@@ -1037,6 +1038,7 @@ const moodEmoji = moodEmojiFromEnergy(energy);
               sienta como un producto digital premium, no un catálogo plano. */}
           <View style={styles.guestDark}>
             <GuestBackgroundOrbs />
+            <HolidayMusicToggle style={styles.guestMusicBtn} />
 
             <View style={styles.guestGlowStage}>
               <GuestGlow />
@@ -1182,9 +1184,12 @@ const moodEmoji = moodEmojiFromEnergy(energy);
 </View>
     </View>
 
-    <TouchableOpacity onPress={signOut} activeOpacity={0.85} style={styles.logoutBtn}>
-      <Text style={styles.logoutText}>Salir</Text>
-    </TouchableOpacity>
+    <View style={styles.topBarRight}>
+      <HolidayMusicToggle />
+      <TouchableOpacity onPress={signOut} activeOpacity={0.85} style={styles.logoutBtn}>
+        <Text style={styles.logoutText}>Salir</Text>
+      </TouchableOpacity>
+    </View>
   </View>
 </View>
 
@@ -1404,6 +1409,8 @@ const moodEmoji = moodEmojiFromEnergy(energy);
 
 const styles = StyleSheet.create({
   /* Guest welcome section -- oscuro/glass, ver comentario en el JSX */
+  guestMusicBtn: { position: "absolute", top: 12, right: 16, zIndex: 5 },
+  topBarRight: { flexDirection: "row", alignItems: "center", gap: 10 },
   guestDark: {
     alignItems: "center",
     // El contenedor de Screen (withPadding=false) igual mete 16px de

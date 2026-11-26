@@ -41,6 +41,8 @@ let idleTimer = null;
 const listeners = new Set();
 
 const emit = () => listeners.forEach((fn) => fn(muted));
+const activeListeners = new Set(); // avisa si hay minijuego abierto (la música navideña se calla)
+const emitActive = () => activeListeners.forEach((fn) => fn(refs > 0));
 
 function ensurePlayer() {
   if (player || !audio || broken) return player;
@@ -115,11 +117,13 @@ export const gameMusic = {
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
     loadPrefs();
     sync();
+    emitActive();
   },
 
   release() {
     refs = Math.max(0, refs - 1);
     sync();
+    emitActive();
     if (refs === 0 && player && !idleTimer) {
       idleTimer = setTimeout(() => {
         idleTimer = null;
@@ -141,6 +145,12 @@ export const gameMusic = {
 
   toggleMuted() {
     gameMusic.setMuted(!muted);
+  },
+
+  /** fn(true|false) cuando se abre/cierra cualquier minijuego. */
+  subscribeActive(fn) {
+    activeListeners.add(fn);
+    return () => activeListeners.delete(fn);
   },
 
   subscribe(fn) {
